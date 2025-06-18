@@ -14,7 +14,8 @@ import (
 type CommonArgs struct {
 	DataDir string `arg:"required" help:"Directory to store data"`
 
-	Csr *CsrCmd `arg:"subcommand:create-csr" help:"Create a TLS certificate signing request for this server"`
+	Csr     *CsrCmd     `arg:"subcommand:create-csr" help:"Create a TLS certificate signing request for this server"`
+	SignCsr *CsrSignCmd `arg:"subcommand:sign-csr" help:"Create the TLS certificate from the signing request"`
 }
 
 func (c CommonArgs) CertsDir() string {
@@ -37,6 +38,10 @@ func main() {
 	switch {
 	case args.Csr != nil:
 		if err := args.Csr.Run(args); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
+		}
+	case args.SignCsr != nil:
+		if err := args.SignCsr.Run(args); err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		}
 	default:

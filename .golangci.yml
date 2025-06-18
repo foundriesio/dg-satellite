@@ -1,0 +1,21 @@
+version: "2"
+run:
+  timeout: 5m
+  allow-parallel-runners: true
+
+linters:
+  enable:
+    - dupl
+    - errcheck
+    - gocyclo
+    - govet
+    - ineffassign
+    - staticcheck
+    - unparam
+    - unused
+    - misspell
+    - unconvert
+formatters:
+  enable:
+    - gofmt
+    - goimports

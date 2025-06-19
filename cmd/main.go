@@ -16,6 +16,7 @@ type CommonArgs struct {
 
 	Csr     *CsrCmd     `arg:"subcommand:create-csr" help:"Create a TLS certificate signing request for this server"`
 	SignCsr *CsrSignCmd `arg:"subcommand:sign-csr" help:"Create the TLS certificate from the signing request"`
+	Serve   *ServeCmd   `arg:"subcommand:serve" help:"Run the REST API and device-gateway services"`
 }
 
 func (c CommonArgs) CertsDir() string {
@@ -42,6 +43,10 @@ func main() {
 		}
 	case args.SignCsr != nil:
 		if err := args.SignCsr.Run(args); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
+		}
+	case args.Serve != nil:
+		if err := args.Serve.Run(args); err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		}
 	default:

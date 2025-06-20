@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/foundriesio/dg-satellite/server"
+	"github.com/foundriesio/dg-satellite/server/gateway"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
 )
@@ -49,6 +50,7 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 
 	c.apiServer = server.NewEchoServer("rest-api", logger)
 	c.gatewayServer = server.NewEchoServer("device-gateway", logger)
+	gateway.RegisterHandlers(c.gatewayServer)
 
 	go func() {
 		if err := c.apiServer.Start(fmt.Sprintf(":%d", c.ApiPort)); err != http.ErrServerClosed {

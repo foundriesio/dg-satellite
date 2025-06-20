@@ -16,7 +16,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/server"
+	"github.com/foundriesio/dg-satellite/server/api"
 	"github.com/foundriesio/dg-satellite/server/gateway"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
@@ -49,6 +51,7 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	serveErr := make(chan error)
 
 	c.apiServer = server.NewEchoServer("rest-api", logger)
+	api.RegisterHandlers(c.apiServer, auth.FakeAuthUser)
 	c.gatewayServer = server.NewEchoServer("device-gateway", logger)
 	gateway.RegisterHandlers(c.gatewayServer)
 

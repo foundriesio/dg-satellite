@@ -22,8 +22,10 @@ func TestStorage(t *testing.T) {
 	t.Cleanup(func() {
 		require.Nil(t, db.Close())
 	})
+	fs, err := storage.NewFs(tmpdir)
+	require.Nil(t, err)
 
-	s, err := NewStorage(db)
+	s, err := NewStorage(db, fs)
 	require.Nil(t, err)
 
 	d, err := s.DeviceGet("does not exist")
@@ -44,6 +46,11 @@ func TestStorage(t *testing.T) {
 	d2, err = s.DeviceGet(uuid)
 	require.Nil(t, err)
 	require.Less(t, d.LastSeen, d2.LastSeen)
+
+	require.Nil(t, d2.PutFile(storage.Aktoml, "test content"))
+	content, err := fs.ReadFile(d2.Uuid, storage.Aktoml)
+	require.Nil(t, err)
+	require.Equal(t, "test content", content)
 }
 
 // Benchmark_CheckIn simulates 100 random device checking in 100_000 times
@@ -55,8 +62,10 @@ func Benchmark_CheckIn(b *testing.B) {
 	b.Cleanup(func() {
 		require.Nil(b, db.Close())
 	})
+	fs, err := storage.NewFs(tmpdir)
+	require.Nil(b, err)
 
-	s, err := NewStorage(db)
+	s, err := NewStorage(db, fs)
 	require.Nil(b, err)
 
 	// Create fake devices

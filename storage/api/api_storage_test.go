@@ -18,11 +18,13 @@ func TestStorage(t *testing.T) {
 	dbFile := filepath.Join(tmpdir, "sql.db")
 	db, err := storage.NewDb(dbFile)
 	require.Nil(t, err)
-
-	s, err := NewStorage(db)
+	fs, err := storage.NewFs(tmpdir)
 	require.Nil(t, err)
 
-	dg, err := dg.NewStorage(db)
+	s, err := NewStorage(db, fs)
+	require.Nil(t, err)
+
+	dg, err := dg.NewStorage(db, fs)
 	require.Nil(t, err)
 
 	// Test 404 type operation
@@ -37,8 +39,9 @@ func TestStorage(t *testing.T) {
 	require.Equal(t, 0, len(devices))
 
 	// Create two devices to list/get on
-	_, err = dg.DeviceCreate("uuid-1", "pubkey-value-1", false)
+	d2, err := dg.DeviceCreate("uuid-1", "pubkey-value-1", false)
 	require.Nil(t, err)
+	require.Nil(t, d2.PutFile(storage.Aktoml, "aktoml content"))
 	time.Sleep(time.Second)
 	_, err = dg.DeviceCreate("uuid-2", "pubkey-value-2", false)
 	require.Nil(t, err)
@@ -65,4 +68,5 @@ func TestStorage(t *testing.T) {
 	require.Equal(t, "", d.OstreeHash)
 	require.Equal(t, "pubkey-value-1", d.PubKey)
 	require.Equal(t, "update42", d.UpdateName)
+	require.Equal(t, "aktoml content", d.Aktoml)
 }

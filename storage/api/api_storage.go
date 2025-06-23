@@ -51,21 +51,24 @@ type Device struct {
 	Tag        string `json:"tag"`
 	UpdateName string `json:"update-name"`
 
+	Aktoml  string `json:"aktualizr-toml"`
+	HwInfo  string `json:"hardware-info"`
+	NetInfo string `json:"network-info"`
+
 	storage Storage
 }
 
 type Storage struct {
 	db *storage.DbHandle
+	fs *storage.FsHandle
 
 	stmtDeviceGet       stmtDeviceGet
 	stmtDeviceList      map[OrderBy]stmtDeviceList
 	stmtDeviceSetUpdate stmtDeviceSetUpdate
 }
 
-func NewStorage(db *storage.DbHandle) (*Storage, error) {
-	handle := Storage{
-		db: db,
-	}
+func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
+	handle := Storage{db: db, fs: fs}
 
 	if err := db.InitStmt(&handle.stmtDeviceGet, &handle.stmtDeviceSetUpdate); err != nil {
 		return nil, err
@@ -110,6 +113,18 @@ func (s Storage) DeviceGet(uuid string) (*Device, error) {
 		}
 		return nil, err
 	}
+
+	var err error
+	if d.Aktoml, err = s.fs.ReadFile(d.Uuid, storage.Aktoml); err != nil {
+		return nil, err
+	}
+	if d.HwInfo, err = s.fs.ReadFile(d.Uuid, storage.HwInfo); err != nil {
+		return nil, err
+	}
+	if d.NetInfo, err = s.fs.ReadFile(d.Uuid, storage.NetInfo); err != nil {
+		return nil, err
+	}
+
 	return &d, nil
 }
 

@@ -13,6 +13,7 @@ import (
 
 type Storage struct {
 	db *storage.DbHandle
+	fs *storage.FsHandle
 
 	stmtDeviceCheckIn stmtDeviceCheckIn
 	stmtDeviceCreate  stmtDeviceCreate
@@ -36,10 +37,12 @@ func (d *DgDevice) CheckIn(targetName, tag, ostreeHash string, apps []string) er
 	return d.storage.stmtDeviceCheckIn.run(d.Uuid, targetName, tag, ostreeHash, appsStr, now)
 }
 
-func NewStorage(db *storage.DbHandle) (*Storage, error) {
-	handle := Storage{
-		db: db,
-	}
+func (d *DgDevice) PutFile(name string, content string) error {
+	return d.storage.fs.WriteFile(d.Uuid, name, content)
+}
+
+func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
+	handle := Storage{db: db, fs: fs}
 
 	if err := db.InitStmt(
 		&handle.stmtDeviceCheckIn,

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/foundriesio/dg-satellite/storage"
 )
@@ -202,4 +203,36 @@ func (s *stmtDeviceSetUpdate) run(uuids []string, updateName string) error {
 	}
 	_, err = s.Stmt.Exec(updateName, uuidsStr)
 	return err
+}
+
+func (d Device) Updates() ([]string, error) {
+	names, err := d.storage.fs.ListFiles(d.Uuid, storage.EventsPrefix, true)
+	if err != nil {
+		return nil, err
+	}
+	for i, name := range names {
+		names[i] = name[len(storage.EventsPrefix)+1:]
+	}
+	return names, nil
+}
+
+func (d Device) Events(updateId string) ([]storage.DeviceUpdateEvent, error) {
+	name := fmt.Sprintf("%s-%s", storage.EventsPrefix, updateId)
+	content, err := d.storage.fs.ReadFile(d.Uuid, name)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(content, "\n")
+	events := make([]storage.DeviceUpdateEvent, 0, len(lines))
+	for _, line := range lines {
+		if len(line) > 0 {
+			var evt storage.DeviceUpdateEvent
+			if err := json.Unmarshal([]byte(line), &evt); err != nil {
+				return nil, fmt.Errorf("unexpected error unmarshalling event json: %w", err)
+			}
+			events = append(events, evt)
+		}
+	}
+	return events, nil
 }

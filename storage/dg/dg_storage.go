@@ -5,6 +5,8 @@ package dg
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -18,6 +20,8 @@ type Storage struct {
 	stmtDeviceCheckIn stmtDeviceCheckIn
 	stmtDeviceCreate  stmtDeviceCreate
 	stmtDeviceGet     stmtDeviceGet
+
+	maxEvents int
 }
 
 type DgDevice struct {
@@ -41,8 +45,34 @@ func (d *DgDevice) PutFile(name string, content string) error {
 	return d.storage.fs.WriteFile(d.Uuid, name, content)
 }
 
+func (d DgDevice) ProcessEvents(events []storage.DeviceUpdateEvent) error {
+	var corrId string
+	for _, evt := range events {
+		if corrId != "" && corrId != evt.Event.CorrelationId {
+			// Events ordering depends onto ModTime.
+			// Make sure that a later events file gets a later ModTime.
+			// Tests show that filesystem's time precision is good enough for 4 milliseconds delay.
+			time.Sleep(4 * time.Millisecond)
+		}
+		corrId = evt.Event.CorrelationId
+		name := fmt.Sprintf("%s-%s", storage.EventsPrefix, corrId)
+		bytes, err := json.Marshal(evt)
+		if err != nil {
+			return err
+		}
+		if err := d.storage.fs.AppendFile(d.Uuid, name, string(bytes)+"\n"); err != nil {
+			return err
+		}
+	}
+	return d.storage.fs.RolloverFiles(d.Uuid, storage.EventsPrefix, d.storage.maxEvents)
+}
+
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
-	handle := Storage{db: db, fs: fs}
+	handle := Storage{
+		db:        db,
+		fs:        fs,
+		maxEvents: 20,
+	}
 
 	if err := db.InitStmt(
 		&handle.stmtDeviceCheckIn,

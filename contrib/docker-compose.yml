@@ -1,0 +1,4 @@
+services:
+  avahi:
+    build: ./avahi
+    network_mode: host

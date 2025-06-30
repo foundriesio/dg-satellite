@@ -2,3 +2,14 @@ services:
   avahi:
     build: ./avahi
     network_mode: host
+
+  server:
+    build:
+      context: ../
+      dockerfile: ./contrib/server/Dockerfile
+    network_mode: host
+    command:
+      - --datadir=/data
+      - serve
+    volumes:
+       - ../.compose-server-data:/data

@@ -4,6 +4,7 @@ go 1.24.4
 
 require (
 	github.com/alexflint/go-arg v1.5.1
+	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/stretchr/testify v1.7.0
 )
 

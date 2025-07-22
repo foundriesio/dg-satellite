@@ -196,7 +196,10 @@ func (s *stmtDeviceSetUpdate) Init(db storage.DbHandle) (err error) {
 }
 
 func (s *stmtDeviceSetUpdate) run(uuids []string, updateName string) error {
-	uuidsStr, _ := json.Marshal(uuids)
-	_, err := s.Stmt.Exec(updateName, uuidsStr)
+	uuidsStr, err := json.Marshal(uuids)
+	if err != nil {
+		return fmt.Errorf("unexpected error marshalling UUIDs to JSON: %w", err)
+	}
+	_, err = s.Stmt.Exec(updateName, uuidsStr)
 	return err
 }

@@ -41,6 +41,11 @@ func (s server) Shutdown(timeout time.Duration) error {
 	return s.echo.Shutdown(ctx)
 }
 
-func (s server) GetAddress() string {
-	return s.echo.Listener.Addr().String()
+func (s server) GetAddress() (ret string) {
+	// ListenerAddr waits for the server to start before returning
+	if addr := s.echo.ListenerAddr(); addr != nil {
+		// Addr can be nil when server fails to start
+		ret = addr.String()
+	}
+	return
 }

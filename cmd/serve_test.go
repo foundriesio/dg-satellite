@@ -8,21 +8,26 @@ import (
 	"net/http"
 	"syscall"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/foundriesio/dg-satellite/context"
 )
 
 func TestServe(t *testing.T) {
 	common := CommonArgs{}
-	server := ServeCmd{}
+	server := NewServeCmd()
+
+	log, err := context.InitLogger("debug")
+	require.Nil(t, err)
+	ctx := context.CtxWithLog(context.Background(), log)
 
 	go func() {
-		require.Nil(t, server.Run(common))
+		require.Nil(t, server.Run(ctx, common))
 	}()
-	time.Sleep(time.Millisecond * 300)
+	server.WaitUntilStarted()
 
-	r, err := http.Get(fmt.Sprintf("http://%s/doesnotexist", server.ApiAddress()))
+	r, err := http.Get(fmt.Sprintf("http://%s/doesnotexist", server.ApiAddress))
 	require.Nil(t, err)
 	require.Equal(t, http.StatusNotFound, r.StatusCode)
 	require.Nil(t, syscall.Kill(syscall.Getpid(), syscall.SIGINT))

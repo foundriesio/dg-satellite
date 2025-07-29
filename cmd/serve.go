@@ -4,31 +4,50 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
+	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
 )
 
 type ServeCmd struct {
+	started sync.WaitGroup
+
 	ApiPort    uint16 `default:"8080"`
-	ApiAddress func() string
+	ApiAddress string
 }
 
-func (c *ServeCmd) Run(args CommonArgs) error {
+func NewServeCmd() (s ServeCmd) {
+	s.started.Add(1)
+	return
+}
+
+func (c *ServeCmd) WaitUntilStarted() {
+	c.started.Wait()
+}
+
+func (c *ServeCmd) Run(ctx context.Context, args CommonArgs) error {
+	log := context.CtxGetLog(ctx)
 	apiServer := server.NewServer(
-		context.Background(),
+		ctx,
 		server.NewEchoServer(),
 		c.ApiPort,
 	)
-	c.ApiAddress = apiServer.GetAddress
 
 	apiErr := make(chan error)
 	apiServer.Start(apiErr)
+
+	// Echo locks a mutex immediately at the Start call, and releases after port binding is done.
+	// GetAddress will be locked for that duration; but we need to give it a tiny favor to start.
+	time.Sleep(time.Millisecond * 2)
+	c.ApiAddress = apiServer.GetAddress()
+	log.Info("rest api server started", "addr", c.ApiAddress)
+	c.started.Done()
 
 	// setup channel to gracefully terminate server
 	quit := make(chan os.Signal, 1)

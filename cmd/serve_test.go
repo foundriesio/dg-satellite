@@ -6,6 +6,8 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"syscall"
 	"testing"
 
@@ -15,12 +17,32 @@ import (
 )
 
 func TestServe(t *testing.T) {
-	common := CommonArgs{}
+	tmpDir := t.TempDir()
+	common := CommonArgs{
+		DataDir: filepath.Join(tmpDir, "data"),
+	}
 	server := NewServeCmd()
 
 	log, err := context.InitLogger("debug")
 	require.Nil(t, err)
 	ctx := context.CtxWithLog(context.Background(), log)
+
+	csr := CsrCmd{
+		DnsName: "example.com",
+		Factory: "example",
+	}
+
+	err = csr.Run(common)
+	require.Nil(t, err)
+	caKeyFile, caFile := createSelfSignedRoot(t, common)
+	sign := CsrSignCmd{
+		CaKey:  caKeyFile,
+		CaCert: caFile,
+		Csr:    filepath.Join(common.CertsDir(), "tls.csr"),
+	}
+	require.Nil(t, sign.Run(common))
+	// create an empty ca file to make the server happy. no client will be able to handshake with it
+	require.Nil(t, os.WriteFile(filepath.Join(common.CertsDir(), "cas.pem"), []byte{}, 0o744))
 
 	go func() {
 		require.Nil(t, server.Run(ctx, common))
@@ -31,5 +53,10 @@ func TestServe(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, http.StatusNotFound, r.StatusCode)
 	require.Equal(t, 12, len(r.Header.Get("X-Request-Id")))
+
+	_, err = http.Get(fmt.Sprintf("https://%s/doesnotexist", server.GatewayAddress))
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "failed to verify certificate")
+
 	require.Nil(t, syscall.Kill(syscall.Getpid(), syscall.SIGINT))
 }

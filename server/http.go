@@ -4,6 +4,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -21,11 +22,12 @@ type server struct {
 	server  *http.Server
 }
 
-func NewServer(ctx context.Context, echo *echo.Echo, port uint16) server {
+func NewServer(ctx context.Context, echo *echo.Echo, port uint16, tlsConfig *tls.Config) server {
 	srv := &http.Server{
 		Addr:        fmt.Sprintf(":%d", port),
 		BaseContext: func(net.Listener) context.Context { return ctx },
 		ConnContext: adjustConnContext,
+		TLSConfig:   tlsConfig,
 	}
 	return server{context: ctx, echo: echo, server: srv}
 }
@@ -46,8 +48,10 @@ func (s server) Shutdown(timeout time.Duration) error {
 
 func (s server) GetAddress() (ret string) {
 	// ListenerAddr waits for the server to start before returning
-	if addr := s.echo.ListenerAddr(); addr != nil {
+	if addr := s.echo.TLSListenerAddr(); addr != nil {
 		// Addr can be nil when server fails to start
+		ret = addr.String()
+	} else if addr := s.echo.ListenerAddr(); addr != nil {
 		ret = addr.String()
 	}
 	return

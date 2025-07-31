@@ -30,5 +30,6 @@ func TestServe(t *testing.T) {
 	r, err := http.Get(fmt.Sprintf("http://%s/doesnotexist", server.ApiAddress))
 	require.Nil(t, err)
 	require.Equal(t, http.StatusNotFound, r.StatusCode)
+	require.Equal(t, 12, len(r.Header.Get("X-Request-Id")))
 	require.Nil(t, syscall.Kill(syscall.Getpid(), syscall.SIGINT))
 }

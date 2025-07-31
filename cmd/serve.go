@@ -35,7 +35,7 @@ func (c *ServeCmd) Run(ctx context.Context, args CommonArgs) error {
 	log := context.CtxGetLog(ctx)
 	apiServer := server.NewServer(
 		ctx,
-		server.NewEchoServer(),
+		server.NewEchoServer("rest-api"),
 		c.ApiPort,
 	)
 

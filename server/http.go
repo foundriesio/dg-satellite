@@ -4,13 +4,15 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/gommon/random"
+
+	"github.com/foundriesio/dg-satellite/context"
 )
 
 type server struct {
@@ -23,6 +25,7 @@ func NewServer(ctx context.Context, echo *echo.Echo, port uint16) server {
 	srv := &http.Server{
 		Addr:        fmt.Sprintf(":%d", port),
 		BaseContext: func(net.Listener) context.Context { return ctx },
+		ConnContext: adjustConnContext,
 	}
 	return server{context: ctx, echo: echo, server: srv}
 }
@@ -48,4 +51,11 @@ func (s server) GetAddress() (ret string) {
 		ret = addr.String()
 	}
 	return
+}
+
+func adjustConnContext(ctx context.Context, conn net.Conn) context.Context {
+	cid := random.String(10) // No need for uuid, save some space
+	log := context.CtxGetLog(ctx).With("conn_id", cid)
+	// There is nothing meaningful to log before the TLS connection
+	return context.CtxWithLog(ctx, log)
 }

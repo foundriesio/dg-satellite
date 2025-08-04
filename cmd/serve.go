@@ -53,7 +53,7 @@ func (c *ServeCmd) Run(ctx context.Context, args CommonArgs) error {
 	gtwServer := server.NewServer(
 		ctx,
 		server.NewEchoServer("rest-api"),
-		c.ApiPort,
+		c.GatewayPort,
 		gtwTlsConfig,
 	)
 

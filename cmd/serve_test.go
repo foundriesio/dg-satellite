@@ -36,7 +36,7 @@ func TestServe(t *testing.T) {
 
 	log, err := context.InitLogger("debug")
 	require.Nil(t, err)
-	ctx := context.CtxWithLog(context.Background(), log)
+	common.ctx = context.CtxWithLog(context.Background(), log)
 
 	csr := CsrCmd{
 		DnsName: "example.com",
@@ -56,7 +56,7 @@ func TestServe(t *testing.T) {
 	require.Nil(t, os.WriteFile(filepath.Join(common.CertsDir(), "cas.pem"), []byte{}, 0o744))
 
 	go func() {
-		require.Nil(t, server.Run(ctx, common))
+		require.Nil(t, server.Run(common))
 	}()
 	startedWg.Wait()
 

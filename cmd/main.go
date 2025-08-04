@@ -11,6 +11,9 @@ import (
 	"github.com/alexflint/go-arg"
 
 	"github.com/foundriesio/dg-satellite/context"
+	"github.com/foundriesio/dg-satellite/storage"
+	"github.com/foundriesio/dg-satellite/storage/api"
+	"github.com/foundriesio/dg-satellite/storage/dg"
 )
 
 type CommonArgs struct {
@@ -19,6 +22,8 @@ type CommonArgs struct {
 	Csr     *CsrCmd     `arg:"subcommand:create-csr" help:"Create a TLS certificate signing request for this server"`
 	SignCsr *CsrSignCmd `arg:"subcommand:sign-csr" help:"Create the TLS certificate from the signing request"`
 	Serve   *ServeCmd   `arg:"subcommand:serve" help:"Run the REST API and device-gateway services"`
+
+	ctx context.Context
 }
 
 func (c CommonArgs) CertsDir() string {
@@ -34,6 +39,27 @@ func (c CommonArgs) MkDirs() error {
 	return nil
 }
 
+func (c CommonArgs) CreateStorageHandles() (*api.Storage, *dg.Storage, error) {
+	fs, err := storage.NewFs(c.DataDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	db, err := storage.NewDb(filepath.Join(c.DataDir, "db.sqlite"))
+	if err != nil {
+		return nil, nil, err
+	}
+	apiS, err := api.NewStorage(db, fs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dgS, err := dg.NewStorage(db, fs)
+	if err != nil {
+		return nil, nil, err
+	}
+	return apiS, dgS, nil
+}
+
 func main() {
 	log, err := context.InitLogger("")
 	if err != nil {
@@ -41,9 +67,10 @@ func main() {
 		os.Exit(1)
 		return
 	}
-	ctx := context.CtxWithLog(context.Background(), log)
 
-	args := CommonArgs{}
+	args := CommonArgs{
+		ctx: context.CtxWithLog(context.Background(), log),
+	}
 	p := arg.MustParse(&args)
 
 	switch {
@@ -52,7 +79,7 @@ func main() {
 	case args.SignCsr != nil:
 		err = args.SignCsr.Run(args)
 	case args.Serve != nil:
-		err = args.Serve.Run(ctx, args)
+		err = args.Serve.Run(args)
 	default:
 		p.Fail("missing required subcommand")
 	}

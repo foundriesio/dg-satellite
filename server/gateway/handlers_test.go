@@ -10,11 +10,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
@@ -44,7 +46,7 @@ func (c testClient) Do(req *http.Request) *httptest.ResponseRecorder {
 }
 
 func (c testClient) GET(resource string, status int) []byte {
-	req := httptest.NewRequest(http.MethodGet, "/tmp", nil)
+	req := httptest.NewRequest(http.MethodGet, resource, nil)
 	rec := c.Do(req)
 	require.Equal(c.t, http.StatusOK, rec.Code)
 	return rec.Body.Bytes()
@@ -83,8 +85,12 @@ func NewTestClient(t *testing.T) *testClient {
 	return &tc
 }
 
-func TestApi(t *testing.T) {
+func TestApiDevice(t *testing.T) {
+	lastSeen := time.Now().Add(-1 * time.Second).Unix()
 	tc := NewTestClient(t)
-	data := tc.GET("/tmp", 200)
-	require.Equal(t, "test-client-uuid", string(data))
+	deviceBytes := tc.GET("/device", 200)
+	var device dg.DgDevice
+	require.Nil(t, json.Unmarshal(deviceBytes, &device))
+	require.Equal(t, tc.cert.Subject.CommonName, device.Uuid)
+	require.Less(t, lastSeen, device.LastSeen)
 }

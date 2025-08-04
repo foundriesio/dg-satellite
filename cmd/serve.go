@@ -25,22 +25,22 @@ type ServeCmd struct {
 	GatewayPort uint16 `default:"8443"`
 }
 
-func (c *ServeCmd) Run(ctx context.Context, args CommonArgs) error {
-	log := context.CtxGetLog(ctx)
+func (c *ServeCmd) Run(args CommonArgs) error {
+	log := context.CtxGetLog(args.ctx)
 	gtwTlsConfig, err := args.gatewayTlsConfig()
 	if err != nil {
 		return err
 	}
 
 	apiServer := server.NewServer(
-		ctx,
+		args.ctx,
 		server.NewEchoServer("rest-api"),
 		c.ApiPort,
 		nil,
 	)
 
 	gtwServer := server.NewServer(
-		ctx,
+		args.ctx,
 		server.NewEchoServer("rest-api"),
 		c.GatewayPort,
 		gtwTlsConfig,

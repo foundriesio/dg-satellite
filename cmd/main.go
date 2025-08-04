@@ -22,6 +22,8 @@ type CommonArgs struct {
 	Csr     *CsrCmd     `arg:"subcommand:create-csr" help:"Create a TLS certificate signing request for this server"`
 	SignCsr *CsrSignCmd `arg:"subcommand:sign-csr" help:"Create the TLS certificate from the signing request"`
 	Serve   *ServeCmd   `arg:"subcommand:serve" help:"Run the REST API and device-gateway services"`
+
+	ctx context.Context
 }
 
 func (c CommonArgs) CertsDir() string {
@@ -65,9 +67,10 @@ func main() {
 		os.Exit(1)
 		return
 	}
-	ctx := context.CtxWithLog(context.Background(), log)
 
-	args := CommonArgs{}
+	args := CommonArgs{
+		ctx: context.CtxWithLog(context.Background(), log),
+	}
 	p := arg.MustParse(&args)
 
 	switch {
@@ -76,7 +79,7 @@ func main() {
 	case args.SignCsr != nil:
 		err = args.SignCsr.Run(args)
 	case args.Serve != nil:
-		err = args.Serve.Run(ctx, args)
+		err = args.Serve.Run(args)
 	default:
 		p.Fail("missing required subcommand")
 	}

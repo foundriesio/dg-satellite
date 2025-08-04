@@ -99,3 +99,26 @@ func TestApiList(t *testing.T) {
 	require.Equal(t, "test-device-1", devices[0].Uuid)
 	require.Equal(t, "test-device-2", devices[1].Uuid)
 }
+
+func TestApiGet(t *testing.T) {
+	tc := NewTestClient(t)
+	tc.GET("/devices/foo?deny-has-scope=1", 403)
+
+	_ = tc.GET("/devices/does-not-exist", 404)
+
+	_, err := tc.dgApi.DeviceCreate("test-device-1", "pubkey1", true)
+	require.Nil(t, err)
+	_, err = tc.dgApi.DeviceCreate("test-device-2", "pubkey2", false)
+	require.Nil(t, err)
+
+	data := tc.GET("/devices/test-device-1", 200)
+	var device api.Device
+	require.Nil(t, json.Unmarshal(data, &device))
+	require.Equal(t, "test-device-1", device.Uuid)
+	require.Equal(t, "pubkey1", device.PubKey)
+
+	data = tc.GET("/devices/test-device-2", 200)
+	require.Nil(t, json.Unmarshal(data, &device))
+	require.Equal(t, "test-device-2", device.Uuid)
+	require.Equal(t, "pubkey2", device.PubKey)
+}

@@ -37,3 +37,11 @@ jobs:
           trap 'docker compose --project-directory ./contrib down' EXIT
           sleep 3s
           ./contrib/fake-device.py -d .compose-server-data/fake-devices/device-1 /device
+          uuid=$(openssl x509 -in .compose-server-data/fake-devices/device-1/client.pem -noout -subject  -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p')
+          curl http://localhost:8080/devices
+          foud_uuid=$(curl http://localhost:8080/devices | jq -r '.[].uuid')
+          if [ "$uuid" != "$foud_uuid" ]; then
+            echo "UUID mismatch: expected $uuid, found $foud_uuid"
+            exit 1
+          fi
+          curl http://localhost:8080/devices/$uuid

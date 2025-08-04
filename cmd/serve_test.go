@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"testing"
 
@@ -21,7 +22,17 @@ func TestServe(t *testing.T) {
 	common := CommonArgs{
 		DataDir: filepath.Join(tmpDir, "data"),
 	}
-	server := NewServeCmd()
+	apiAddress := ""
+	gatewayAddress := ""
+	startedWg := sync.WaitGroup{}
+	startedWg.Add(1)
+	server := ServeCmd{
+		startedCb: func(apiAddr, gwAddr string) {
+			apiAddress = apiAddr
+			gatewayAddress = gwAddr
+			startedWg.Done()
+		},
+	}
 
 	log, err := context.InitLogger("debug")
 	require.Nil(t, err)
@@ -47,14 +58,14 @@ func TestServe(t *testing.T) {
 	go func() {
 		require.Nil(t, server.Run(ctx, common))
 	}()
-	server.WaitUntilStarted()
+	startedWg.Wait()
 
-	r, err := http.Get(fmt.Sprintf("http://%s/doesnotexist", server.ApiAddress))
+	r, err := http.Get(fmt.Sprintf("http://%s/doesnotexist", apiAddress))
 	require.Nil(t, err)
 	require.Equal(t, http.StatusNotFound, r.StatusCode)
 	require.Equal(t, 12, len(r.Header.Get("X-Request-Id")))
 
-	_, err = http.Get(fmt.Sprintf("https://%s/doesnotexist", server.GatewayAddress))
+	_, err = http.Get(fmt.Sprintf("https://%s/doesnotexist", gatewayAddress))
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "failed to verify certificate")
 

@@ -19,21 +19,10 @@ import (
 )
 
 type ServeCmd struct {
-	started sync.WaitGroup
+	startedCb func(apiAddress, gatewayAddress string)
 
-	ApiPort        uint16 `default:"8080"`
-	GatewayPort    uint16 `default:"8443"`
-	ApiAddress     string
-	GatewayAddress string
-}
-
-func NewServeCmd() (s ServeCmd) {
-	s.started.Add(1)
-	return
-}
-
-func (c *ServeCmd) WaitUntilStarted() {
-	c.started.Wait()
+	ApiPort     uint16 `default:"8080"`
+	GatewayPort uint16 `default:"8443"`
 }
 
 func (c *ServeCmd) Run(ctx context.Context, args CommonArgs) error {
@@ -65,11 +54,13 @@ func (c *ServeCmd) Run(ctx context.Context, args CommonArgs) error {
 	// Echo locks a mutex immediately at the Start call, and releases after port binding is done.
 	// GetAddress will be locked for that duration; but we need to give it a tiny favor to start.
 	time.Sleep(time.Millisecond * 2)
-	c.ApiAddress = apiServer.GetAddress()
-	c.GatewayAddress = gtwServer.GetAddress()
-	log.Info("rest api server started", "addr", c.ApiAddress)
-	log.Info("gateway server started", "addr", c.GatewayAddress)
-	c.started.Done()
+	apiAddress := apiServer.GetAddress()
+	gatewayAddress := gtwServer.GetAddress()
+	log.Info("rest api server started", "addr", apiAddress)
+	log.Info("gateway server started", "addr", gatewayAddress)
+	if c.startedCb != nil {
+		c.startedCb(apiAddress, gatewayAddress)
+	}
 
 	// setup channel to gracefully terminate server
 	quit := make(chan os.Signal, 1)

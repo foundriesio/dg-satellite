@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
 	"github.com/foundriesio/dg-satellite/server/api"
@@ -44,7 +45,7 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	}
 
 	apiE := server.NewEchoServer("rest-api")
-	api.RegisterHandlers(apiE, apiS)
+	api.RegisterHandlers(apiE, apiS, auth.FakeAuthUser)
 	apiServer := server.NewServer(
 		args.ctx,
 		apiE,

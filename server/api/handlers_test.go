@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
 	"github.com/foundriesio/dg-satellite/storage"
@@ -52,7 +53,7 @@ func NewTestClient(t *testing.T) *testClient {
 	require.Nil(t, err)
 
 	e := server.NewEchoServer("api-test")
-	RegisterHandlers(e, apiS)
+	RegisterHandlers(e, apiS, auth.FakeAuthUser)
 
 	tc := testClient{
 		t:   t,
@@ -67,4 +68,5 @@ func TestApi(t *testing.T) {
 	tc := NewTestClient(t)
 	data := tc.GET("/tmp", 200)
 	require.Equal(t, "OK", string(data))
+	tc.GET("/tmp?deny-has-scope=1", 403)
 }

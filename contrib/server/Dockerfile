@@ -1,0 +1,21 @@
+FROM public.ecr.aws/docker/library/golang:1.24 AS builder
+
+# hack for building on QC managed laptops
+RUN --mount=target=/ctx \
+    if [ -d /ctx/.extra-certs/ ] ; then \
+        cp /ctx/.extra-certs/* /usr/local/share/ca-certificates/ && update-ca-certificates; \
+    fi
+
+WORKDIR /src
+COPY go.* ./
+RUN go mod download
+
+COPY . .
+RUN go build \
+    --ldflags '-linkmode external -extldflags "-static"' \
+    -o dg-satellite \
+    github.com/foundriesio/dg-satellite/cmd
+
+FROM gcr.io/distroless/static-debian12
+COPY --from=builder /src/dg-satellite /usr/local/bin/
+ENTRYPOINT ["/usr/local/bin/dg-satellite"]

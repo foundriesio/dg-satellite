@@ -1,0 +1,22 @@
+#!/bin/sh -ex
+cd $(dirname $(readlink -f $0))
+cd ../  # jump up from ./contrib to root of project
+container="$(basename $(pwd))-devshell"
+
+cmd="$*"
+[ -z "$cmd" ] && cmd="/bin/bash"
+
+ttyarg=""
+if [ -t 1 ] ; then
+	ttyarg="-it"
+fi
+
+if ! docker image inspect ${container} 2>/dev/null >/dev/null ; then
+	docker build -t ${container} -f contrib/Dockerfile.devshell ./
+fi
+
+docker run --rm ${ttyarg} \
+	--network=host \
+	-v `pwd`:`pwd` \
+	-w `pwd` \
+	${container} $cmd

@@ -1,0 +1,39 @@
+name: Unit Test
+on:
+  pull_request:
+
+permissions:
+  checks: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  contrib-test:
+    name: contrib-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '~1.24'
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Build and test devshell
+        run: |
+          ./contrib/dev-shell go run github.com/foundriesio/dg-satellite/cmd --help
+
+      - name: Build compose image(s)
+        run: |
+          docker compose --project-directory ./contrib build
+
+      - name: Generate test data
+        run: |
+          ./contrib/gen-certs.sh --data-dir .compose-server-data
+
+      - name: Test server
+        run: |
+          docker compose --project-directory ./contrib up -d
+          trap 'docker compose --project-directory ./contrib down' EXIT
+          sleep 3s
+          ./contrib/fake-device.py -d .compose-server-data/fake-devices/device-1 /device

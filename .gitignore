@@ -1,2 +1,4 @@
 *.swp
 *.swo
+.extra-certs
+.compose-server-data

@@ -16,6 +16,8 @@ import (
 
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
+	"github.com/foundriesio/dg-satellite/server/api"
+	"github.com/foundriesio/dg-satellite/server/gateway"
 )
 
 type ServeCmd struct {
@@ -32,16 +34,25 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 		return err
 	}
 
+	apiS, gwS, err := args.CreateStorageHandles()
+	if err != nil {
+		return err
+	}
+
+	apiE := server.NewEchoServer("rest-api")
+	api.RegisterHandlers(apiE, apiS)
 	apiServer := server.NewServer(
 		args.ctx,
-		server.NewEchoServer("rest-api"),
+		apiE,
 		c.ApiPort,
 		nil,
 	)
 
+	gtwE := server.NewEchoServer("dg-api")
+	gateway.RegisterHandlers(gtwE, gwS)
 	gtwServer := server.NewServer(
 		args.ctx,
-		server.NewEchoServer("rest-api"),
+		gtwE,
 		c.GatewayPort,
 		gtwTlsConfig,
 	)

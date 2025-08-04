@@ -38,6 +38,21 @@ func TestCsr(t *testing.T) {
 	require.Nil(t, csr.Run(common))
 
 	// Create a root CA
+	caKeyFile, caFile := createSelfSignedRoot(t, common)
+
+	sign := CsrSignCmd{
+		CaKey:  caKeyFile,
+		CaCert: caFile,
+		Csr:    filepath.Join(common.CertsDir(), "tls.csr"),
+	}
+	require.Nil(t, sign.Run(common))
+
+	cert, err := loadCert(filepath.Join(common.CertsDir(), "tls.crt"))
+	require.Nil(t, err)
+	require.Equal(t, "example.com", cert.Subject.CommonName)
+}
+
+func createSelfSignedRoot(t *testing.T, common CommonArgs) (string, string) {
 	caKeyFile := filepath.Join(common.CertsDir(), "tls.key") // just steal the key we already generated
 	key, err := loadKey(caKeyFile)
 	require.Nil(t, err)
@@ -61,17 +76,7 @@ func TestCsr(t *testing.T) {
 			Bytes: caDer,
 		},
 	)
-	caFile := filepath.Join(tmpDir, "ca.crt")
+	caFile := filepath.Join(common.CertsDir(), "ca.crt")
 	require.Nil(t, os.WriteFile(caFile, caPem, 0o744))
-
-	sign := CsrSignCmd{
-		CaKey:  caKeyFile,
-		CaCert: caFile,
-		Csr:    filepath.Join(common.CertsDir(), "tls.csr"),
-	}
-	require.Nil(t, sign.Run(common))
-
-	cert, err := loadCert(filepath.Join(common.CertsDir(), "tls.crt"))
-	require.Nil(t, err)
-	require.Equal(t, "example.com", cert.Subject.CommonName)
+	return caKeyFile, caFile
 }

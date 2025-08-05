@@ -41,7 +41,7 @@ func (d *DgDevice) CheckIn(targetName, tag, ostreeHash string, apps []string) er
 	return d.storage.stmtDeviceCheckIn.run(d.Uuid, targetName, tag, ostreeHash, appsStr, now)
 }
 
-func (d *DgDevice) PutFile(name string, content string) error {
+func (d *DgDevice) PutFile(name string, content []byte) error {
 	return d.storage.fs.WriteFile(d.Uuid, name, content)
 }
 
@@ -60,7 +60,7 @@ func (d DgDevice) ProcessEvents(events []storage.DeviceUpdateEvent) error {
 		if err != nil {
 			return err
 		}
-		if err := d.storage.fs.AppendFile(d.Uuid, name, string(bytes)+"\n"); err != nil {
+		if err := d.storage.fs.AppendFile(d.Uuid, name, append(bytes, '\n')); err != nil {
 			return err
 		}
 	}

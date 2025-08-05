@@ -4,7 +4,9 @@
 package storage
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -39,19 +41,28 @@ func (s FsHandle) ReadFile(uuid, name string) (string, error) {
 	}
 }
 
-func (s FsHandle) WriteFile(uuid, name, content string) error {
+func (s FsHandle) WriteFileStream(uuid, name string, src io.Reader) error {
 	path := filepath.Join(s.root, uuid)
 	if err := os.MkdirAll(path, 0o744); err != nil {
 		return fmt.Errorf("unable to create file storage for device %s: %w", uuid, err)
 	}
 	path = filepath.Join(path, name)
-	if err := os.WriteFile(path, []byte(content), 0o744); err != nil {
+	dst, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o744)
+	if err != nil {
 		return fmt.Errorf("error writing file %s for device %s: %w", name, uuid, err)
 	}
-	return nil
+	if _, err = io.Copy(dst, src); err != nil {
+		_ = dst.Close()
+		return fmt.Errorf("error writing file content %s for device %s: %w", name, uuid, err)
+	}
+	return dst.Close()
 }
 
-func (s FsHandle) AppendFile(uuid, name, content string) error {
+func (s FsHandle) WriteFile(uuid, name string, content []byte) error {
+	return s.WriteFileStream(uuid, name, bytes.NewReader(content))
+}
+
+func (s FsHandle) AppendFile(uuid, name string, content []byte) error {
 	path := filepath.Join(s.root, uuid)
 	if err := os.MkdirAll(path, 0o744); err != nil {
 		return fmt.Errorf("unable to create file storage for device %s: %w", uuid, err)
@@ -59,7 +70,7 @@ func (s FsHandle) AppendFile(uuid, name, content string) error {
 	path = filepath.Join(path, name)
 	fd, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o744)
 	if err == nil {
-		_, err = fd.Write([]byte(content))
+		_, err = fd.Write(content)
 		if err != nil {
 			_ = fd.Close()
 		} else {

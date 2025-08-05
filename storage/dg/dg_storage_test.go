@@ -78,7 +78,7 @@ func TestStorage(t *testing.T) {
 	require.Nil(t, err)
 	require.Less(t, d.LastSeen, d2.LastSeen)
 
-	require.Nil(t, d2.PutFile(storage.Aktoml, "test content"))
+	require.Nil(t, d2.PutFile(storage.Aktoml, []byte("test content")))
 	content, err := fs.ReadFile(d2.Uuid, storage.Aktoml)
 	require.Nil(t, err)
 	require.Equal(t, "test content", content)

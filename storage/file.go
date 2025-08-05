@@ -5,6 +5,7 @@ package storage
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,10 +16,12 @@ import (
 )
 
 const (
-	Aktoml       = "aktoml"
-	HwInfo       = "hardware-info"
-	NetInfo      = "network-info"
-	EventsPrefix = "events"
+	Aktoml              = "aktoml"
+	HwInfo              = "hardware-info"
+	NetInfo             = "network-info"
+	EventsPrefix        = "events"
+	TestsPrefix         = "tests"
+	TestArtifactsPrefix = "test-artifacts"
 )
 
 type FsHandle struct {
@@ -53,6 +56,17 @@ func (s FsHandle) ReadFile(uuid, name string) (string, error) {
 	} else {
 		return "", fmt.Errorf("unexpected error reading file %s for device %s: %w", name, uuid, err)
 	}
+}
+
+func (s FsHandle) ReadAsJson(uuid, name string, value any) error {
+	if content, err := os.ReadFile(filepath.Join(s.root, uuid, name)); err == nil {
+		if err = json.Unmarshal(content, value); err != nil {
+			return fmt.Errorf("unexpected error unmarshalling file %s for device %s: %w", name, uuid, err)
+		}
+	} else {
+		return fmt.Errorf("unexpected error reading file %s for device %s: %w", name, uuid, err)
+	}
+	return nil
 }
 
 func (s FsHandle) WriteFileStream(uuid, name string, src io.Reader) error {

@@ -6,6 +6,7 @@ package dg
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/foundriesio/dg-satellite/storage"
+	"github.com/foundriesio/dg-satellite/storage/api"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
@@ -210,4 +212,73 @@ func Benchmark_CheckIn(b *testing.B) {
 		require.Nil(b, devices[deviceIdx].CheckIn("target", "tag", "hash", []string{}))
 	}
 	b.StopTimer()
+}
+
+func Test_Fiotest(t *testing.T) {
+	tmpdir := t.TempDir()
+	dbFile := filepath.Join(tmpdir, "sql.db")
+	db, err := storage.NewDb(dbFile)
+	require.Nil(t, err)
+	t.Cleanup(func() {
+		require.Nil(t, db.Close())
+	})
+	fs, err := storage.NewFs(tmpdir)
+	require.Nil(t, err)
+
+	s, err := NewStorage(db, fs)
+	require.Nil(t, err)
+
+	// Create fake device
+	id := uuid.New().String()
+	d, err := s.DeviceCreate(id, "pubkey", false)
+	require.Nil(t, err)
+
+	require.Nil(t, d.TestCreate("intel-corei7-64-lmp-23", "test1", "test1-id"))
+	require.Nil(t, d.TestCreate("intel-corei7-64-lmp-23", "test1", "test2-id"))
+
+	require.Nil(t, d.TestComplete("test1-id", "PASSED", "details", nil))
+
+	results := []storage.TargetTestResult{
+		{
+			Name:    "res1",
+			Status:  "PASSED",
+			Details: "details",
+		},
+	}
+	require.Nil(t, d.TestComplete("test2-id", "FAILED", "details", results))
+
+	// A little lazy, but test the REST API code from here as well
+	api, err := api.NewStorage(db, fs)
+	require.Nil(t, err)
+
+	apiD, err := api.DeviceGet(d.Uuid)
+	require.Nil(t, err)
+	tests, err := apiD.Tests()
+	require.Nil(t, err)
+	require.Len(t, tests, 2)
+
+	require.Equal(t, "test1-id", tests[0].Uuid)
+	require.Equal(t, "test1", tests[0].Name)
+	require.Equal(t, "intel-corei7-64-lmp-23", tests[0].TargetName)
+	require.Equal(t, "PASSED", tests[0].Status)
+	require.NotNil(t, tests[0].CompletedOn)
+	require.Len(t, tests[0].Results, 0)
+
+	require.Equal(t, "test2-id", tests[1].Uuid)
+	require.Equal(t, "test1", tests[1].Name)
+	require.Equal(t, "intel-corei7-64-lmp-23", tests[1].TargetName)
+	require.Equal(t, "FAILED", tests[1].Status)
+	require.NotNil(t, tests[0].CompletedOn)
+	require.Len(t, tests[1].Results, 1)
+	require.Equal(t, "res1", tests[1].Results[0].Name)
+
+	require.Nil(t, d.TestStoreArtifact("test1-id", "artifact.txt", strings.NewReader("artifact content")))
+	fd, err := apiD.TestArtifact("test1-id", "artifact.txt")
+	require.Nil(t, err)
+	t.Cleanup(func() {
+		require.Nil(t, fd.Close())
+	})
+	content, err := io.ReadAll(fd)
+	require.Nil(t, err)
+	require.Equal(t, "artifact content", string(content))
 }

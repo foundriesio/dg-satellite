@@ -42,3 +42,14 @@ Example:
  {"Uuid":"04581446-DB43-43B1-BAC3-DBA7D1328AAC","PubKey":"-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcD
 QgAE9M4irNPAcO+3N+UZdfqH6M86IhGg\nC1X2xPHpE1q1JkPnJUYnOtoLPrCVERAQqN/2gzeJG3nl7fqKHrbzNRixgA==\n-----END PUBLIC KEY-----\n","UpdateName":"","Deleted":false,"LastSeen":1754345526,"IsProd":false}
 ```
+
+## load-test
+
+`run-load-tests` is a simple script that:
+ * generates data for a server and 3 fake-devices
+ * runs the Vegeta load test tool with 3 devices against the satellite server
+ * summarizes the results to STDOUT
+
+ **NOTE** On a Mac, `LOAD_TEST_DIR` can't be set to something under `/tmp`.
+ That won't get mounted into Colima's context and will result in errors about
+ missing certificates.

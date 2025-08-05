@@ -1,0 +1,30 @@
+name: Load Test
+on:
+  pull_request:
+
+permissions:
+  checks: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  load-test:
+    name: vegeta
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Run load testing
+        run: |
+          LOAD_TEST_DIR=`pwd`/lt-results ./contrib/load-test/run.sh
+
+      - name: Print results
+        run: |
+          cat lt-results/results.txt
+
+      - name: Save results
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-results-vegeta.txt
+          path: lt-results/results.txt

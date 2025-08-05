@@ -1,0 +1,37 @@
+services:
+  dg-server:
+    build:
+      context: ../..
+      dockerfile: ./contrib/server/Dockerfile
+    command:
+      - --datadir=/data
+      - serve
+    volumes:
+       - ${LOAD_TEST_DIR}:/data
+
+  vegeta-1:
+    build:
+      context: ../..
+      dockerfile: ./contrib/load-test/Dockerfile
+    volumes:
+       - ${LOAD_TEST_DIR}/fake-devices/device-1:/device
+    depends_on:
+      - dg-server
+
+  vegeta-2:
+    build:
+      context: ../..
+      dockerfile: ./contrib/load-test/Dockerfile
+    volumes:
+       - ${LOAD_TEST_DIR}/fake-devices/device-2:/device
+    depends_on:
+      - dg-server
+
+  vegeta-3:
+    build:
+      context: ../..
+      dockerfile: ./contrib/load-test/Dockerfile
+    volumes:
+       - ${LOAD_TEST_DIR}/fake-devices/device-3:/device
+    depends_on:
+      - dg-server

@@ -5,6 +5,7 @@ package storage
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -31,10 +32,23 @@ func NewFs(root string) (*FsHandle, error) {
 	return &FsHandle{root: root}, nil
 }
 
+func (s FsHandle) ReadFileStream(uuid, name string) (io.ReadCloser, error) {
+	fd, err := os.Open(filepath.Join(s.root, uuid, name))
+	if err != nil {
+		return nil, fmt.Errorf("error reading file %s for device %s: %w", name, uuid, err)
+	}
+	return fd, nil
+}
+
 func (s FsHandle) ReadFile(uuid, name string) (string, error) {
-	if content, err := os.ReadFile(filepath.Join(s.root, uuid, name)); err == nil {
-		return string(content), nil
-	} else if os.IsNotExist(err) {
+	if fd, err := s.ReadFileStream(uuid, name); err == nil {
+		content, err := io.ReadAll(fd)
+		if err != nil {
+			_ = fd.Close()
+			return "", fmt.Errorf("error reading file content %s for device %s: %w", name, uuid, err)
+		}
+		return string(content), fd.Close()
+	} else if errors.Is(err, os.ErrNotExist) {
 		return "", nil
 	} else {
 		return "", fmt.Errorf("unexpected error reading file %s for device %s: %w", name, uuid, err)

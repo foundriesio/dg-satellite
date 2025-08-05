@@ -6,8 +6,10 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
+	"mime"
 	"net"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -62,4 +64,13 @@ func adjustConnContext(ctx context.Context, conn net.Conn) context.Context {
 	log := context.CtxGetLog(ctx).With("conn_id", cid)
 	// There is nothing meaningful to log before the TLS connection
 	return context.CtxWithLog(ctx, log)
+}
+
+func GuessContentType(path string) string {
+	ext := filepath.Ext(path)
+	if ext == ".log" {
+		// Ubuntu doesn't do this, so hack
+		ext = ".txt"
+	}
+	return mime.TypeByExtension(ext)
 }

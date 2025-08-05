@@ -23,6 +23,10 @@ func RegisterHandlers(e *echo.Echo, storage *dg.Storage) {
 	e.PUT("/system_info/config", h.putAktoml)
 	e.PUT("/system_info/network", h.putNetInfo)
 	e.PUT("/system_info", h.putHwInfo)
+
+	e.POST("/tests", h.testCreate)
+	e.PUT("/tests/:testid", h.testComplete)
+	e.PUT("/tests/:testid/:path", h.testArtifact)
 }
 
 func ErrResponse(c echo.Context, status int, respMsg string, err error) error {

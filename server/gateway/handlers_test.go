@@ -62,6 +62,14 @@ func (c testClient) PUT(resource string, data []byte, status int) []byte {
 	return rec.Body.Bytes()
 }
 
+func (c testClient) POST(resource string, data []byte, status int) []byte {
+	reader := bytes.NewReader(data)
+	req := httptest.NewRequest(http.MethodPost, resource, reader)
+	rec := c.Do(req)
+	require.Equal(c.t, status, rec.Code)
+	return rec.Body.Bytes()
+}
+
 func NewTestClient(t *testing.T) *testClient {
 	tmpDir := t.TempDir()
 	fsS, err := storage.NewFs(tmpDir)
@@ -123,4 +131,50 @@ func TestApiSysInfo(t *testing.T) {
 	content, err = tc.fs.ReadFile(tc.cert.Subject.CommonName, storage.HwInfo)
 	require.Nil(t, err)
 	require.Equal(t, "lshw info", content)
+}
+
+func TestApiFiotest(t *testing.T) {
+	tc := NewTestClient(t)
+
+	content := `{"name": "test-1"}`
+	resp := tc.POST("/tests", []byte(content), 201)
+	testid := string(resp)
+
+	content = `{
+			"status": "PASSED",
+			"details": "detail x",
+			"results": [
+				{
+					"name": "tr-1",
+					"status": "FAILED"
+				},
+				{
+					"name": "tr-2",
+					"status": "PASSED",
+					"local_ts": 1597802911.1365469,
+					"details": "tr2-detail",
+					"metrics": {
+						"m1": 12,
+						"m2": 42.1
+					}
+				}
+			],
+			"artifacts": ["console.txt"]
+		}`
+	out := tc.PUT("/tests/"+testid, []byte(content), 200)
+
+	type signedUrl struct {
+		Url         string `json:"url"`
+		ContentType string `json:"content-type"`
+	}
+	var urls map[string]signedUrl
+	require.Nil(t, json.Unmarshal(out, &urls))
+	for name, signed := range urls {
+		tc.PUT(signed.Url, []byte(name+"BLAH"), 200)
+	}
+	prefix := storage.TestArtifactsPrefix + "-" + testid + "_"
+	files, err := tc.fs.ListFiles(tc.cert.Subject.CommonName, prefix, true)
+	require.Nil(t, err)
+	require.Len(t, files, 1)
+	require.Equal(t, prefix+"console.txt", files[0])
 }

@@ -26,6 +26,7 @@ type testClient struct {
 	t     *testing.T
 	api   *api.Storage
 	dgApi *dg.Storage
+	fs    *storage.FsHandle
 	e     *echo.Echo
 	log   *slog.Logger
 }
@@ -65,6 +66,7 @@ func NewTestClient(t *testing.T) *testClient {
 		t:     t,
 		api:   apiS,
 		dgApi: dgApi,
+		fs:    fsS,
 		e:     e,
 		log:   log,
 	}
@@ -121,4 +123,14 @@ func TestApiGet(t *testing.T) {
 	require.Nil(t, json.Unmarshal(data, &device))
 	require.Equal(t, "test-device-2", device.Uuid)
 	require.Equal(t, "pubkey2", device.PubKey)
+
+	// Test sys-info files
+	require.Nil(t, tc.fs.WriteFile("test-device-1", storage.Aktoml, []byte("test-aktoml")))
+	require.Nil(t, tc.fs.WriteFile("test-device-1", storage.NetInfo, []byte("netinfo")))
+	require.Nil(t, tc.fs.WriteFile("test-device-1", storage.HwInfo, []byte("lshw")))
+	data = tc.GET("/devices/test-device-1", 200)
+	require.Nil(t, json.Unmarshal(data, &device))
+	require.Equal(t, "test-aktoml", device.Aktoml)
+	require.Equal(t, "netinfo", device.NetInfo)
+	require.Equal(t, "lshw", device.HwInfo)
 }

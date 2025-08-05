@@ -4,6 +4,7 @@
 package gateway
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -29,6 +30,7 @@ import (
 type testClient struct {
 	t   *testing.T
 	gw  *dg.Storage
+	fs  *storage.FsHandle
 	e   *echo.Echo
 	log *slog.Logger
 
@@ -48,7 +50,15 @@ func (c testClient) Do(req *http.Request) *httptest.ResponseRecorder {
 func (c testClient) GET(resource string, status int) []byte {
 	req := httptest.NewRequest(http.MethodGet, resource, nil)
 	rec := c.Do(req)
-	require.Equal(c.t, http.StatusOK, rec.Code)
+	require.Equal(c.t, status, rec.Code)
+	return rec.Body.Bytes()
+}
+
+func (c testClient) PUT(resource string, data []byte, status int) []byte {
+	reader := bytes.NewReader(data)
+	req := httptest.NewRequest(http.MethodPut, resource, reader)
+	rec := c.Do(req)
+	require.Equal(c.t, status, rec.Code)
 	return rec.Body.Bytes()
 }
 
@@ -76,6 +86,7 @@ func NewTestClient(t *testing.T) *testClient {
 	}
 	tc := testClient{
 		t:   t,
+		fs:  fsS,
 		gw:  gwS,
 		e:   e,
 		log: log,
@@ -93,4 +104,23 @@ func TestApiDevice(t *testing.T) {
 	require.Nil(t, json.Unmarshal(deviceBytes, &device))
 	require.Equal(t, tc.cert.Subject.CommonName, device.Uuid)
 	require.Less(t, lastSeen, device.LastSeen)
+}
+
+func TestApiSysInfo(t *testing.T) {
+	tc := NewTestClient(t)
+	tc.PUT("/system_info/config", []byte("test-aktoml"), 204)
+	tc.PUT("/system_info/network", []byte("network-info"), 204)
+	tc.PUT("/system_info", []byte("lshw info"), 204)
+
+	content, err := tc.fs.ReadFile(tc.cert.Subject.CommonName, storage.Aktoml)
+	require.Nil(t, err)
+	require.Equal(t, "test-aktoml", content)
+
+	content, err = tc.fs.ReadFile(tc.cert.Subject.CommonName, storage.NetInfo)
+	require.Nil(t, err)
+	require.Equal(t, "network-info", content)
+
+	content, err = tc.fs.ReadFile(tc.cert.Subject.CommonName, storage.HwInfo)
+	require.Nil(t, err)
+	require.Equal(t, "lshw info", content)
 }

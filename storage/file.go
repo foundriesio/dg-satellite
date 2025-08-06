@@ -29,8 +29,22 @@ func NewFs(root string) (*FsHandle, error) {
 	return &FsHandle{root: root}, nil
 }
 
+func (s FsHandle) devicePath(uuid, name string) string {
+	if len(name) == 0 {
+		return filepath.Join(s.root, uuid)
+	}
+	return filepath.Join(s.root, uuid, name)
+}
+
+func (s FsHandle) assertDevicePath(uuid string) error {
+	if err := os.MkdirAll(s.devicePath(uuid, ""), 0o744); err != nil {
+		return fmt.Errorf("unable to create file storage for device %s: %w", uuid, err)
+	}
+	return nil
+}
+
 func (s FsHandle) ReadFile(uuid, name string) (string, error) {
-	if content, err := os.ReadFile(filepath.Join(s.root, uuid, name)); err == nil {
+	if content, err := os.ReadFile(s.devicePath(uuid, name)); err == nil {
 		return string(content), nil
 	} else if os.IsNotExist(err) {
 		return "", nil
@@ -40,24 +54,20 @@ func (s FsHandle) ReadFile(uuid, name string) (string, error) {
 }
 
 func (s FsHandle) WriteFile(uuid, name, content string) error {
-	path := filepath.Join(s.root, uuid)
-	if err := os.MkdirAll(path, 0o744); err != nil {
-		return fmt.Errorf("unable to create file storage for device %s: %w", uuid, err)
+	if err := s.assertDevicePath(uuid); err != nil {
+		return err
 	}
-	path = filepath.Join(path, name)
-	if err := os.WriteFile(path, []byte(content), 0o744); err != nil {
+	if err := os.WriteFile(s.devicePath(uuid, name), []byte(content), 0o744); err != nil {
 		return fmt.Errorf("error writing file %s for device %s: %w", name, uuid, err)
 	}
 	return nil
 }
 
 func (s FsHandle) AppendFile(uuid, name, content string) error {
-	path := filepath.Join(s.root, uuid)
-	if err := os.MkdirAll(path, 0o744); err != nil {
-		return fmt.Errorf("unable to create file storage for device %s: %w", uuid, err)
+	if err := s.assertDevicePath(uuid); err != nil {
+		return err
 	}
-	path = filepath.Join(path, name)
-	fd, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o744)
+	fd, err := os.OpenFile(s.devicePath(uuid, name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o744)
 	if err == nil {
 		_, err = fd.Write([]byte(content))
 		if err != nil {
@@ -81,7 +91,7 @@ func (s FsHandle) ListFiles(uuid, prefix string, sortByModTime bool) ([]string, 
 }
 
 func (s FsHandle) RolloverFiles(uuid, prefix string, max int) error {
-	path := filepath.Join(s.root, uuid)
+	path := s.devicePath(uuid, "")
 	names, err := s.matchFiles(uuid, prefix, true)
 	if err == nil {
 		for i := 0; i < len(names)-max; i++ {
@@ -97,7 +107,7 @@ func (s FsHandle) RolloverFiles(uuid, prefix string, max int) error {
 }
 
 func (s FsHandle) matchFiles(uuid, prefix string, sortByModTime bool) ([]string, error) {
-	path := filepath.Join(s.root, uuid)
+	path := s.devicePath(uuid, "")
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err

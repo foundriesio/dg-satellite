@@ -31,9 +31,9 @@ func NewFs(root string) (*FsHandle, error) {
 
 func (s FsHandle) devicePath(uuid, name string) string {
 	if len(name) == 0 {
-		return filepath.Join(s.root, uuid)
+		return filepath.Join(s.root, "devices", uuid)
 	}
-	return filepath.Join(s.root, uuid, name)
+	return filepath.Join(s.root, "devices", uuid, name)
 }
 
 func (s FsHandle) assertDevicePath(uuid string) error {

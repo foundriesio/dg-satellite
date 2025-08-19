@@ -6,8 +6,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sync"
 	"syscall"
 	"testing"
@@ -20,9 +18,7 @@ import (
 
 func TestServe(t *testing.T) {
 	tmpDir := t.TempDir()
-	common := CommonArgs{
-		DataDir: filepath.Join(tmpDir, "data"),
-	}
+	common := CommonArgs{DataDir: tmpDir}
 	fs, err := storage.NewFs(common.DataDir)
 	require.Nil(t, err)
 	apiAddress := ""
@@ -52,11 +48,10 @@ func TestServe(t *testing.T) {
 	sign := CsrSignCmd{
 		CaKey:  caKeyFile,
 		CaCert: caFile,
-		Csr:    filepath.Join(fs.Config.CertsDir(), "tls.csr"),
 	}
 	require.Nil(t, sign.Run(common))
 	// create an empty ca file to make the server happy. no client will be able to handshake with it
-	require.Nil(t, os.WriteFile(filepath.Join(fs.Config.CertsDir(), "cas.pem"), []byte{}, 0o744))
+	require.Nil(t, fs.Certs.WriteFile(storage.CertsCasPemFile, []byte{}))
 
 	go func() {
 		require.Nil(t, server.Run(common))

@@ -11,7 +11,6 @@ import (
 	"errors"
 	"math/big"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,21 +30,20 @@ func TestCsr(t *testing.T) {
 	common := CommonArgs{
 		DataDir: tmpDir,
 	}
-	fs, err := storage.NewFs(common.DataDir)
-	require.Nil(t, err)
 	require.Nil(t, csr.Run(common))
 
+	fs, err := storage.NewFs(common.DataDir)
+	require.Nil(t, err)
 	// Create a root CA
 	caKeyFile, caFile := createSelfSignedRoot(t, fs)
 
 	sign := CsrSignCmd{
 		CaKey:  caKeyFile,
 		CaCert: caFile,
-		Csr:    filepath.Join(fs.Config.CertsDir(), "tls.csr"),
 	}
 	require.Nil(t, sign.Run(common))
 
-	cert, err := loadCert(filepath.Join(fs.Config.CertsDir(), "tls.crt"))
+	cert, err := loadCert(fs.Certs.FilePath(storage.CertsTlsPemFile))
 	require.Nil(t, err)
 	require.Equal(t, "example.com", cert.Subject.CommonName)
 
@@ -56,7 +54,7 @@ func TestCsr(t *testing.T) {
 }
 
 func createSelfSignedRoot(t *testing.T, fs *storage.FsHandle) (string, string) {
-	caKeyFile := filepath.Join(fs.Config.CertsDir(), "tls.key") // just steal the key we already generated
+	caKeyFile := fs.Certs.FilePath(storage.CertsTlsKeyFile) // reuse the key we already generated
 	key, err := loadKey(caKeyFile)
 	require.Nil(t, err)
 
@@ -79,7 +77,7 @@ func createSelfSignedRoot(t *testing.T, fs *storage.FsHandle) (string, string) {
 			Bytes: caDer,
 		},
 	)
-	caFile := filepath.Join(fs.Config.CertsDir(), "ca.crt")
-	require.Nil(t, os.WriteFile(caFile, caPem, 0o744))
+	caFile := fs.Certs.FilePath("ca.pem")
+	require.Nil(t, os.WriteFile(caFile, caPem, 0o740))
 	return caKeyFile, caFile
 }

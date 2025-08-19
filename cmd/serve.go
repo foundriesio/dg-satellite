@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -112,8 +111,7 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 }
 
 func loadCas(fs *storage.FsHandle) (*x509.CertPool, error) {
-	path := filepath.Join(fs.Config.CertsDir(), "cas.pem")
-	bytes, err := os.ReadFile(path)
+	bytes, err := fs.Certs.ReadFile(storage.CertsCasPemFile)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read CAs file: %w", err)
 	}
@@ -124,8 +122,8 @@ func loadCas(fs *storage.FsHandle) (*x509.CertPool, error) {
 }
 
 func loadTlsKeyPair(fs *storage.FsHandle) (tls.Certificate, error) {
-	keyFile := filepath.Join(fs.Config.CertsDir(), "tls.key")
-	certFile := filepath.Join(fs.Config.CertsDir(), "tls.crt")
+	keyFile := fs.Certs.FilePath(storage.CertsTlsKeyFile)
+	certFile := fs.Certs.FilePath(storage.CertsTlsPemFile)
 	return tls.LoadX509KeyPair(certFile, keyFile)
 }
 

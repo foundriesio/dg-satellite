@@ -42,7 +42,7 @@ func (d *DgDevice) CheckIn(targetName, tag, ostreeHash string, apps []string) er
 }
 
 func (d *DgDevice) PutFile(name string, content string) error {
-	return d.storage.fs.WriteFile(d.Uuid, name, content)
+	return d.storage.fs.Devices.WriteFile(d.Uuid, name, content)
 }
 
 func (d DgDevice) ProcessEvents(events []storage.DeviceUpdateEvent) error {
@@ -60,11 +60,11 @@ func (d DgDevice) ProcessEvents(events []storage.DeviceUpdateEvent) error {
 		if err != nil {
 			return err
 		}
-		if err := d.storage.fs.AppendFile(d.Uuid, name, string(bytes)+"\n"); err != nil {
+		if err := d.storage.fs.Devices.AppendFile(d.Uuid, name, string(bytes)+"\n"); err != nil {
 			return err
 		}
 	}
-	return d.storage.fs.RolloverFiles(d.Uuid, storage.EventsPrefix, d.storage.maxEvents)
+	return d.storage.fs.Devices.RolloverFiles(d.Uuid, storage.EventsPrefix, d.storage.maxEvents)
 }
 
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {

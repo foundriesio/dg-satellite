@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/foundriesio/dg-satellite/storage"
 )
 
 type CsrCmd struct {
@@ -21,8 +23,12 @@ type CsrCmd struct {
 }
 
 func (c CsrCmd) Run(args CommonArgs) error {
-	if err := args.MkDirs(); err != nil {
+	fs, err := storage.NewFs(args.DataDir)
+	if err != nil {
 		return err
+	}
+	if err = os.Mkdir(fs.Config.CertsDir(), 0o740); err != nil {
+		return fmt.Errorf("unable to create certs directory: %w", err)
 	}
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -46,7 +52,7 @@ func (c CsrCmd) Run(args CommonArgs) error {
 		return fmt.Errorf("unexpected error creating CSR: %w", err)
 	}
 
-	keyFile := filepath.Join(args.CertsDir(), "tls.key")
+	keyFile := filepath.Join(fs.Config.CertsDir(), "tls.key")
 	privDer, err := x509.MarshalECPrivateKey(priv)
 	if err != nil {
 		return fmt.Errorf("unexpected error encoding private key: %w", err)
@@ -61,7 +67,7 @@ func (c CsrCmd) Run(args CommonArgs) error {
 		return fmt.Errorf("unable to store TLS private key for CSR: %w", err)
 	}
 
-	csrFile := filepath.Join(args.CertsDir(), "tls.csr")
+	csrFile := filepath.Join(fs.Config.CertsDir(), "tls.csr")
 	fd, err := os.Create(csrFile)
 	if err != nil {
 		return fmt.Errorf("unable to write TLS CSR: %w", err)

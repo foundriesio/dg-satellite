@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/alexflint/go-arg"
 
@@ -26,29 +25,12 @@ type CommonArgs struct {
 	ctx context.Context
 }
 
-func (c CommonArgs) DbFile() string {
-	return filepath.Join(c.DataDir, storage.DbFile)
-}
-
-func (c CommonArgs) CertsDir() string {
-	return filepath.Join(c.DataDir, storage.CertsDir)
-}
-
-func (c CommonArgs) MkDirs() error {
-	for _, x := range []string{c.DataDir, c.CertsDir()} {
-		if err := os.Mkdir(x, 0o740); err != nil {
-			return fmt.Errorf("unable to create data directory(%s): %w", x, err)
-		}
-	}
-	return nil
-}
-
 func (c CommonArgs) CreateStorageHandles() (*api.Storage, *dg.Storage, error) {
 	fs, err := storage.NewFs(c.DataDir)
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := storage.NewDb(c.DbFile())
+	db, err := storage.NewDb(fs.Config.DbFile())
 	if err != nil {
 		return nil, nil, err
 	}

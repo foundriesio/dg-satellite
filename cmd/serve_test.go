@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/foundriesio/dg-satellite/context"
+	"github.com/foundriesio/dg-satellite/storage"
 )
 
 func TestServe(t *testing.T) {
@@ -22,6 +23,8 @@ func TestServe(t *testing.T) {
 	common := CommonArgs{
 		DataDir: filepath.Join(tmpDir, "data"),
 	}
+	fs, err := storage.NewFs(common.DataDir)
+	require.Nil(t, err)
 	apiAddress := ""
 	gatewayAddress := ""
 	startedWg := sync.WaitGroup{}
@@ -45,15 +48,15 @@ func TestServe(t *testing.T) {
 
 	err = csr.Run(common)
 	require.Nil(t, err)
-	caKeyFile, caFile := createSelfSignedRoot(t, common)
+	caKeyFile, caFile := createSelfSignedRoot(t, fs)
 	sign := CsrSignCmd{
 		CaKey:  caKeyFile,
 		CaCert: caFile,
-		Csr:    filepath.Join(common.CertsDir(), "tls.csr"),
+		Csr:    filepath.Join(fs.Config.CertsDir(), "tls.csr"),
 	}
 	require.Nil(t, sign.Run(common))
 	// create an empty ca file to make the server happy. no client will be able to handshake with it
-	require.Nil(t, os.WriteFile(filepath.Join(common.CertsDir(), "cas.pem"), []byte{}, 0o744))
+	require.Nil(t, os.WriteFile(filepath.Join(fs.Config.CertsDir(), "cas.pem"), []byte{}, 0o744))
 
 	go func() {
 		require.Nil(t, server.Run(common))

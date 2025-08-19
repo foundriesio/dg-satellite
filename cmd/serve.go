@@ -18,6 +18,7 @@ import (
 	"github.com/foundriesio/dg-satellite/server"
 	"github.com/foundriesio/dg-satellite/server/api"
 	"github.com/foundriesio/dg-satellite/server/gateway"
+	"github.com/foundriesio/dg-satellite/storage"
 )
 
 type ServeCmd struct {
@@ -29,7 +30,11 @@ type ServeCmd struct {
 
 func (c *ServeCmd) Run(args CommonArgs) error {
 	log := context.CtxGetLog(args.ctx)
-	gtwTlsConfig, err := args.gatewayTlsConfig()
+	fs, err := storage.NewFs(args.DataDir)
+	if err != nil {
+		return err
+	}
+	gtwTlsConfig, err := gatewayTlsConfig(fs)
 	if err != nil {
 		return err
 	}
@@ -106,8 +111,8 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	return nil
 }
 
-func (c CommonArgs) loadCas() (*x509.CertPool, error) {
-	path := filepath.Join(c.CertsDir(), "cas.pem")
+func loadCas(fs *storage.FsHandle) (*x509.CertPool, error) {
+	path := filepath.Join(fs.Config.CertsDir(), "cas.pem")
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read CAs file: %w", err)
@@ -118,18 +123,18 @@ func (c CommonArgs) loadCas() (*x509.CertPool, error) {
 	return caPool, nil
 }
 
-func (c CommonArgs) loadTlsKeyPair() (tls.Certificate, error) {
-	keyFile := filepath.Join(c.CertsDir(), "tls.key")
-	certFile := filepath.Join(c.CertsDir(), "tls.crt")
+func loadTlsKeyPair(fs *storage.FsHandle) (tls.Certificate, error) {
+	keyFile := filepath.Join(fs.Config.CertsDir(), "tls.key")
+	certFile := filepath.Join(fs.Config.CertsDir(), "tls.crt")
 	return tls.LoadX509KeyPair(certFile, keyFile)
 }
 
-func (c CommonArgs) gatewayTlsConfig() (*tls.Config, error) {
-	caPool, err := c.loadCas()
+func gatewayTlsConfig(fs *storage.FsHandle) (*tls.Config, error) {
+	caPool, err := loadCas(fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load gateway cert: %w", err)
 	}
-	kp, err := c.loadTlsKeyPair()
+	kp, err := loadTlsKeyPair(fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load gateway key: %w", err)
 	}

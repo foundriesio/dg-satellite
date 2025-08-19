@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/foundriesio/dg-satellite/storage"
 )
 
 type CsrSignCmd struct {
@@ -23,6 +25,10 @@ type CsrSignCmd struct {
 }
 
 func (c CsrSignCmd) Run(args CommonArgs) error {
+	fs, err := storage.NewFs(args.DataDir)
+	if err != nil {
+		return err
+	}
 	csr, err := loadCsr(c.Csr)
 	if err != nil {
 		return err
@@ -38,7 +44,7 @@ func (c CsrSignCmd) Run(args CommonArgs) error {
 		return err
 	}
 
-	tlsKey, err := loadKey(filepath.Join(args.CertsDir(), "tls.key"))
+	tlsKey, err := loadKey(filepath.Join(fs.Config.CertsDir(), "tls.key"))
 	if err != nil {
 		return err
 	}
@@ -72,7 +78,7 @@ func (c CsrSignCmd) Run(args CommonArgs) error {
 			Bytes: certDer,
 		},
 	)
-	certFile := filepath.Join(args.CertsDir(), "tls.crt")
+	certFile := filepath.Join(fs.Config.CertsDir(), "tls.crt")
 	if err := os.WriteFile(certFile, certPem, 0o744); err != nil {
 		return fmt.Errorf("unable to store TLS certificate: %w", err)
 	}

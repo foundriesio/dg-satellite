@@ -24,22 +24,40 @@ const (
 	EventsPrefix = "events"
 )
 
+type FsConfig string
+
+func (c FsConfig) RootDir() string {
+	return string(c)
+}
+
+func (c FsConfig) DbFile() string {
+	return filepath.Join(string(c), DbFile)
+}
+
+func (c FsConfig) CertsDir() string {
+	return filepath.Join(string(c), CertsDir)
+}
+
+func (c FsConfig) DevicesDir() string {
+	return filepath.Join(string(c), DevicesDir)
+}
+
 type FsHandle struct {
-	root string
+	Config FsConfig
 }
 
 func NewFs(root string) (*FsHandle, error) {
 	if err := os.MkdirAll(root, 0o744); err != nil {
 		return nil, fmt.Errorf("unable to initialize file storage: %w", err)
 	}
-	return &FsHandle{root: root}, nil
+	return &FsHandle{Config: FsConfig(root)}, nil
 }
 
 func (s FsHandle) devicePath(uuid, name string) string {
 	if len(name) == 0 {
-		return filepath.Join(s.root, DevicesDir, uuid)
+		return filepath.Join(s.Config.DevicesDir(), uuid)
 	}
-	return filepath.Join(s.root, DevicesDir, uuid, name)
+	return filepath.Join(s.Config.DevicesDir(), uuid, name)
 }
 
 func (s FsHandle) assertDevicePath(uuid string) error {

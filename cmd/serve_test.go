@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"sync"
 	"syscall"
 	"testing"
 
@@ -23,13 +22,12 @@ func TestServe(t *testing.T) {
 	require.Nil(t, err)
 	apiAddress := ""
 	gatewayAddress := ""
-	startedWg := sync.WaitGroup{}
-	startedWg.Add(1)
+	wait := make(chan bool)
 	server := ServeCmd{
 		startedCb: func(apiAddr, gwAddr string) {
 			apiAddress = apiAddr
 			gatewayAddress = gwAddr
-			startedWg.Done()
+			wait <- true
 		},
 	}
 
@@ -54,9 +52,13 @@ func TestServe(t *testing.T) {
 	require.Nil(t, fs.Certs.WriteFile(storage.CertsCasPemFile, []byte{}))
 
 	go func() {
-		require.Nil(t, server.Run(common))
+		if err = server.Run(common); err != nil {
+			// Unblock main thread and check an error over there
+			wait <- false
+		}
 	}()
-	startedWg.Wait()
+	<-wait
+	require.Nil(t, err)
 
 	r, err := http.Get(fmt.Sprintf("http://%s/doesnotexist", apiAddress))
 	require.Nil(t, err)

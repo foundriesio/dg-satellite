@@ -26,8 +26,12 @@ type CommonArgs struct {
 	ctx context.Context
 }
 
+func (c CommonArgs) DbFile() string {
+	return filepath.Join(c.DataDir, storage.DbFile)
+}
+
 func (c CommonArgs) CertsDir() string {
-	return filepath.Join(c.DataDir, "certs")
+	return filepath.Join(c.DataDir, storage.CertsDir)
 }
 
 func (c CommonArgs) MkDirs() error {
@@ -44,7 +48,7 @@ func (c CommonArgs) CreateStorageHandles() (*api.Storage, *dg.Storage, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := storage.NewDb(filepath.Join(c.DataDir, "db.sqlite"))
+	db, err := storage.NewDb(c.DbFile())
 	if err != nil {
 		return nil, nil, err
 	}

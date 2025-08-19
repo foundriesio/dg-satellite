@@ -43,7 +43,7 @@ func NewTestClient(t *testing.T) *testClient {
 	tmpDir := t.TempDir()
 	fsS, err := storage.NewFs(tmpDir)
 	require.Nil(t, err)
-	db, err := storage.NewDb(filepath.Join(tmpDir, "db.sqlite"))
+	db, err := storage.NewDb(filepath.Join(tmpDir, storage.DbFile))
 	require.Nil(t, err)
 	apiS, err := api.NewStorage(db, fsS)
 	require.Nil(t, err)

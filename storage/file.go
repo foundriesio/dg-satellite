@@ -12,9 +12,15 @@ import (
 )
 
 const (
-	Aktoml       = "aktoml"
-	HwInfo       = "hardware-info"
-	NetInfo      = "network-info"
+	// Global files/dirs
+	CertsDir   = "certs"
+	DbFile     = "db.sqlite"
+	DevicesDir = "devices"
+
+	// Per device files/dirs
+	AktomlFile   = "aktoml"
+	HwInfoFile   = "hardware-info"
+	NetInfoFile  = "network-info"
 	EventsPrefix = "events"
 )
 
@@ -31,9 +37,9 @@ func NewFs(root string) (*FsHandle, error) {
 
 func (s FsHandle) devicePath(uuid, name string) string {
 	if len(name) == 0 {
-		return filepath.Join(s.root, "devices", uuid)
+		return filepath.Join(s.root, DevicesDir, uuid)
 	}
-	return filepath.Join(s.root, "devices", uuid, name)
+	return filepath.Join(s.root, DevicesDir, uuid, name)
 }
 
 func (s FsHandle) assertDevicePath(uuid string) error {

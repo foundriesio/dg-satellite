@@ -116,13 +116,13 @@ func (s Storage) DeviceGet(uuid string) (*Device, error) {
 	}
 
 	var err error
-	if d.Aktoml, err = s.fs.ReadFile(d.Uuid, storage.Aktoml); err != nil {
+	if d.Aktoml, err = s.fs.ReadFile(d.Uuid, storage.AktomlFile); err != nil {
 		return nil, err
 	}
-	if d.HwInfo, err = s.fs.ReadFile(d.Uuid, storage.HwInfo); err != nil {
+	if d.HwInfo, err = s.fs.ReadFile(d.Uuid, storage.HwInfoFile); err != nil {
 		return nil, err
 	}
-	if d.NetInfo, err = s.fs.ReadFile(d.Uuid, storage.NetInfo); err != nil {
+	if d.NetInfo, err = s.fs.ReadFile(d.Uuid, storage.NetInfoFile); err != nil {
 		return nil, err
 	}
 

@@ -5,6 +5,7 @@ package server
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -57,9 +58,26 @@ func (s server) GetAddress() (ret string) {
 	return
 }
 
+func (s server) GetDnsName() (ret string) {
+	log := context.CtxGetLog(s.context)
+	if s.server.TLSConfig == nil || len(s.server.TLSConfig.Certificates) == 0 {
+		log.Error("programming error", "error", errTlsNotConfigured)
+	} else if cert := s.server.TLSConfig.Certificates[0].Leaf; cert == nil {
+		log.Error("programming error", "error", errTlsLeafCert)
+	} else if len(cert.DNSNames) > 0 {
+		ret = cert.DNSNames[0]
+	}
+	return
+}
+
 func adjustConnContext(ctx context.Context, conn net.Conn) context.Context {
 	cid := random.String(10) // No need for uuid, save some space
 	log := context.CtxGetLog(ctx).With("conn_id", cid)
 	// There is nothing meaningful to log before the TLS connection
 	return context.CtxWithLog(ctx, log)
 }
+
+var (
+	errTlsNotConfigured = errors.New("server TLS not configured properly")
+	errTlsLeafCert      = errors.New("since Golang 1.23, LoadX509KeyPair always sets TLS leaf cert")
+)

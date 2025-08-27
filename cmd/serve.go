@@ -37,10 +37,6 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	if err != nil {
 		return err
 	}
-	gwDnsName, err := dnsNameFromCert(gtwTlsConfig.Certificates[0])
-	if err != nil {
-		return err
-	}
 
 	apiS, gwS, err := args.CreateStorageHandles()
 	if err != nil {
@@ -74,11 +70,12 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	// GetAddress will be locked for that duration; but we need to give it a tiny favor to start.
 	time.Sleep(time.Millisecond * 2)
 	apiAddress := apiServer.GetAddress()
-	gatewayAddress := gtwServer.GetAddress()
+	gtwAddress := gtwServer.GetAddress()
+	gtwDnsName := gtwServer.GetDnsName()
 	log.Info("rest api server started", "addr", apiAddress)
-	log.Info("gateway server started", "addr", gatewayAddress, "dns_name", gwDnsName)
+	log.Info("gateway server started", "addr", gtwAddress, "dns_name", gtwDnsName)
 	if c.startedCb != nil {
-		c.startedCb(apiAddress, gatewayAddress)
+		c.startedCb(apiAddress, gtwAddress)
 	}
 
 	// setup channel to gracefully terminate server
@@ -144,17 +141,4 @@ func gatewayTlsConfig(fs *storage.FsHandle) (*tls.Config, error) {
 		ClientCAs:    caPool,
 	}
 	return cfg, nil
-}
-
-func dnsNameFromCert(cert tls.Certificate) (string, error) {
-	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return "", fmt.Errorf("failed to parse certificate: %w", err)
-	}
-
-	if len(x509Cert.DNSNames) == 0 {
-		return "", fmt.Errorf("no DNS names found in certificate")
-	}
-
-	return x509Cert.DNSNames[0], nil
 }

@@ -4,8 +4,6 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"os"
 	"os/signal"
@@ -29,37 +27,20 @@ type ServeCmd struct {
 func (c *ServeCmd) Run(args CommonArgs) error {
 	fs, err := storage.NewFs(args.DataDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load filesystem: %w", err)
 	}
-	gtwTlsConfig, err := gatewayTlsConfig(fs)
+	db, err := storage.NewDb(fs.Config.DbFile())
+	if err != nil {
+		return fmt.Errorf("failed to load database: %w", err)
+	}
+	apiServer, err := api.NewServer(args.ctx, db, fs, c.ApiPort)
 	if err != nil {
 		return err
 	}
-
-	apiS, gwS, err := args.CreateStorageHandles()
+	gtwServer, err := gateway.NewServer(args.ctx, db, fs, c.GatewayPort)
 	if err != nil {
 		return err
 	}
-
-	apiE := server.NewEchoServer()
-	api.RegisterHandlers(apiE, apiS)
-	apiServer := server.NewServer(
-		args.ctx,
-		apiE,
-		"rest-api",
-		c.ApiPort,
-		nil,
-	)
-
-	gtwE := server.NewEchoServer()
-	gateway.RegisterHandlers(gtwE, gwS)
-	gtwServer := server.NewServer(
-		args.ctx,
-		gtwE,
-		"gateway-api",
-		c.GatewayPort,
-		gtwTlsConfig,
-	)
 
 	quitErr := make(chan error, 2)
 	apiServer.Start(quitErr)
@@ -83,7 +64,7 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	for _, srv := range []server.Server{apiServer, gtwServer} {
+	for _, srv := range []*server.Server{apiServer, gtwServer} {
 		go func() {
 			srv.Shutdown(time.Minute)
 			wg.Done()
@@ -92,40 +73,4 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	wg.Wait()
 
 	return err
-}
-
-func loadCas(fs *storage.FsHandle) (*x509.CertPool, error) {
-	bytes, err := fs.Certs.ReadFile(storage.CertsCasPemFile)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read CAs file: %w", err)
-	}
-
-	caPool := x509.NewCertPool()
-	caPool.AppendCertsFromPEM(bytes)
-	return caPool, nil
-}
-
-func loadTlsKeyPair(fs *storage.FsHandle) (tls.Certificate, error) {
-	keyFile := fs.Certs.FilePath(storage.CertsTlsKeyFile)
-	certFile := fs.Certs.FilePath(storage.CertsTlsPemFile)
-	return tls.LoadX509KeyPair(certFile, keyFile)
-}
-
-func gatewayTlsConfig(fs *storage.FsHandle) (*tls.Config, error) {
-	caPool, err := loadCas(fs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load gateway cert: %w", err)
-	}
-	kp, err := loadTlsKeyPair(fs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load gateway key: %w", err)
-	}
-
-	cfg := &tls.Config{
-		Certificates: []tls.Certificate{kp},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		MinVersion:   tls.VersionTLS12,
-		ClientCAs:    caPool,
-	}
-	return cfg, nil
 }

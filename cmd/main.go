@@ -10,9 +10,6 @@ import (
 	"github.com/alexflint/go-arg"
 
 	"github.com/foundriesio/dg-satellite/context"
-	"github.com/foundriesio/dg-satellite/storage"
-	"github.com/foundriesio/dg-satellite/storage/api"
-	"github.com/foundriesio/dg-satellite/storage/dg"
 )
 
 type CommonArgs struct {
@@ -23,27 +20,6 @@ type CommonArgs struct {
 	Serve   *ServeCmd   `arg:"subcommand:serve" help:"Run the REST API and device-gateway services"`
 
 	ctx context.Context
-}
-
-func (c CommonArgs) CreateStorageHandles() (*api.Storage, *dg.Storage, error) {
-	fs, err := storage.NewFs(c.DataDir)
-	if err != nil {
-		return nil, nil, err
-	}
-	db, err := storage.NewDb(fs.Config.DbFile())
-	if err != nil {
-		return nil, nil, err
-	}
-	apiS, err := api.NewStorage(db, fs)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	dgS, err := dg.NewStorage(db, fs)
-	if err != nil {
-		return nil, nil, err
-	}
-	return apiS, dgS, nil
 }
 
 func main() {

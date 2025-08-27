@@ -37,17 +37,34 @@ func NewServer(ctx context.Context, echo *echo.Echo, name string, port uint16, t
 }
 
 func (s Server) Start(quit chan error) {
+	log := context.CtxGetLog(s.context)
 	go func() {
 		if err := s.echo.StartServer(s.server); err != nil && err != http.ErrServerClosed {
-			quit <- err
+			log.Error("failed to start server", "error", err)
+			quit <- fmt.Errorf("failed to start server %s: %w", s.name, err)
+		}
+	}()
+	go func() {
+		// Echo locks a mutex immediately at the Start call, and releases after port binding is done.
+		// GetAddress will be locked for that duration; but we need to give it a tiny favor to start.
+		time.Sleep(time.Millisecond * 2)
+		if addr := s.GetAddress(); addr != "" {
+			args := []any{"addr", addr}
+			if s.echo.TLSListener != nil {
+				args = append(args, "dns_name", s.GetDnsName())
+			}
+			log.Info("server started", args...)
 		}
 	}()
 }
 
-func (s Server) Shutdown(timeout time.Duration) error {
+func (s Server) Shutdown(timeout time.Duration) {
 	ctx, cancel := context.WithTimeout(s.context, timeout)
 	defer cancel()
-	return s.echo.Shutdown(ctx)
+	if err := s.echo.Shutdown(ctx); err != nil {
+		log := context.CtxGetLog(s.context)
+		log.Error("error stopping server", "error", err)
+	}
 }
 
 func (s Server) GetAddress() (ret string) {

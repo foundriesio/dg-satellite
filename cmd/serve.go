@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
 	"github.com/foundriesio/dg-satellite/server/api"
 	"github.com/foundriesio/dg-satellite/server/gateway"
@@ -28,7 +27,6 @@ type ServeCmd struct {
 }
 
 func (c *ServeCmd) Run(args CommonArgs) error {
-	log := context.CtxGetLog(args.ctx)
 	fs, err := storage.NewFs(args.DataDir)
 	if err != nil {
 		return err
@@ -63,21 +61,14 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 		gtwTlsConfig,
 	)
 
-	apiErr := make(chan error)
-	gtwErr := make(chan error)
-	apiServer.Start(apiErr)
-	gtwServer.Start(gtwErr)
+	quitErr := make(chan error, 2)
+	apiServer.Start(quitErr)
+	gtwServer.Start(quitErr)
 
-	// Echo locks a mutex immediately at the Start call, and releases after port binding is done.
-	// GetAddress will be locked for that duration; but we need to give it a tiny favor to start.
-	time.Sleep(time.Millisecond * 2)
-	apiAddress := apiServer.GetAddress()
-	gtwAddress := gtwServer.GetAddress()
-	gtwDnsName := gtwServer.GetDnsName()
-	log.Info("rest-api server started", "addr", apiAddress)
-	log.Info("gateway-api server started", "addr", gtwAddress, "dns_name", gtwDnsName)
 	if c.startedCb != nil {
-		c.startedCb(apiAddress, gtwAddress)
+		// Testing code, see serve_test.go
+		time.Sleep(time.Millisecond * 2)
+		c.startedCb(apiServer.GetAddress(), gtwServer.GetAddress())
 	}
 
 	// setup channel to gracefully terminate server
@@ -85,28 +76,22 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 
 	select {
-	case err := <-apiErr:
-		return fmt.Errorf("failed to start API server: %w", err)
-	case err := <-gtwErr:
-		return fmt.Errorf("failed to start gateway server: %w", err)
+	case err = <-quitErr:
 	case <-quit:
-		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
-			if err := apiServer.Shutdown(time.Minute); err != nil {
-				log.Error("unexpected error stopping rest-api server", "error", err)
-			}
-			wg.Done()
-		}()
-		go func() {
-			if err := gtwServer.Shutdown(time.Minute); err != nil {
-				log.Error("unexpected error stopping gateway server", "error", err)
-			}
-			wg.Done()
-		}()
-		wg.Wait()
+		break
 	}
-	return nil
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	for _, srv := range []server.Server{apiServer, gtwServer} {
+		go func() {
+			srv.Shutdown(time.Minute)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	return err
 }
 
 func loadCas(fs *storage.FsHandle) (*x509.CertPool, error) {

@@ -19,18 +19,21 @@ import (
 
 type Server struct {
 	context context.Context
+	name    string
 	echo    *echo.Echo
 	server  *http.Server
 }
 
-func NewServer(ctx context.Context, echo *echo.Echo, port uint16, tlsConfig *tls.Config) Server {
+func NewServer(ctx context.Context, echo *echo.Echo, name string, port uint16, tlsConfig *tls.Config) Server {
+	log := context.CtxGetLog(ctx).With("server", name)
+	ctx = context.CtxWithLog(ctx, log)
 	srv := &http.Server{
 		Addr:        fmt.Sprintf(":%d", port),
 		BaseContext: func(net.Listener) context.Context { return ctx },
 		ConnContext: adjustConnContext,
 		TLSConfig:   tlsConfig,
 	}
-	return Server{context: ctx, echo: echo, server: srv}
+	return Server{context: ctx, name: name, echo: echo, server: srv}
 }
 
 func (s Server) Start(quit chan error) {

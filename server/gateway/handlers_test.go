@@ -64,7 +64,7 @@ func NewTestClient(t *testing.T) *testClient {
 	log, err := context.InitLogger("debug")
 	require.Nil(t, err)
 
-	e := server.NewEchoServer("api-test")
+	e := server.NewEchoServer()
 	RegisterHandlers(e, gwS)
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)

@@ -43,20 +43,22 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 		return err
 	}
 
-	apiE := server.NewEchoServer("rest-api")
+	apiE := server.NewEchoServer()
 	api.RegisterHandlers(apiE, apiS)
 	apiServer := server.NewServer(
 		args.ctx,
 		apiE,
+		"rest-api",
 		c.ApiPort,
 		nil,
 	)
 
-	gtwE := server.NewEchoServer("dg-api")
+	gtwE := server.NewEchoServer()
 	gateway.RegisterHandlers(gtwE, gwS)
 	gtwServer := server.NewServer(
 		args.ctx,
 		gtwE,
+		"gateway-api",
 		c.GatewayPort,
 		gtwTlsConfig,
 	)
@@ -72,8 +74,8 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	apiAddress := apiServer.GetAddress()
 	gtwAddress := gtwServer.GetAddress()
 	gtwDnsName := gtwServer.GetDnsName()
-	log.Info("rest api server started", "addr", apiAddress)
-	log.Info("gateway server started", "addr", gtwAddress, "dns_name", gtwDnsName)
+	log.Info("rest-api server started", "addr", apiAddress)
+	log.Info("gateway-api server started", "addr", gtwAddress, "dns_name", gtwDnsName)
 	if c.startedCb != nil {
 		c.startedCb(apiAddress, gtwAddress)
 	}

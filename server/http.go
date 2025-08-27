@@ -17,23 +17,23 @@ import (
 	"github.com/foundriesio/dg-satellite/context"
 )
 
-type server struct {
+type Server struct {
 	context context.Context
 	echo    *echo.Echo
 	server  *http.Server
 }
 
-func NewServer(ctx context.Context, echo *echo.Echo, port uint16, tlsConfig *tls.Config) server {
+func NewServer(ctx context.Context, echo *echo.Echo, port uint16, tlsConfig *tls.Config) Server {
 	srv := &http.Server{
 		Addr:        fmt.Sprintf(":%d", port),
 		BaseContext: func(net.Listener) context.Context { return ctx },
 		ConnContext: adjustConnContext,
 		TLSConfig:   tlsConfig,
 	}
-	return server{context: ctx, echo: echo, server: srv}
+	return Server{context: ctx, echo: echo, server: srv}
 }
 
-func (s server) Start(quit chan error) {
+func (s Server) Start(quit chan error) {
 	go func() {
 		if err := s.echo.StartServer(s.server); err != nil && err != http.ErrServerClosed {
 			quit <- err
@@ -41,13 +41,13 @@ func (s server) Start(quit chan error) {
 	}()
 }
 
-func (s server) Shutdown(timeout time.Duration) error {
+func (s Server) Shutdown(timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(s.context, timeout)
 	defer cancel()
 	return s.echo.Shutdown(ctx)
 }
 
-func (s server) GetAddress() (ret string) {
+func (s Server) GetAddress() (ret string) {
 	// ListenerAddr waits for the server to start before returning
 	if addr := s.echo.TLSListenerAddr(); addr != nil {
 		// Addr can be nil when server fails to start
@@ -58,7 +58,7 @@ func (s server) GetAddress() (ret string) {
 	return
 }
 
-func (s server) GetDnsName() (ret string) {
+func (s Server) GetDnsName() (ret string) {
 	log := context.CtxGetLog(s.context)
 	if s.server.TLSConfig == nil || len(s.server.TLSConfig.Certificates) == 0 {
 		log.Error("programming error", "error", errTlsNotConfigured)

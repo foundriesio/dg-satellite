@@ -6,14 +6,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/alexflint/go-arg"
 
 	"github.com/foundriesio/dg-satellite/context"
-	"github.com/foundriesio/dg-satellite/storage"
-	"github.com/foundriesio/dg-satellite/storage/api"
-	"github.com/foundriesio/dg-satellite/storage/dg"
 )
 
 type CommonArgs struct {
@@ -24,40 +20,6 @@ type CommonArgs struct {
 	Serve   *ServeCmd   `arg:"subcommand:serve" help:"Run the REST API and device-gateway services"`
 
 	ctx context.Context
-}
-
-func (c CommonArgs) CertsDir() string {
-	return filepath.Join(c.DataDir, "certs")
-}
-
-func (c CommonArgs) MkDirs() error {
-	for _, x := range []string{c.DataDir, c.CertsDir()} {
-		if err := os.Mkdir(x, 0o740); err != nil {
-			return fmt.Errorf("unable to create data directory(%s): %w", x, err)
-		}
-	}
-	return nil
-}
-
-func (c CommonArgs) CreateStorageHandles() (*api.Storage, *dg.Storage, error) {
-	fs, err := storage.NewFs(c.DataDir)
-	if err != nil {
-		return nil, nil, err
-	}
-	db, err := storage.NewDb(filepath.Join(c.DataDir, "db.sqlite"))
-	if err != nil {
-		return nil, nil, err
-	}
-	apiS, err := api.NewStorage(db, fs)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	dgS, err := dg.NewStorage(db, fs)
-	if err != nil {
-		return nil, nil, err
-	}
-	return apiS, dgS, nil
 }
 
 func main() {

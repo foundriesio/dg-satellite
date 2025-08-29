@@ -113,4 +113,4 @@ done
 echo
 echo "## Generate TLS cert"
 cd ${DG_DIR}
-go run github.com/foundriesio/dg-satellite/cmd --datadir ${DATA_DIR} sign-csr --cakey ${DATA_DIR}/certs/factory_ca.key --cacert ${DATA_DIR}/certs/factory_ca.pem --csr ${DATA_DIR}/certs/tls.csr
+go run github.com/foundriesio/dg-satellite/cmd --datadir ${DATA_DIR} sign-csr --cakey ${DATA_DIR}/certs/factory_ca.key --cacert ${DATA_DIR}/certs/factory_ca.pem

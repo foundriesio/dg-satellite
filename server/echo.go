@@ -11,17 +11,16 @@ import (
 	"github.com/foundriesio/dg-satellite/context"
 )
 
-func NewEchoServer(name string) *echo.Echo {
+func NewEchoServer() *echo.Echo {
 	server := echo.New()
 	server.HideBanner = true
 	server.HidePort = true
 	server.Use(contextLogger())
-	server.Use(middlewareLogger(name))
+	server.Use(middlewareLogger())
 	return server
 }
 
-func middlewareLogger(name string) echo.MiddlewareFunc {
-	msg := name + " response"
+func middlewareLogger() echo.MiddlewareFunc {
 	return middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		HandleError:      true, // forwards error to the global error handler, so it can decide appropriate status code
 		LogContentLength: true,
@@ -33,10 +32,10 @@ func middlewareLogger(name string) echo.MiddlewareFunc {
 			log := context.CtxGetLog(c.Request().Context())
 			args := []any{"method", v.Method, "content-length", v.ContentLength, "status", v.Status}
 			if v.Error == nil {
-				log.Info(msg, args...)
+				log.Info("response", args...)
 			} else {
 				args = append(args, "err", v.Error.Error())
-				log.Error(msg, args...)
+				log.Error("response", args...)
 			}
 			return nil
 		},

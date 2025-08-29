@@ -6,31 +6,28 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
-	"sync"
 	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/foundriesio/dg-satellite/context"
+	"github.com/foundriesio/dg-satellite/storage"
 )
 
 func TestServe(t *testing.T) {
 	tmpDir := t.TempDir()
-	common := CommonArgs{
-		DataDir: filepath.Join(tmpDir, "data"),
-	}
+	common := CommonArgs{DataDir: tmpDir}
+	fs, err := storage.NewFs(common.DataDir)
+	require.Nil(t, err)
 	apiAddress := ""
 	gatewayAddress := ""
-	startedWg := sync.WaitGroup{}
-	startedWg.Add(1)
+	wait := make(chan bool)
 	server := ServeCmd{
 		startedCb: func(apiAddr, gwAddr string) {
 			apiAddress = apiAddr
 			gatewayAddress = gwAddr
-			startedWg.Done()
+			wait <- true
 		},
 	}
 
@@ -45,20 +42,23 @@ func TestServe(t *testing.T) {
 
 	err = csr.Run(common)
 	require.Nil(t, err)
-	caKeyFile, caFile := createSelfSignedRoot(t, common)
+	caKeyFile, caFile := createSelfSignedRoot(t, fs)
 	sign := CsrSignCmd{
 		CaKey:  caKeyFile,
 		CaCert: caFile,
-		Csr:    filepath.Join(common.CertsDir(), "tls.csr"),
 	}
 	require.Nil(t, sign.Run(common))
 	// create an empty ca file to make the server happy. no client will be able to handshake with it
-	require.Nil(t, os.WriteFile(filepath.Join(common.CertsDir(), "cas.pem"), []byte{}, 0o744))
+	require.Nil(t, fs.Certs.WriteFile(storage.CertsCasPemFile, []byte{}))
 
 	go func() {
-		require.Nil(t, server.Run(common))
+		if err = server.Run(common); err != nil {
+			// Unblock main thread and check an error over there
+			wait <- false
+		}
 	}()
-	startedWg.Wait()
+	<-wait
+	require.Nil(t, err)
 
 	r, err := http.Get(fmt.Sprintf("http://%s/doesnotexist", apiAddress))
 	require.Nil(t, err)

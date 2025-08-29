@@ -11,8 +11,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"os"
-	"path/filepath"
+
+	"github.com/foundriesio/dg-satellite/storage"
 )
 
 type CsrCmd struct {
@@ -21,7 +21,11 @@ type CsrCmd struct {
 }
 
 func (c CsrCmd) Run(args CommonArgs) error {
-	if err := args.MkDirs(); err != nil {
+	fs, err := storage.NewFs(args.DataDir)
+	if err != nil {
+		return err
+	}
+	if err = fs.Certs.AssertCleanTls(); err != nil {
 		return err
 	}
 
@@ -46,7 +50,6 @@ func (c CsrCmd) Run(args CommonArgs) error {
 		return fmt.Errorf("unexpected error creating CSR: %w", err)
 	}
 
-	keyFile := filepath.Join(args.CertsDir(), "tls.key")
 	privDer, err := x509.MarshalECPrivateKey(priv)
 	if err != nil {
 		return fmt.Errorf("unexpected error encoding private key: %w", err)
@@ -57,27 +60,19 @@ func (c CsrCmd) Run(args CommonArgs) error {
 			Bytes: privDer,
 		},
 	)
-	if err := os.WriteFile(keyFile, privPem, 0o740); err != nil {
-		return fmt.Errorf("unable to store TLS private key for CSR: %w", err)
+	if err := fs.Certs.WriteFile(storage.CertsTlsKeyFile, privPem); err != nil {
+		return fmt.Errorf("unable to store TLS private key file: %w", err)
 	}
 
-	csrFile := filepath.Join(args.CertsDir(), "tls.csr")
-	fd, err := os.Create(csrFile)
-	if err != nil {
-		return fmt.Errorf("unable to write TLS CSR: %w", err)
+	csrPem := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "CERTIFICATE REQUEST",
+			Bytes: csrBytes,
+		},
+	)
+	if err := fs.Certs.WriteFile(storage.CertsTlsCsrFile, csrPem); err != nil {
+		return fmt.Errorf("unable to store TLS CSR file: %w", err)
 	}
-	defer func() {
-		if err := fd.Close(); err != nil {
-			fmt.Println("Unexpected error closing file", err)
-		}
-	}()
-	if err := pem.Encode(fd, &pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrBytes}); err != nil {
-		return fmt.Errorf("unexpected error in pem-encode: %w", err)
-	}
-	fmt.Println("CSR written to:", csrFile)
-	if err := pem.Encode(os.Stdout, &pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrBytes}); err != nil {
-		return fmt.Errorf("unexpected error in pem-encode: %w", err)
-	}
-
+	fmt.Println(string(csrPem))
 	return nil
 }

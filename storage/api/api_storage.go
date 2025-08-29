@@ -116,13 +116,13 @@ func (s Storage) DeviceGet(uuid string) (*Device, error) {
 	}
 
 	var err error
-	if d.Aktoml, err = s.fs.ReadFile(d.Uuid, storage.Aktoml); err != nil {
+	if d.Aktoml, err = s.fs.Devices.ReadFile(d.Uuid, storage.AktomlFile); err != nil {
 		return nil, err
 	}
-	if d.HwInfo, err = s.fs.ReadFile(d.Uuid, storage.HwInfo); err != nil {
+	if d.HwInfo, err = s.fs.Devices.ReadFile(d.Uuid, storage.HwInfoFile); err != nil {
 		return nil, err
 	}
-	if d.NetInfo, err = s.fs.ReadFile(d.Uuid, storage.NetInfo); err != nil {
+	if d.NetInfo, err = s.fs.Devices.ReadFile(d.Uuid, storage.NetInfoFile); err != nil {
 		return nil, err
 	}
 
@@ -206,7 +206,7 @@ func (s *stmtDeviceSetUpdate) run(uuids []string, updateName string) error {
 }
 
 func (d Device) Updates() ([]string, error) {
-	names, err := d.storage.fs.ListFiles(d.Uuid, storage.EventsPrefix, true)
+	names, err := d.storage.fs.Devices.ListFiles(d.Uuid, storage.EventsPrefix, true)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (d Device) Updates() ([]string, error) {
 
 func (d Device) Events(updateId string) ([]storage.DeviceUpdateEvent, error) {
 	name := fmt.Sprintf("%s-%s", storage.EventsPrefix, updateId)
-	content, err := d.storage.fs.ReadFile(d.Uuid, name)
+	content, err := d.storage.fs.Devices.ReadFile(d.Uuid, name)
 	if err != nil {
 		return nil, err
 	}

@@ -78,8 +78,8 @@ func TestStorage(t *testing.T) {
 	require.Nil(t, err)
 	require.Less(t, d.LastSeen, d2.LastSeen)
 
-	require.Nil(t, d2.PutFile(storage.Aktoml, "test content"))
-	content, err := fs.ReadFile(d2.Uuid, storage.Aktoml)
+	require.Nil(t, d2.PutFile(storage.AktomlFile, "test content"))
+	content, err := fs.Devices.ReadFile(d2.Uuid, storage.AktomlFile)
 	require.Nil(t, err)
 	require.Equal(t, "test content", content)
 }
@@ -115,7 +115,7 @@ func Test_ProcessEvents(t *testing.T) {
 		require.Equal(t, s.maxEvents, len(files))
 		for i, name := range files {
 			pack := fmt.Sprintf("test-%d", i+skip) // Some initial events must get stripped
-			content, err := fs.ReadFile(d.Uuid, name)
+			content, err := fs.Devices.ReadFile(d.Uuid, name)
 			require.Nil(t, err)
 			for _, line := range strings.Split(content, "\n") {
 				if len(line) == 0 {
@@ -128,7 +128,7 @@ func Test_ProcessEvents(t *testing.T) {
 		}
 	}
 
-	files, err := fs.ListFiles(d.Uuid, storage.EventsPrefix, true)
+	files, err := fs.Devices.ListFiles(d.Uuid, storage.EventsPrefix, true)
 	require.Nil(t, err)
 	validate(files, 3)
 
@@ -141,7 +141,7 @@ func Test_ProcessEvents(t *testing.T) {
 	events[0].Event.Details = lastEventPack
 	require.Nil(t, d.ProcessEvents(events))
 
-	files, err = fs.ListFiles(d.Uuid, storage.EventsPrefix, true)
+	files, err = fs.Devices.ListFiles(d.Uuid, storage.EventsPrefix, true)
 	require.Nil(t, err)
 	validate(files, 4)
 }

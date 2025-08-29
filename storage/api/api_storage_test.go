@@ -41,7 +41,7 @@ func TestStorage(t *testing.T) {
 	// Create two devices to list/get on
 	d2, err := dg.DeviceCreate("uuid-1", "pubkey-value-1", false)
 	require.Nil(t, err)
-	require.Nil(t, d2.PutFile(storage.Aktoml, "aktoml content"))
+	require.Nil(t, d2.PutFile(storage.AktomlFile, "aktoml content"))
 	time.Sleep(time.Second)
 	_, err = dg.DeviceCreate("uuid-2", "pubkey-value-2", false)
 	require.Nil(t, err)

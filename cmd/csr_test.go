@@ -11,11 +11,12 @@ import (
 	"errors"
 	"math/big"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/foundriesio/dg-satellite/storage"
 )
 
 func TestCsr(t *testing.T) {
@@ -26,34 +27,34 @@ func TestCsr(t *testing.T) {
 		Factory: "example",
 	}
 
-	// fail because we require a new directory (so we don't accidentally overwrite our key)
 	common := CommonArgs{
 		DataDir: tmpDir,
 	}
-	err := csr.Run(common)
-	require.NotNil(t, err)
-	require.True(t, errors.Is(err, os.ErrExist))
-
-	common.DataDir = filepath.Join(common.DataDir, "data")
 	require.Nil(t, csr.Run(common))
 
+	fs, err := storage.NewFs(common.DataDir)
+	require.Nil(t, err)
 	// Create a root CA
-	caKeyFile, caFile := createSelfSignedRoot(t, common)
+	caKeyFile, caFile := createSelfSignedRoot(t, fs)
 
 	sign := CsrSignCmd{
 		CaKey:  caKeyFile,
 		CaCert: caFile,
-		Csr:    filepath.Join(common.CertsDir(), "tls.csr"),
 	}
 	require.Nil(t, sign.Run(common))
 
-	cert, err := loadCert(filepath.Join(common.CertsDir(), "tls.crt"))
+	cert, err := loadCert(fs.Certs.FilePath(storage.CertsTlsPemFile))
 	require.Nil(t, err)
 	require.Equal(t, "example.com", cert.Subject.CommonName)
+
+	// fail second run because we require a new directory (so we don't accidentally overwrite a key)
+	err = csr.Run(common)
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, os.ErrExist))
 }
 
-func createSelfSignedRoot(t *testing.T, common CommonArgs) (string, string) {
-	caKeyFile := filepath.Join(common.CertsDir(), "tls.key") // just steal the key we already generated
+func createSelfSignedRoot(t *testing.T, fs *storage.FsHandle) (string, string) {
+	caKeyFile := fs.Certs.FilePath(storage.CertsTlsKeyFile) // reuse the key we already generated
 	key, err := loadKey(caKeyFile)
 	require.Nil(t, err)
 
@@ -76,7 +77,7 @@ func createSelfSignedRoot(t *testing.T, common CommonArgs) (string, string) {
 			Bytes: caDer,
 		},
 	)
-	caFile := filepath.Join(common.CertsDir(), "ca.crt")
-	require.Nil(t, os.WriteFile(caFile, caPem, 0o744))
+	caFile := fs.Certs.FilePath("ca.pem")
+	require.Nil(t, os.WriteFile(caFile, caPem, 0o740))
 	return caKeyFile, caFile
 }

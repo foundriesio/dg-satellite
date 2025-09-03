@@ -11,7 +11,7 @@ import (
 
 // @Summary Get server side information on device
 // @Produce json
-// @Success 200 {object} dg.DgDevice
+// @Success 200 {object} Device
 // @Router  /device [get]
 func (handlers) deviceGet(c echo.Context) error {
 	d := getDevice(c)

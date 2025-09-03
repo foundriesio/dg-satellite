@@ -14,21 +14,20 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/foundriesio/dg-satellite/context"
-	"github.com/foundriesio/dg-satellite/server"
-	"github.com/foundriesio/dg-satellite/storage"
-	"github.com/foundriesio/dg-satellite/storage/gateway"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
+
+	"github.com/foundriesio/dg-satellite/context"
+	"github.com/foundriesio/dg-satellite/server"
+	storage "github.com/foundriesio/dg-satellite/storage/gateway"
 )
 
 type testClient struct {
 	t   *testing.T
-	gw  *gateway.Storage
+	gw  *storage.Storage
 	e   *echo.Echo
 	log *slog.Logger
 
@@ -56,9 +55,9 @@ func NewTestClient(t *testing.T) *testClient {
 	tmpDir := t.TempDir()
 	fsS, err := storage.NewFs(tmpDir)
 	require.Nil(t, err)
-	db, err := storage.NewDb(filepath.Join(tmpDir, storage.DbFile))
+	db, err := storage.NewDb(fsS.Config.DbFile())
 	require.Nil(t, err)
-	gwS, err := gateway.NewStorage(db, fsS)
+	gwS, err := storage.NewStorage(db, fsS)
 	require.Nil(t, err)
 
 	log, err := context.InitLogger("debug")
@@ -89,7 +88,7 @@ func TestApiDevice(t *testing.T) {
 	lastSeen := time.Now().Add(-1 * time.Second).Unix()
 	tc := NewTestClient(t)
 	deviceBytes := tc.GET("/device", 200)
-	var device gateway.DgDevice
+	var device storage.DgDevice
 	require.Nil(t, json.Unmarshal(deviceBytes, &device))
 	require.Equal(t, tc.cert.Subject.CommonName, device.Uuid)
 	require.Less(t, lastSeen, device.LastSeen)

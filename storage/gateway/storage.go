@@ -13,9 +13,34 @@ import (
 	"github.com/foundriesio/dg-satellite/storage"
 )
 
+type (
+	// Convenience aliases for importing modules
+	DbHandle = storage.DbHandle
+	FsHandle = storage.FsHandle
+
+	DeviceUpdateEvent = storage.DeviceUpdateEvent
+)
+
+var (
+	NewDb = storage.NewDb
+	NewFs = storage.NewFs
+)
+
+const (
+	// TLS certs
+	CertsCasPemFile = "cas.pem"
+	CertsTlsKeyFile = "tls.key"
+	CertsTlsPemFile = "tls.pem"
+
+	// Per device files/dirs
+	AktomlFile  = "aktoml"
+	HwInfoFile  = "hardware-info"
+	NetInfoFile = "network-info"
+)
+
 type Storage struct {
-	db *storage.DbHandle
-	fs *storage.FsHandle
+	db *DbHandle
+	fs *FsHandle
 
 	stmtDeviceCheckIn stmtDeviceCheckIn
 	stmtDeviceCreate  stmtDeviceCreate

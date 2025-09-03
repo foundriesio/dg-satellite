@@ -88,7 +88,7 @@ func TestApiDevice(t *testing.T) {
 	lastSeen := time.Now().Add(-1 * time.Second).Unix()
 	tc := NewTestClient(t)
 	deviceBytes := tc.GET("/device", 200)
-	var device storage.DgDevice
+	var device storage.Device
 	require.Nil(t, json.Unmarshal(deviceBytes, &device))
 	require.Equal(t, tc.cert.Subject.CommonName, device.Uuid)
 	require.Less(t, lastSeen, device.LastSeen)

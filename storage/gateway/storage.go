@@ -49,7 +49,7 @@ type Storage struct {
 	maxEvents int
 }
 
-type DgDevice struct {
+type Device struct {
 	storage Storage
 
 	Uuid       string
@@ -60,17 +60,17 @@ type DgDevice struct {
 	IsProd     bool
 }
 
-func (d *DgDevice) CheckIn(targetName, tag, ostreeHash string, apps []string) error {
+func (d *Device) CheckIn(targetName, tag, ostreeHash string, apps []string) error {
 	appsStr := strings.Join(apps, ",")
 	now := time.Now().Unix()
 	return d.storage.stmtDeviceCheckIn.run(d.Uuid, targetName, tag, ostreeHash, appsStr, now)
 }
 
-func (d *DgDevice) PutFile(name string, content string) error {
+func (d *Device) PutFile(name string, content string) error {
 	return d.storage.fs.Devices.WriteFile(d.Uuid, name, content)
 }
 
-func (d DgDevice) ProcessEvents(events []storage.DeviceUpdateEvent) error {
+func (d Device) ProcessEvents(events []storage.DeviceUpdateEvent) error {
 	var corrId string
 	for _, evt := range events {
 		if corrId != "" && corrId != evt.Event.CorrelationId {
@@ -110,13 +110,13 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	return &handle, nil
 }
 
-func (s Storage) DeviceCreate(uuid, pubkey string, isProd bool) (*DgDevice, error) {
+func (s Storage) DeviceCreate(uuid, pubkey string, isProd bool) (*Device, error) {
 	now := time.Now().Unix()
 	if err := s.stmtDeviceCreate.run(uuid, pubkey, now, now, isProd); err != nil {
 		return nil, err
 	}
 
-	d := DgDevice{
+	d := Device{
 		storage: s,
 		Uuid:    uuid,
 
@@ -127,8 +127,8 @@ func (s Storage) DeviceCreate(uuid, pubkey string, isProd bool) (*DgDevice, erro
 	return &d, nil
 }
 
-func (s Storage) DeviceGet(uuid string) (*DgDevice, error) {
-	d := DgDevice{storage: s, Uuid: uuid}
+func (s Storage) DeviceGet(uuid string) (*Device, error) {
+	d := Device{storage: s, Uuid: uuid}
 	if err := s.stmtDeviceGet.run(uuid, &d); err != nil {
 		if err == sql.ErrNoRows {
 			err = nil
@@ -180,6 +180,6 @@ func (s *stmtDeviceGet) Init(db storage.DbHandle) (err error) {
 	return
 }
 
-func (s *stmtDeviceGet) run(uuid string, d *DgDevice) error {
+func (s *stmtDeviceGet) run(uuid string, d *Device) error {
 	return s.Stmt.QueryRow(uuid).Scan(&d.Deleted, &d.PubKey, &d.UpdateName, &d.LastSeen)
 }

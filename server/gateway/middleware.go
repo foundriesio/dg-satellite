@@ -95,6 +95,6 @@ func getBusinessCategory(subject pkix.Name) string {
 	return ""
 }
 
-func getDevice(c echo.Context) *storage.DgDevice {
-	return c.Request().Context().Value(DeviceKey).(*storage.DgDevice)
+func getDevice(c echo.Context) *storage.Device {
+	return c.Request().Context().Value(DeviceKey).(*storage.Device)
 }

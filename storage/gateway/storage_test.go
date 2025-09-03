@@ -161,7 +161,7 @@ func Benchmark_ProcessEvents(b *testing.B) {
 	require.Nil(b, err)
 
 	// Create fake devices
-	var devices []*DgDevice
+	var devices []*Device
 	for i := 0; i < 10; i++ {
 		id := uuid.New().String()
 		d, err := s.DeviceCreate(id, "pubkey", false)
@@ -196,7 +196,7 @@ func Benchmark_CheckIn(b *testing.B) {
 	require.Nil(b, err)
 
 	// Create fake devices
-	var devices []*DgDevice
+	var devices []*Device
 	for range 100 {
 		id := uuid.New().String()
 		d, err := s.DeviceCreate(id, "pubkey"+id, false)

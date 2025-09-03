@@ -11,7 +11,7 @@ import (
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
 	"github.com/foundriesio/dg-satellite/storage"
-	"github.com/foundriesio/dg-satellite/storage/dg"
+	"github.com/foundriesio/dg-satellite/storage/gateway"
 )
 
 const serverName = "gateway-api"
@@ -21,7 +21,7 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to load %s TLS config: %w", serverName, err)
 	}
-	strg, err := dg.NewStorage(db, fs)
+	strg, err := gateway.NewStorage(db, fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load %s storage: %w", serverName, err)
 	}

@@ -13,7 +13,7 @@ import (
 	"net/http"
 
 	dgctx "github.com/foundriesio/dg-satellite/context"
-	"github.com/foundriesio/dg-satellite/storage/dg"
+	"github.com/foundriesio/dg-satellite/storage/gateway"
 	"github.com/labstack/echo/v4"
 )
 
@@ -94,6 +94,6 @@ func getBusinessCategory(subject pkix.Name) string {
 	return ""
 }
 
-func getDevice(c echo.Context) *dg.DgDevice {
-	return c.Request().Context().Value(DeviceKey).(*dg.DgDevice)
+func getDevice(c echo.Context) *gateway.DgDevice {
+	return c.Request().Context().Value(DeviceKey).(*gateway.DgDevice)
 }

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/foundriesio/dg-satellite/storage"
-	"github.com/foundriesio/dg-satellite/storage/dg"
+	"github.com/foundriesio/dg-satellite/storage/gateway"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,7 @@ func TestStorage(t *testing.T) {
 	s, err := NewStorage(db, fs)
 	require.Nil(t, err)
 
-	dg, err := dg.NewStorage(db, fs)
+	dg, err := gateway.NewStorage(db, fs)
 	require.Nil(t, err)
 
 	// Test 404 type operation

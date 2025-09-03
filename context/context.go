@@ -16,6 +16,7 @@ type (
 var (
 	Background  = context.Background
 	WithTimeout = context.WithTimeout
+	WithValue   = context.WithValue
 )
 
 const (
@@ -26,6 +27,6 @@ func CtxGetLog(ctx context.Context) *slog.Logger {
 	return ctx.Value(ctxKeyLogger).(*slog.Logger)
 }
 
-func CtxWithLog(ctx context.Context, log *slog.Logger) context.Context {
-	return context.WithValue(ctx, ctxKeyLogger, log)
+func CtxWithLog(ctx Context, log *slog.Logger) Context {
+	return WithValue(ctx, ctxKeyLogger, log)
 }

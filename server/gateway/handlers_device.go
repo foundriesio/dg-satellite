@@ -14,6 +14,7 @@ import (
 // @Success 200 {object} Device
 // @Router  /device [get]
 func (handlers) deviceGet(c echo.Context) error {
-	d := getDevice(c)
+	ctx := c.Request().Context()
+	d := CtxGetDevice(ctx)
 	return c.JSON(http.StatusOK, d)
 }

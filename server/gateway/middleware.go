@@ -4,7 +4,6 @@
 package gateway
 
 import (
-	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -13,14 +12,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-
-	dgctx "github.com/foundriesio/dg-satellite/context"
-	storage "github.com/foundriesio/dg-satellite/storage/gateway"
 )
-
-type _DeviceKey int
-
-const DeviceKey = _DeviceKey(1)
 
 var (
 	businessCategoryOid        = asn1.ObjectIdentifier{2, 5, 4, 15}
@@ -30,11 +22,11 @@ var (
 func (h handlers) authDevice(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		req := c.Request()
-		ctx := req.Context()
-		log := dgctx.CtxGetLog(ctx)
-		tls := c.Request().TLS
-		cert := tls.PeerCertificates[0]
+		cert := req.TLS.PeerCertificates[0]
 		uuid := cert.Subject.CommonName
+		ctx := req.Context()
+		log := CtxGetLog(ctx).With("device", uuid)
+		ctx = CtxWithLog(ctx, log)
 
 		isProd := getBusinessCategory(cert.Subject) == businessCategoryProduction
 		pub, err := pubkey(cert)
@@ -45,17 +37,17 @@ func (h handlers) authDevice(next echo.HandlerFunc) echo.HandlerFunc {
 		device, err := h.storage.DeviceGet(uuid)
 
 		if err != nil {
-			log.Error("Unable to query for device", "uuid", uuid, "error", err)
+			log.Error("Unable to query for device", "error", err)
 			return c.String(http.StatusBadGateway, err.Error())
 		} else if device == nil {
 			device, err = h.storage.DeviceCreate(cert.Subject.CommonName, pub, isProd)
 			if err != nil {
-				log.Error("Unable to create device", "cn", cert.Subject.CommonName, "error", err)
+				log.Error("Unable to create device", "error", err)
 				return c.String(http.StatusBadGateway, err.Error())
 			}
-			log.Info("Created device", "uuid", device.Uuid)
+			log.Info("Created device")
 		} else if device.Deleted {
-			return c.String(http.StatusForbidden, fmt.Sprintf("Device(%s) has been deleted", cert.Subject.CommonName))
+			return c.String(http.StatusForbidden, fmt.Sprintf("Device(%s) has been deleted", uuid))
 		} else if pub != device.PubKey {
 			/*if err := device.RotatePubKey(pub); err != nil {
 				return c.String(http.StatusForbidden, err.Error())
@@ -63,9 +55,7 @@ func (h handlers) authDevice(next echo.HandlerFunc) echo.HandlerFunc {
 			panic("TODO ROTATE KEY")
 		}
 
-		ctx = context.WithValue(c.Request().Context(), DeviceKey, device)
-		log = log.With("device", uuid)
-		ctx = dgctx.CtxWithLog(ctx, log)
+		ctx = CtxWithDevice(ctx, device)
 		c.SetRequest(req.WithContext(ctx))
 
 		return next(c)
@@ -92,8 +82,4 @@ func getBusinessCategory(subject pkix.Name) string {
 		}
 	}
 	return ""
-}
-
-func getDevice(c echo.Context) *storage.Device {
-	return c.Request().Context().Value(DeviceKey).(*storage.Device)
 }

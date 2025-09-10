@@ -62,7 +62,6 @@ func (h handlers) authDevice(next echo.HandlerFunc) echo.HandlerFunc {
 			}*/
 			panic("TODO ROTATE KEY")
 		}
-		device.IsProd = isProd
 
 		ctx = context.WithValue(c.Request().Context(), DeviceKey, device)
 		log = log.With("device", uuid)

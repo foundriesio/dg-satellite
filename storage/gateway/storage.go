@@ -123,6 +123,7 @@ func (s Storage) DeviceCreate(uuid, pubkey string, isProd bool) (*Device, error)
 		Deleted:  false,
 		LastSeen: now,
 		PubKey:   pubkey,
+		IsProd:   isProd,
 	}
 	return &d, nil
 }
@@ -173,7 +174,7 @@ type stmtDeviceGet storage.DbStmt
 
 func (s *stmtDeviceGet) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("DeviceGet", `
-		SELECT deleted, pubkey, update_name, last_seen
+		SELECT deleted, pubkey, update_name, last_seen, is_prod
 		FROM devices
 		WHERE uuid = ?`,
 	)
@@ -181,5 +182,5 @@ func (s *stmtDeviceGet) Init(db storage.DbHandle) (err error) {
 }
 
 func (s *stmtDeviceGet) run(uuid string, d *Device) error {
-	return s.Stmt.QueryRow(uuid).Scan(&d.Deleted, &d.PubKey, &d.UpdateName, &d.LastSeen)
+	return s.Stmt.QueryRow(uuid).Scan(&d.Deleted, &d.PubKey, &d.UpdateName, &d.LastSeen, &d.IsProd)
 }

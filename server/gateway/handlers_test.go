@@ -49,7 +49,7 @@ func (c testClient) GET(resource string, status int, headers ...string) []byte {
 	req := httptest.NewRequest(http.MethodGet, resource, nil)
 	c.marshalHeaders(headers, req)
 	rec := c.Do(req)
-	require.Equal(c.t, http.StatusOK, rec.Code)
+	require.Equal(c.t, status, rec.Code)
 	return rec.Body.Bytes()
 }
 

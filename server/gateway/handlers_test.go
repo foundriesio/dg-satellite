@@ -58,6 +58,14 @@ func (c testClient) GET(resource string, status int, headers ...string) []byte {
 	return rec.Body.Bytes()
 }
 
+func (c testClient) POST(resource string, status int, data any, headers ...string) []byte {
+	req := httptest.NewRequest(http.MethodPost, resource, c.marshalBody(data))
+	c.marshalHeaders(headers, req)
+	rec := c.Do(req)
+	require.Equal(c.t, status, rec.Code)
+	return rec.Body.Bytes()
+}
+
 func (c testClient) PUT(resource string, status int, data any, headers ...string) []byte {
 	req := httptest.NewRequest(http.MethodPut, resource, c.marshalBody(data))
 	c.marshalHeaders(headers, req)
@@ -173,12 +181,20 @@ func TestInfo(t *testing.T) {
 	hwInfoBad := `{key=value}`
 	nwInfo := `{"hostname":"example.org"}`
 	nwInfoBad := `{"hostname":123}`
+	stInfo := `{"deviceTime":"2025-09-12T10:00:00Z"}`
+	stInfo1 := `{"deviceTime":"2025-09-12T10:00:05Z"}`
+	stInfoBad := `{"deviceTime":"2025-09-12 10:00:00"}`
+
 	tc := NewTestClient(t)
 	_ = tc.PUT("/system_info", 200, hwInfo)
 	_ = tc.PUT("/system_info", 400, hwInfoBad)
 	_ = tc.PUT("/system_info/config", 200, akInfo)
 	_ = tc.PUT("/system_info/network", 200, nwInfo)
 	_ = tc.PUT("/system_info/network", 400, nwInfoBad)
+	_ = tc.POST("/apps-states", 200, stInfo)
+	_ = tc.POST("/apps-states", 200, stInfo1)
+	_ = tc.POST("/apps-states", 400, stInfoBad)
+
 	data, err := tc.fs.Devices.ReadFile(tc.uuid, storage.AktomlFile)
 	assert.Nil(t, err)
 	assert.Equal(t, akInfo, data)
@@ -188,4 +204,27 @@ func TestInfo(t *testing.T) {
 	data, err = tc.fs.Devices.ReadFile(tc.uuid, storage.NetInfoFile)
 	assert.Nil(t, err)
 	assert.Equal(t, nwInfo, data)
+
+	states, err := tc.fs.Devices.ListFiles(tc.uuid, storage.StatesPrefix, true)
+	require.Nil(t, err)
+	assert.Equal(t, 2, len(states))
+	exp := []string{stInfo, stInfo1}
+	for idx, name := range states {
+		data, err = tc.fs.Devices.ReadFile(tc.uuid, name)
+		assert.Nil(t, err)
+		assert.Equal(t, exp[idx], data)
+	}
+
+	// apps states rollover
+	for i := 0; i < 15; i++ {
+		_ = tc.POST("/apps-states", 200, stInfo1)
+	}
+	states, err = tc.fs.Devices.ListFiles(tc.uuid, storage.StatesPrefix, true)
+	require.Nil(t, err)
+	assert.Equal(t, 10, len(states))
+	for _, name := range states {
+		data, err = tc.fs.Devices.ReadFile(tc.uuid, name)
+		assert.Nil(t, err)
+		assert.Equal(t, stInfo1, data)
+	}
 }

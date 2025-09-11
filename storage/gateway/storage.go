@@ -32,9 +32,10 @@ const (
 	CertsTlsPemFile = storage.CertsTlsPemFile
 
 	// Per device files/dirs
-	AktomlFile  = storage.AktomlFile
-	HwInfoFile  = storage.HwInfoFile
-	NetInfoFile = storage.NetInfoFile
+	AktomlFile   = storage.AktomlFile
+	HwInfoFile   = storage.HwInfoFile
+	NetInfoFile  = storage.NetInfoFile
+	StatesPrefix = storage.StatesPrefix
 )
 
 type Storage struct {
@@ -46,6 +47,7 @@ type Storage struct {
 	stmtDeviceGet     stmtDeviceGet
 
 	maxEvents int
+	maxStates int
 }
 
 type Device struct {
@@ -104,11 +106,23 @@ func (d Device) ProcessEvents(events []storage.DeviceUpdateEvent) error {
 	return d.storage.fs.Devices.RolloverFiles(d.Uuid, storage.EventsPrefix, d.storage.maxEvents)
 }
 
+func (d Device) SaveAppsStates(content string) error {
+	// Apps states ordering depends onto ModTime.
+	// Make sure that a later events file gets a later ModTime.
+	time.Sleep(4 * time.Millisecond)
+	name := fmt.Sprintf("%s-%d", storage.StatesPrefix, time.Now().UnixMilli())
+	if err := d.storage.fs.Devices.WriteFile(d.Uuid, name, content); err != nil {
+		return err
+	}
+	return d.storage.fs.Devices.RolloverFiles(d.Uuid, storage.StatesPrefix, d.storage.maxStates)
+}
+
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	handle := Storage{
 		db:        db,
 		fs:        fs,
 		maxEvents: 20,
+		maxStates: 10,
 	}
 
 	if err := db.InitStmt(

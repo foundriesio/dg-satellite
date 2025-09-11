@@ -27,6 +27,7 @@ const (
 	HwInfoFile   = "hardware-info"
 	NetInfoFile  = "network-info"
 	EventsPrefix = "events"
+	StatesPrefix = "apps-states"
 )
 
 type FsConfig string

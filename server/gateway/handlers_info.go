@@ -3,7 +3,9 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -62,6 +64,30 @@ func (handlers) networkInfo(c echo.Context) error {
 		return err
 	} else if err = d.PutFile(storage.NetInfoFile, string(bytes)); err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Failed to save netinfo")
+	} else {
+		return c.String(http.StatusOK, "")
+	}
+}
+
+// @Summary Store the apps states info of a device
+// @Accept  json
+// @Param   data body AppsStates true "Apps States"
+// @Produce plain
+// @Success 200 ""
+// @Router  /apps-states [post]
+func (handlers) appsStatesInfo(c echo.Context) error {
+	// Strictly verify apps states info JSON and save original payload
+	var data AppsStates
+	d := CtxGetDevice(c.Request().Context())
+	if bytes, err := ReadBody(c); err != nil {
+		return err
+	} else if err = ParseJsonBody(c, bytes, &data); err != nil {
+		return err
+	} else if _, err := time.Parse(time.RFC3339, data.DeviceTime); err != nil {
+		msg := fmt.Sprintf("Failed to parse device time, must be RFC3339: %s", data.DeviceTime)
+		return EchoError(c, err, http.StatusBadRequest, msg)
+	} else if err = d.SaveAppsStates(string(bytes)); err != nil {
+		return EchoError(c, err, http.StatusInternalServerError, "Failed to save apps-states")
 	} else {
 		return c.String(http.StatusOK, "")
 	}

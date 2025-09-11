@@ -25,6 +25,7 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage) {
 	h := handlers{storage: storage}
 	e.Use(h.authDevice)
 	e.Use(h.checkinDevice)
+	e.POST("/apps-states", h.appsStatesInfo)
 	e.GET("/device", h.deviceGet)
 	e.PUT("/system_info", h.hardwareInfo)
 	e.PUT("/system_info/config", h.akTomlInfo)

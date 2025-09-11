@@ -144,6 +144,8 @@ func Test_ProcessEvents(t *testing.T) {
 	files, err = fs.Devices.ListFiles(d.Uuid, storage.EventsPrefix, true)
 	require.Nil(t, err)
 	validate(files, 4)
+
+	// TODO: Add fine-grained unit tests for SaveAppsStates
 }
 
 func Benchmark_ProcessEvents(b *testing.B) {

@@ -17,6 +17,11 @@ type NetworkInfo struct {
 	LocalIpv4 string `json:"local_ipv4,omitempty"`
 }
 
+type EcuInfo struct {
+	TargetName string `json:"target"`
+	HardwareId string `json:"hwid"`
+}
+
 type AppsStates struct {
 	DeviceTime string `json:"deviceTime"`
 	Ostree     string `json:"ostree"`

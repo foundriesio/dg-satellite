@@ -24,8 +24,10 @@ const (
 
 	// Per device files/dirs
 	AktomlFile   = "aktoml"
+	EcusInfoFile = "ecus-info"
 	HwInfoFile   = "hardware-info"
 	NetInfoFile  = "network-info"
+
 	EventsPrefix = "events"
 	StatesPrefix = "apps-states"
 )

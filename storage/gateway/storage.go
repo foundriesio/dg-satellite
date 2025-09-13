@@ -34,7 +34,9 @@ const (
 	// Per device files/dirs
 	AktomlFile   = storage.AktomlFile
 	HwInfoFile   = storage.HwInfoFile
+	EcusInfoFile = storage.EcusInfoFile
 	NetInfoFile  = storage.NetInfoFile
+
 	StatesPrefix = storage.StatesPrefix
 )
 

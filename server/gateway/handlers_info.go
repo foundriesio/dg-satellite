@@ -69,6 +69,26 @@ func (handlers) networkInfo(c echo.Context) error {
 	}
 }
 
+// @Summary Set secondary ECUs
+// @Accept  json
+// @Param   ecus body map[string]EcuInfo true "Ecus"
+// @Produce plain
+// @Success 200 ""
+// @Router  /ecus [put]
+func (handlers) ecusInfo(c echo.Context) error {
+	var data map[string]EcuInfo
+	d := CtxGetDevice(c.Request().Context())
+	if bytes, err := ReadBody(c); err != nil {
+		return err
+	} else if err = ParseJsonBody(c, bytes, &data); err != nil {
+		return err
+	} else if err = d.PutFile(storage.EcusInfoFile, string(bytes)); err != nil {
+		return EchoError(c, err, http.StatusInternalServerError, "Failed to save ECUs info")
+	} else {
+		return c.String(http.StatusOK, "")
+	}
+}
+
 // @Summary Store the apps states info of a device
 // @Accept  json
 // @Param   data body AppsStates true "Apps States"

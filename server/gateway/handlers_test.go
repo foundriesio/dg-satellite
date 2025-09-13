@@ -177,6 +177,8 @@ func TestCheckIn(t *testing.T) {
 
 func TestInfo(t *testing.T) {
 	akInfo := "[config]\nkey=value"
+	ecInfo := `{"abc":{"hwid":"beef","target":"rack"}}`
+	ecInfoBad := `{"hw":"target"}`
 	hwInfo := `{"key":"value"}`
 	hwInfoBad := `{key=value}`
 	nwInfo := `{"hostname":"example.org"}`
@@ -191,6 +193,8 @@ func TestInfo(t *testing.T) {
 	_ = tc.PUT("/system_info/config", 200, akInfo)
 	_ = tc.PUT("/system_info/network", 200, nwInfo)
 	_ = tc.PUT("/system_info/network", 400, nwInfoBad)
+	_ = tc.PUT("/ecus", 200, ecInfo)
+	_ = tc.PUT("/ecus", 400, ecInfoBad)
 	_ = tc.POST("/apps-states", 200, stInfo)
 	_ = tc.POST("/apps-states", 200, stInfo1)
 	_ = tc.POST("/apps-states", 400, stInfoBad)
@@ -204,6 +208,9 @@ func TestInfo(t *testing.T) {
 	data, err = tc.fs.Devices.ReadFile(tc.uuid, storage.NetInfoFile)
 	assert.Nil(t, err)
 	assert.Equal(t, nwInfo, data)
+	data, err = tc.fs.Devices.ReadFile(tc.uuid, storage.EcusInfoFile)
+	assert.Nil(t, err)
+	assert.Equal(t, ecInfo, data)
 
 	states, err := tc.fs.Devices.ListFiles(tc.uuid, storage.StatesPrefix, true)
 	require.Nil(t, err)

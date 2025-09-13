@@ -28,6 +28,7 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage) {
 	e.POST("/apps-states", h.appsStatesInfo)
 	e.GET("/device", h.deviceGet)
 	e.PUT("/ecus", h.ecusInfo)
+	e.POST("/events", h.eventsUpload)
 	e.PUT("/system_info", h.hardwareInfo)
 	e.PUT("/system_info/config", h.akTomlInfo)
 	e.PUT("/system_info/network", h.networkInfo)

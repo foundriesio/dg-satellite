@@ -8,7 +8,8 @@ import (
 )
 
 type (
-	Device = storage.Device
+	Device      = storage.Device
+	UpdateEvent = storage.DeviceUpdateEvent
 )
 
 type NetworkInfo struct {

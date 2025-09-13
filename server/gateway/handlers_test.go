@@ -12,6 +12,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -234,4 +235,42 @@ func TestInfo(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, stInfo1, data)
 	}
+}
+
+func TestEvents(t *testing.T) {
+	var (
+		eventSatus = `{"id":"dead","deviceTime":"2023-12-12T12:00:00Z",` +
+			`"event":{"correlationId":"feed","ecu":"","targetName":"metam","version":"42"},` +
+			`"eventType":{"id":"satus","version":123}}`
+		eventFinis = `{"id":"beaf","deviceTime":"2023-12-12T12:00:42Z",` +
+			`"event":{"correlationId":"feed","ecu":"","targetName":"metam","version":"42"},` +
+			`"eventType":{"id":"finis","version":123}}`
+		eventBadDate = `{"id":"dodo","deviceTime":"omghf",` +
+			`"event":{"correlationId":"feed","ecu":"","targetName":"metam","version":"42"},` +
+			`"eventType":{"id":"dies","version":123}}`
+		eventFixedDate = strings.Replace(eventBadDate, "omghf", time.Now().UTC().Format(time.RFC3339), 1)
+		eventBadId     = `{"id":"","deviceTime":"2023-12-12T12:00:55Z",` +
+			`"event":{"correlationId":"feed","ecu":"","targetName":"metam","version":"42"},` +
+			`"eventType":{"id":"fraus","version":123}}`
+		eventBadCorrId = `{"id":"kiwi","deviceTime":"2023-12-12T12:00:55Z",` +
+			`"event":{"correlationId":"","ecu":"","targetName":"metam","version":"42"},` +
+			`"eventType":{"id":"fraus","version":123}}`
+
+		eventsGood    = fmt.Sprintf(`[%s,%s]`, eventSatus, eventFinis)
+		eventsBadData = fmt.Sprintf(`[%s,%s,%s]`, eventBadDate, eventBadId, eventBadCorrId)
+		eventsBadJson = "here we go"
+	)
+
+	fmt.Println(eventsGood)
+	tc := NewTestClient(t)
+	_ = tc.POST("/events", 200, eventsGood)
+	_ = tc.POST("/events", 200, eventsBadData)
+	_ = tc.POST("/events", 400, eventsBadJson)
+
+	eventsFiles, err := tc.fs.Devices.ListFiles(tc.uuid, storage.EventsPrefix, true)
+	require.Nil(t, err)
+	assert.Equal(t, 1, len(eventsFiles))
+	eventsSaved, err := tc.fs.Devices.ReadFile(tc.uuid, eventsFiles[0])
+	assert.Nil(t, err)
+	assert.Equal(t, fmt.Sprintf("%s\n%s\n%s\n", eventSatus, eventFinis, eventFixedDate), eventsSaved)
 }

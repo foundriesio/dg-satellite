@@ -37,6 +37,7 @@ const (
 	EcusInfoFile = storage.EcusInfoFile
 	NetInfoFile  = storage.NetInfoFile
 
+	EventsPrefix = storage.EventsPrefix
 	StatesPrefix = storage.StatesPrefix
 )
 

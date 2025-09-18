@@ -15,7 +15,9 @@ import (
 
 const serverName = "gateway-api"
 
-func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, port uint16) (*server.Server, error) {
+func NewServer(
+	ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, auth server.Authenticator, port uint16,
+) (*server.Server, error) {
 	tlsCfg, err := loadTlsConfig(fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load %s TLS config: %w", serverName, err)
@@ -26,7 +28,7 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 	}
 	e := server.NewEchoServer()
 	srv := server.NewServer(ctx, e, serverName, port, tlsCfg)
-	RegisterHandlers(e, strg)
+	RegisterHandlers(e, strg, auth)
 	return &srv, nil
 }
 

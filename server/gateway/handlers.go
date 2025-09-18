@@ -11,6 +11,7 @@ import (
 )
 
 type handlers struct {
+	auth    server.Authenticator
 	storage *storage.Storage
 }
 
@@ -21,11 +22,12 @@ var (
 	ParseJsonBody = server.ParseJsonBody
 )
 
-func RegisterHandlers(e *echo.Echo, storage *storage.Storage) {
-	h := handlers{storage: storage}
+func RegisterHandlers(e *echo.Echo, storage *storage.Storage, auth server.Authenticator) {
+	h := handlers{auth: auth, storage: storage}
 	e.Use(h.authDevice)
 	e.Use(h.checkinDevice)
 	e.POST("/apps-states", h.appsStatesInfo)
+	e.GET("/hub-creds", h.dockerCreds)
 	e.GET("/device", h.deviceGet)
 	e.PUT("/ecus", h.ecusInfo)
 	e.POST("/events", h.eventsUpload)

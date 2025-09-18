@@ -22,6 +22,7 @@ type ServeCmd struct {
 
 	ApiPort     uint16 `default:"8080"`
 	GatewayPort uint16 `default:"8443"`
+	TokenSecret string `default:"secret"`
 }
 
 func (c *ServeCmd) Run(args CommonArgs) error {
@@ -33,11 +34,15 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	if err != nil {
 		return fmt.Errorf("failed to load database: %w", err)
 	}
+	auth, err := server.NewAuthenticator(c.TokenSecret)
+	if err != nil {
+		return fmt.Errorf("failed to load authenticator: %w", err)
+	}
 	apiServer, err := api.NewServer(args.ctx, db, fs, c.ApiPort)
 	if err != nil {
 		return err
 	}
-	gtwServer, err := gateway.NewServer(args.ctx, db, fs, c.GatewayPort)
+	gtwServer, err := gateway.NewServer(args.ctx, db, fs, auth, c.GatewayPort)
 	if err != nil {
 		return err
 	}

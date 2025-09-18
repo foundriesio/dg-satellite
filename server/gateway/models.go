@@ -12,6 +12,11 @@ type (
 	UpdateEvent = storage.DeviceUpdateEvent
 )
 
+type DockerCreds struct {
+	Username string
+	Secret   string
+}
+
 type NetworkInfo struct {
 	Hostname  string `json:"hostname,omitempty"`
 	Mac       string `json:"mac,omitempty"`

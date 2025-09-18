@@ -103,11 +103,14 @@ func NewTestClient(t *testing.T) *testClient {
 	gwS, err := storage.NewStorage(db, fsS)
 	require.Nil(t, err)
 
+	auth, err := server.NewAuthenticator("secret")
+	require.Nil(t, err)
+
 	log, err := context.InitLogger("debug")
 	require.Nil(t, err)
 
 	e := server.NewEchoServer()
-	RegisterHandlers(e, gwS)
+	RegisterHandlers(e, gwS, auth)
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.Nil(t, err)

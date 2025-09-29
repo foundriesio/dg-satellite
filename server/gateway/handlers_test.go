@@ -325,6 +325,7 @@ func TestTufMeta(t *testing.T) {
 			// Update must be equal for the same device across test cases.
 			require.Equal(t, update, ts.update, ts.name)
 		} else {
+			visited[ts.tc] = ts.update
 			_ = ts.tc.GET("/device", 200) // This creates the device via auto-register
 			stmt, err := ts.tc.db.Prepare("TestUpdateUpdate", "UPDATE devices SET update_name=? WHERE uuid=?")
 			require.Nil(t, err, ts.name)

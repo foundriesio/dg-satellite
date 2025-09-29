@@ -64,14 +64,14 @@ func (handlers) metaHandler(c echo.Context, role, file string) error {
 	c.SetRequest(req.WithContext(CtxWithLog(ctx, log)))
 
 	d := CtxGetDevice(ctx)
-	if root, err := d.GetTufMeta(tag, file); err != nil {
+	if content, err := d.GetTufMeta(tag, file); err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Failed to fetch TUF role")
-	} else if len(root) == 0 {
+	} else if len(content) == 0 {
 		return EchoError(c, err, http.StatusNotFound, "Not found TUF role")
 	} else {
-		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(root)))
+		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
 		c.Response().Header().Set("x-ats-role-checksum", hash)
-		return c.String(http.StatusOK, root)
+		return c.String(http.StatusOK, content)
 	}
 }
 

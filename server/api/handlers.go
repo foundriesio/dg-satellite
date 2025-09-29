@@ -4,8 +4,6 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/storage/api"
 	"github.com/labstack/echo/v4"
@@ -18,9 +16,7 @@ type handlers struct {
 func RegisterHandlers(e *echo.Echo, storage *api.Storage, authFunc auth.AuthUserFunc) {
 	h := handlers{storage: storage}
 	e.Use(authUser(authFunc))
-	e.GET("/tmp", h.tmp)
-}
 
-func (handlers) tmp(c echo.Context) error {
-	return c.String(http.StatusOK, "OK")
+	e.GET("/devices", h.deviceList, requireScope(auth.ScopeDevicesR))
+
 }

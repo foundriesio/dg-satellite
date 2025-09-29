@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/server"
 	"github.com/foundriesio/dg-satellite/server/api"
 	"github.com/foundriesio/dg-satellite/server/gateway"
@@ -33,7 +34,7 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	if err != nil {
 		return fmt.Errorf("failed to load database: %w", err)
 	}
-	apiServer, err := api.NewServer(args.ctx, db, fs, c.ApiPort)
+	apiServer, err := api.NewServer(args.ctx, db, fs, c.ApiPort, auth.FakeAuthUser)
 	if err != nil {
 		return err
 	}

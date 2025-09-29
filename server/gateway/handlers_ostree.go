@@ -1,0 +1,46 @@
+// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+// SPDX-License-Identifier: BSD-3-Clause-Clear
+
+package gateway
+
+import (
+	"net/http"
+	"strings"
+
+	"github.com/labstack/echo/v4"
+)
+
+// @Summary Get the Ostree download URLs
+// @Produce json
+// @Success 200
+// @Router  /ostree/download-urls [post]
+func (h handlers) ostreeUrls(c echo.Context) error {
+	// Returning no download URLs tells the client to only use this OSTree server.
+	return c.NoContent(http.StatusNoContent)
+}
+
+// @Summary Get the Ostree file contents
+// @Produce octet-stream,plain,json
+// @Success 200
+// @Router  /ostree/{path} [get]
+func (handlers) ostreeFileStream(c echo.Context) error {
+	req := c.Request()
+	ctx := req.Context()
+	filePath := req.URL.Path[len("/ostree/"):]
+	log := CtxGetLog(ctx).With("file", filePath)
+	c.SetRequest(req.WithContext(CtxWithLog(ctx, log)))
+	d := CtxGetDevice(c.Request().Context())
+	c.Response().Header().Set(echo.HeaderContentType, ostreeContentType(filePath))
+	return c.File(d.GetOstreeFilePath(filePath))
+}
+
+func ostreeContentType(path string) string {
+	switch {
+	case path == "config":
+		return echo.MIMETextPlain
+	case strings.HasPrefix(path, "delta-stats/"):
+		return echo.MIMEApplicationJSON
+	default:
+		return echo.MIMEOctetStream
+	}
+}

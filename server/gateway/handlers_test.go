@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
+	baseStorage "github.com/foundriesio/dg-satellite/storage"
 	storage "github.com/foundriesio/dg-satellite/storage/gateway"
 )
 
@@ -372,5 +374,102 @@ func TestTufMeta(t *testing.T) {
 	t.Run("Missing targets.json for existing tag but not matching update", func(t *testing.T) {
 		tcCi42.t = t
 		_ = tcCi42.GET("/repo/targets.json", 404, "x-ats-tags", "beta")
+	})
+}
+
+func TestOstree(t *testing.T) {
+	tcCi42 := NewTestClient(t)
+	tcCi137 := NewTestClient(t)
+	tcProd42 := NewProdTestClient(t)
+	tcProd137 := NewProdTestClient(t)
+
+	// Positive test bed
+	tests := []struct {
+		tc     *testClient // CI vs prod
+		name   string      // test name and file data
+		tag    string      // x-ats-tags header value
+		update string      // update name, set for the device
+		path   string      // URL's leaf path and file name
+	}{
+		{tcCi42, "CI test config", "test", "42", "config"},
+		{tcCi42, "CI test objects", "test", "42", "objects/foo"},
+		{tcCi42, "CI test deltas", "test", "42", "deltas/foo"},
+		{tcCi42, "CI test delta indexes", "test", "42", "delta-indexes/foo"},
+		{tcCi42, "CI test delta stats", "test", "42", "delta-stats/foo"},
+		{tcCi42, "CI test summary", "test", "42", "summary"},
+		{tcCi137, "CI beta config", "beta", "137", "config"},
+		{tcCi137, "CI beta objects", "beta", "137", "objects/bar"},
+		{tcProd42, "Prod beta config", "beta", "42", "config"},
+		{tcProd42, "Prod beta objects", "beta", "42", "objects/bar"},
+		{tcProd137, "Prod prod config", "prod", "137", "config"},
+		{tcProd137, "Prod prod objects", "prod", "137", "objects/foo"},
+	}
+
+	// Pre-create devices and set their update names before tests
+	visited := make(map[*testClient][2]string, 4)
+	for _, ts := range tests {
+		if tagAndUpdate, ok := visited[ts.tc]; ok {
+			// Update and tag must be equal for the same device across test cases.
+			require.Equal(t, tagAndUpdate[0], ts.tag, ts.name)
+			require.Equal(t, tagAndUpdate[1], ts.update, ts.name)
+		} else {
+			visited[ts.tc] = [2]string{ts.tag, ts.update}
+			_ = ts.tc.GET("/device", 200) // This creates the device via auto-register
+			stmt, err := ts.tc.db.Prepare("TestUpdateUpdate", "UPDATE devices SET update_name=?, tag=? WHERE uuid=?")
+			require.Nil(t, err, ts.name)
+			_, err = stmt.Exec(ts.update, ts.tag, ts.tc.cert.Subject.CommonName)
+			require.Nil(t, err, ts.name)
+		}
+	}
+
+	writeFile := func(h baseStorage.UpdatesFsHandle, tag, update, path, content string) error {
+		if parts := strings.Split(path, "/"); len(parts) > 1 {
+			require.Equal(t, 2, len(parts), content) // Only level 1 depth in tests
+			if err := os.MkdirAll(h.FilePath(tag, update, parts[0]), 0o775); err != nil {
+				return err
+			}
+		}
+		return h.WriteFile(tag, update, path, content)
+	}
+
+	// Pre-create TUF data before tests
+	var err error
+	for _, ts := range tests {
+		switch ts.tc {
+		case tcCi42, tcCi137:
+			err = writeFile(ts.tc.fs.Updates.Ci.Ostree, ts.tag, ts.update, ts.path, ts.name)
+		case tcProd42, tcProd137:
+			err = writeFile(ts.tc.fs.Updates.Prod.Ostree, ts.tag, ts.update, ts.path, ts.name)
+		}
+		require.Nil(t, err, ts.name)
+	}
+
+	// Finally, run the test
+	for _, ts := range tests {
+		t.Run(ts.name, func(t *testing.T) {
+			ts.tc.t = t // Use sub-test testing handle
+			fileBytes := ts.tc.GET("/ostree/"+ts.path, 200)
+			assert.Equal(t, ts.name, string(fileBytes))
+		})
+		ts.tc.t = t // Restore parent test testing handle
+	}
+
+	// A few negative tests
+	t.Run("Wrong endpoint", func(t *testing.T) {
+		tcCi42.t = t
+		_ = tcCi42.GET("/ostree/foo", 404)
+	})
+	t.Run("Missing objects", func(t *testing.T) {
+		tcCi42.t = t
+		_ = tcCi42.GET("/ostree/objects/bar", 404)
+	})
+	t.Run("Download URLs", func(t *testing.T) {
+		tcCi42.t = t
+		body := tcCi42.POST("/ostree/download-urls", 204, nil)
+		assert.Equal(t, "", string(body))
+	})
+	t.Run("Summary signature", func(t *testing.T) {
+		tcCi42.t = t
+		_ = tcCi42.GET("/ostree/summary.sig", 404)
 	})
 }

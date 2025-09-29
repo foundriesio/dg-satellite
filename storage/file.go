@@ -221,6 +221,10 @@ type UpdatesFsHandle struct {
 	category string
 }
 
+func (s UpdatesFsHandle) FilePath(tag, update, name string) string {
+	return filepath.Join(s.root, tag, update, s.category, name)
+}
+
 func (s UpdatesFsHandle) ReadFile(tag, update, name string) (string, error) {
 	h, _ := s.updateLocalHandle(tag, update, false)
 	content, err := h.readFile(name, true)

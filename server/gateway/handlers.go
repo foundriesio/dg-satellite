@@ -30,6 +30,8 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage) {
 	e.POST("/apps-states", h.appsStatesInfo)
 	e.GET("/device", h.deviceGet)
 	e.POST("/events", h.eventsUpload)
+	e.POST("/ostree/download-urls", h.ostreeUrls)
+	e.GET("/ostree/*", h.ostreeFileStream)
 	e.GET("/repo/timestamp.json", h.metaTimestamp)
 	e.GET("/repo/snapshot.json", h.metaSnapshot)
 	e.GET("/repo/targets.json", h.metaTargets)

@@ -39,4 +39,7 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage) {
 	e.PUT("/system_info", h.hardwareInfo)
 	e.PUT("/system_info/config", h.akTomlInfo)
 	e.PUT("/system_info/network", h.networkInfo)
+	e.POST("/tests", h.testCreate)
+	e.PUT("/tests/:testid", h.testComplete)
+	e.PUT("/tests/:testid/:path", h.testArtifact)
 }

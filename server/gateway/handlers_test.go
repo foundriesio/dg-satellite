@@ -473,3 +473,50 @@ func TestOstree(t *testing.T) {
 		_ = tcCi42.GET("/ostree/summary.sig", 404)
 	})
 }
+
+func TestApiFiotest(t *testing.T) {
+	tc := NewTestClient(t)
+
+	content := `{"name": "test-1"}`
+	resp := tc.POST("/tests", 201, []byte(content))
+	testid := string(resp)
+
+	content = `{
+			"status": "PASSED",
+			"details": "detail x",
+			"results": [
+				{
+					"name": "tr-1",
+					"status": "FAILED"
+				},
+				{
+					"name": "tr-2",
+					"status": "PASSED",
+					"local_ts": 1597802911.1365469,
+					"details": "tr2-detail",
+					"metrics": {
+						"m1": 12,
+						"m2": 42.1
+					}
+				}
+			],
+			"artifacts": ["console.txt"]
+		}`
+	out := tc.PUT("/tests/"+testid, 200, []byte(content))
+
+	type signedUrl struct {
+		Url         string `json:"url"`
+		ContentType string `json:"content-type"`
+	}
+	var urls map[string]signedUrl
+	require.Nil(t, json.Unmarshal(out, &urls))
+	for name, signed := range urls {
+		tc.PUT(signed.Url, 200, []byte(name+"BLAH"))
+	}
+
+	prefix := baseStorage.TestArtifactsPrefix + "-" + testid + "_"
+	files, err := tc.fs.Devices.ListFiles(tc.cert.Subject.CommonName, prefix, true)
+	require.Nil(t, err)
+	require.Len(t, files, 1)
+	require.Equal(t, prefix+"console.txt", files[0])
+}

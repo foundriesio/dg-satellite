@@ -19,4 +19,8 @@ func RegisterHandlers(e *echo.Echo, storage *api.Storage, authFunc auth.AuthUser
 
 	e.GET("/devices", h.deviceList, requireScope(auth.ScopeDevicesR))
 	e.GET("/devices/:uuid", h.deviceGet, requireScope(auth.ScopeDevicesR))
+
+	e.GET("/devices/:uuid/tests", h.deviceTestsList, requireScope(auth.ScopeDevicesR))
+	e.GET("/devices/:uuid/tests/:testid", h.deviceTestGet, requireScope(auth.ScopeDevicesR))
+	e.GET("/devices/:uuid/tests/:testid/:artifact", h.deviceTestArtifact, requireScope(auth.ScopeDevicesR))
 }

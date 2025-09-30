@@ -95,3 +95,25 @@ type AppsStates struct {
 		} `json:"services"`
 	} `json:"apps"`
 }
+
+var TestIdRegex = regexp.MustCompile(`^[A-Za-z0-9\-\_]{15,48}$`)
+
+type TargetTestResult struct {
+	Name    string             `json:"name"`
+	Status  string             `json:"status"`
+	LocalTs float64            `json:"local_ts"`
+	Details string             `json:"details"`
+	Metrics map[string]float64 `json:"metrics"`
+}
+
+type TargetTest struct {
+	Uuid        string             `json:"uuid"`
+	Name        string             `json:"name"`
+	TargetName  string             `json:"target_name"`
+	Status      string             `json:"status"`
+	CreatedOn   int64              `json:"created_on"`
+	CompletedOn *int64             `json:"completed_on"`
+	Details     string             `json:"details,omitempty"`
+	Artifacts   []string           `json:"artifacts,omitempty"`
+	Results     []TargetTestResult `json:"results,omitempty"`
+}

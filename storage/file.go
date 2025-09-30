@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"os"
 	"path/filepath"
@@ -44,11 +45,13 @@ const (
 	ConfigsJournalFile = ".journal"
 
 	// Per device files/dirs
-	AktomlFile   = "aktoml"
-	HwInfoFile   = "hardware-info"
-	NetInfoFile  = "network-info"
-	EventsPrefix = "events"
-	StatesPrefix = "apps-states"
+	AktomlFile          = "aktoml"
+	HwInfoFile          = "hardware-info"
+	NetInfoFile         = "network-info"
+	EventsPrefix        = "events"
+	StatesPrefix        = "apps-states"
+	TestsPrefix         = "tests"
+	TestArtifactsPrefix = "test-artifacts"
 
 	// Per update files/dirs
 	// Update roots
@@ -232,6 +235,19 @@ func (s baseFsHandle) writeFile(name, content string, mode os.FileMode) error {
 	} else {
 		return os.Rename(partial, path)
 	}
+}
+
+func (s baseFsHandle) writeFileStream(name string, src io.Reader, mode os.FileMode) error {
+	path := filepath.Join(s.root, name)
+	dst, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	if _, err = io.Copy(dst, src); err != nil {
+		_ = dst.Close()
+		return err
+	}
+	return dst.Close()
 }
 
 func (s baseFsHandle) appendFile(name, content string, mode os.FileMode) error { //nolint:unparam

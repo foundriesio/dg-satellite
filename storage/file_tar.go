@@ -276,7 +276,7 @@ func (s tarFsHandle) _unpackTar(srcReader io.Reader, destDirPath string, cfg tar
 		case tar.TypeReg:
 			// Logic continues after the switch.
 		case tar.TypeDir:
-			dirPath, err := absPathNoEscape(destDirPath, hdr.Name)
+			dirPath, err := AbsPathNoEscape(destDirPath, hdr.Name)
 			if err == nil {
 				err = os.MkdirAll(dirPath, cfg.dirAccess)
 			}
@@ -290,7 +290,7 @@ func (s tarFsHandle) _unpackTar(srcReader io.Reader, destDirPath string, cfg tar
 		if len(hdr.Name) == 0 {
 			return errors.New("failed to unpack file with empty name")
 		}
-		filePath, err := absPathNoEscape(destDirPath, hdr.Name)
+		filePath, err := AbsPathNoEscape(destDirPath, hdr.Name)
 		if err != nil {
 			return fmt.Errorf("failed to unpack file '%s': %w", hdr.Name, err)
 		}
@@ -312,7 +312,7 @@ func (s tarFsHandle) _unpackTar(srcReader io.Reader, destDirPath string, cfg tar
 	return nil
 }
 
-func absPathNoEscape(root, path string) (absPath string, err error) {
+func AbsPathNoEscape(root, path string) (absPath string, err error) {
 	// Assume that the root is clean (a caller is responsible for this for performance optimization).
 	// A filepath.Join warrants that the absPath is also clean.
 	// So, in order to check for the root path escape attempt, we only need to check for the path prefix.

@@ -25,6 +25,7 @@ var (
 	NewDb = storage.NewDb
 	NewFs = storage.NewFs
 
+	TestIdRegex        = storage.TestIdRegex
 	ValidCorrelationId = storage.ValidCorrelationId
 )
 

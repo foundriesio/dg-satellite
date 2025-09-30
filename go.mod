@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/alexflint/go-arg v1.6.0
 	github.com/go-pkgz/expirable-cache/v3 v3.1.0
+	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.14.0
 	github.com/labstack/gommon v0.4.2
 	github.com/mattn/go-sqlite3 v1.14.32

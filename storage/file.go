@@ -4,7 +4,9 @@
 package storage
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,11 +26,13 @@ const (
 	CertsTlsPemFile = "tls.pem"
 
 	// Per device files/dirs
-	AktomlFile   = "aktoml"
-	HwInfoFile   = "hardware-info"
-	NetInfoFile  = "network-info"
-	EventsPrefix = "events"
-	StatesPrefix = "apps-states"
+	AktomlFile          = "aktoml"
+	HwInfoFile          = "hardware-info"
+	NetInfoFile         = "network-info"
+	EventsPrefix        = "events"
+	StatesPrefix        = "apps-states"
+	TestsPrefix         = "tests"
+	TestArtifactsPrefix = "test-artifacts"
 
 	// Per update files/dirs
 	// Update roots
@@ -161,6 +165,11 @@ type DevicesFsHandle struct {
 	baseFsHandle
 }
 
+func (s DevicesFsHandle) FilePath(uuid, name string) string {
+	h, _ := s.deviceLocalHandle(uuid, false)
+	return filepath.Join(h.root, name)
+}
+
 func (s DevicesFsHandle) ReadFile(uuid, name string) (string, error) {
 	h, _ := s.deviceLocalHandle(uuid, false)
 	content, err := h.readFile(name, true)
@@ -170,11 +179,36 @@ func (s DevicesFsHandle) ReadFile(uuid, name string) (string, error) {
 	return content, err
 }
 
+func (s DevicesFsHandle) ReadAsJson(uuid, name string, value any) error {
+	h, _ := s.deviceLocalHandle(uuid, false)
+	content, err := h.readFile(name, false)
+	if err != nil {
+		err = fmt.Errorf("unexpected error reading file %s for device %s: %w", name, uuid, err)
+	} else {
+		err = json.Unmarshal([]byte(content), value)
+		if err != nil {
+			err = fmt.Errorf("unexpected error unmarshalling file content %s for device %s: %w", name, uuid, err)
+		}
+	}
+	return err
+}
+
 func (s DevicesFsHandle) WriteFile(uuid, name, content string) error {
 	if h, err := s.deviceLocalHandle(uuid, true); err != nil {
 		return err
 	} else if err = h.writeFile(name, content, 0o744); err != nil {
 		return fmt.Errorf("error writing file %s for device %s: %w", name, uuid, err)
+	}
+	return nil
+}
+
+func (s DevicesFsHandle) WriteFileStream(uuid, name string, src io.Reader) error {
+	if h, err := s.deviceLocalHandle(uuid, true); err != nil {
+		return err
+	} else {
+		if err := h.writeFileStream(name, src, 0o744); err != nil {
+			return fmt.Errorf("error writing file stream %s for device %s: %w", name, uuid, err)
+		}
 	}
 	return nil
 }
@@ -277,6 +311,19 @@ func (s baseFsHandle) readFile(name string, ignoreNotExist bool) (string, error)
 
 func (s baseFsHandle) writeFile(name, content string, mode os.FileMode) error {
 	return os.WriteFile(filepath.Join(s.root, name), []byte(content), mode)
+}
+
+func (s baseFsHandle) writeFileStream(name string, src io.Reader, mode os.FileMode) error {
+	path := filepath.Join(s.root, name)
+	dst, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	if _, err = io.Copy(dst, src); err != nil {
+		_ = dst.Close()
+		return err
+	}
+	return dst.Close()
 }
 
 func (s baseFsHandle) appendFile(name, content string, mode os.FileMode) error {

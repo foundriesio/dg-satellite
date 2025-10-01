@@ -67,7 +67,7 @@ func createTables(db *sql.DB) error {
 			target_name VARCHAR(80) DEFAULT "",
 			ostree_hash VARCHAR(80) DEFAULT "",
 			apps VARCHAR(2048) DEFAULT ""
-		);
+		) WITHOUT ROWID;
 	`
 	if _, err := db.Exec(sqlStmt); err != nil {
 		return fmt.Errorf("unable to create devices db: %w", err)

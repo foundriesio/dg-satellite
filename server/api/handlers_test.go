@@ -12,22 +12,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/require"
+
 	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
-	"github.com/foundriesio/dg-satellite/storage"
-	"github.com/foundriesio/dg-satellite/storage/api"
-	"github.com/foundriesio/dg-satellite/storage/gateway"
-	"github.com/labstack/echo/v4"
-	"github.com/stretchr/testify/require"
+	storage "github.com/foundriesio/dg-satellite/storage/api"
+	gatewayStorage "github.com/foundriesio/dg-satellite/storage/gateway"
 )
 
 type testClient struct {
-	t     *testing.T
-	api   *api.Storage
-	gwapi *gateway.Storage
-	e     *echo.Echo
-	log   *slog.Logger
+	t   *testing.T
+	api *storage.Storage
+	gw  *gatewayStorage.Storage
+	e   *echo.Echo
+	log *slog.Logger
 }
 
 func (c testClient) Do(req *http.Request) *httptest.ResponseRecorder {
@@ -50,9 +50,9 @@ func NewTestClient(t *testing.T) *testClient {
 	require.Nil(t, err)
 	db, err := storage.NewDb(filepath.Join(tmpDir, storage.DbFile))
 	require.Nil(t, err)
-	apiS, err := api.NewStorage(db, fsS)
+	apiS, err := storage.NewStorage(db, fsS)
 	require.Nil(t, err)
-	gwapi, err := gateway.NewStorage(db, fsS)
+	gwS, err := gatewayStorage.NewStorage(db, fsS)
 	require.Nil(t, err)
 
 	log, err := context.InitLogger("debug")
@@ -62,11 +62,11 @@ func NewTestClient(t *testing.T) *testClient {
 	RegisterHandlers(e, apiS, auth.FakeAuthUser)
 
 	tc := testClient{
-		t:     t,
-		api:   apiS,
-		gwapi: gwapi,
-		e:     e,
-		log:   log,
+		t:   t,
+		api: apiS,
+		gw:  gwS,
+		e:   e,
+		log: log,
 	}
 	return &tc
 }
@@ -80,14 +80,14 @@ func TestApiList(t *testing.T) {
 	require.Equal(t, "[]\n", string(data))
 
 	// two devices with different last seen times
-	_, err := tc.gwapi.DeviceCreate("test-device-1", "pubkey1", true)
+	_, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
 	require.Nil(t, err)
 	time.Sleep(1 * time.Second)
-	_, err = tc.gwapi.DeviceCreate("test-device-2", "pubkey2", false)
+	_, err = tc.gw.DeviceCreate("test-device-2", "pubkey2", false)
 	require.Nil(t, err)
 
 	data = tc.GET("/devices", 200)
-	var devices []api.Device
+	var devices []storage.Device
 	require.Nil(t, json.Unmarshal(data, &devices))
 	require.Len(t, devices, 2)
 	require.Equal(t, "test-device-2", devices[0].Uuid)
@@ -106,13 +106,13 @@ func TestApiGet(t *testing.T) {
 
 	_ = tc.GET("/devices/does-not-exist", 404)
 
-	_, err := tc.gwapi.DeviceCreate("test-device-1", "pubkey1", true)
+	_, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
 	require.Nil(t, err)
-	_, err = tc.gwapi.DeviceCreate("test-device-2", "pubkey2", false)
+	_, err = tc.gw.DeviceCreate("test-device-2", "pubkey2", false)
 	require.Nil(t, err)
 
 	data := tc.GET("/devices/test-device-1", 200)
-	var device api.Device
+	var device storage.Device
 	require.Nil(t, json.Unmarshal(data, &device))
 	require.Equal(t, "test-device-1", device.Uuid)
 	require.Equal(t, "pubkey1", device.PubKey)

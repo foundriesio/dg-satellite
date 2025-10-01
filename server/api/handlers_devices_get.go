@@ -6,12 +6,12 @@ package api
 import (
 	"net/http"
 
-	"github.com/foundriesio/dg-satellite/server"
-	"github.com/foundriesio/dg-satellite/storage/api"
 	"github.com/labstack/echo/v4"
+
+	storage "github.com/foundriesio/dg-satellite/storage/api"
 )
 
-type Device = api.Device
+type Device = storage.Device
 
 // @Summary Get a device by its UUID
 // @Produce json
@@ -22,11 +22,11 @@ func (h *handlers) deviceGet(c echo.Context) error {
 
 	device, err := h.storage.DeviceGet(uuid)
 	if err != nil {
-		return server.EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device")
+		return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device")
 	}
 
 	if device == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "Not found")
+		return c.NoContent(http.StatusNotFound)
 	}
 	return c.JSON(http.StatusOK, device)
 }

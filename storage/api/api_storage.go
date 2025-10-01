@@ -28,6 +28,13 @@ var orderByDeviceMap = map[OrderBy]string{
 	OrderByDeviceLastSeenDsc: "last_seen DESC",
 }
 
+var (
+	NewDb = storage.NewDb
+	NewFs = storage.NewFs
+
+	DbFile = storage.DbFile
+)
+
 // DeviceListOpts lets you set the order devices will be returned
 // by the `List` api
 type DeviceListOpts struct {

@@ -102,7 +102,7 @@ func NewFs(root string) (*FsHandle, error) {
 	fs.Updates.Prod.Ostree.root = fs.Config.UpdatesProdDir()
 	fs.Updates.Prod.Ostree.category = UpdatesOstreeDir
 	fs.Updates.Prod.Tuf.root = fs.Config.UpdatesProdDir()
-	fs.Updates.Prod.Ostree.category = UpdatesTufDir
+	fs.Updates.Prod.Tuf.category = UpdatesTufDir
 
 	for _, h := range []struct {
 		handle baseFsHandle

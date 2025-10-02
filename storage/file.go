@@ -227,7 +227,7 @@ func (s UpdatesFsHandle) FilePath(tag, update, name string) string {
 
 func (s UpdatesFsHandle) ReadFile(tag, update, name string) (string, error) {
 	h, _ := s.updateLocalHandle(tag, update, false)
-	content, err := h.readFile(name, true)
+	content, err := h.readFile(name, false)
 	if err != nil {
 		err = fmt.Errorf("unexpected error reading %s file for tag %s update %s: %w", s.category, tag, update, err)
 	}

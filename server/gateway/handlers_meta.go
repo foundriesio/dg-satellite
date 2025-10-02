@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -65,9 +66,11 @@ func (handlers) metaHandler(c echo.Context, role, file string) error {
 
 	d := CtxGetDevice(ctx)
 	if content, err := d.GetTufMeta(tag, file); err != nil {
-		return EchoError(c, err, http.StatusInternalServerError, "Failed to fetch TUF role")
-	} else if len(content) == 0 {
-		return EchoError(c, err, http.StatusNotFound, "Not found TUF role")
+		if errors.Is(err, os.ErrNotExist) {
+			return EchoError(c, err, http.StatusNotFound, "Not found TUF role")
+		} else {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to fetch TUF role")
+		}
 	} else {
 		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
 		c.Response().Header().Set("x-ats-role-checksum", hash)

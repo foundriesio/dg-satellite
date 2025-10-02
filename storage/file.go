@@ -4,6 +4,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -150,7 +151,7 @@ func (s CertsFsHandle) AssertCleanTls() error {
 	} {
 		if _, err := os.Stat(filepath.Join(s.root, name)); err == nil {
 			return fmt.Errorf("a TLS file %s already exists: %w", name, os.ErrExist)
-		} else if !os.IsNotExist(err) {
+		} else if !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("failed to check if a TLS file %s exists: %w", name, err)
 		}
 	}
@@ -268,7 +269,7 @@ func (s baseFsHandle) mkdirs(mode os.FileMode, ignoreExists bool) error {
 func (s baseFsHandle) readFile(name string, ignoreNotExist bool) (string, error) {
 	if content, err := os.ReadFile(filepath.Join(s.root, name)); err == nil {
 		return string(content), nil
-	} else if ignoreNotExist && os.IsNotExist(err) {
+	} else if ignoreNotExist && errors.Is(err, os.ErrNotExist) {
 		return "", nil
 	} else {
 		return "", err
@@ -307,7 +308,7 @@ func (s baseFsHandle) rolloverFiles(prefix string, max int) error {
 func (s baseFsHandle) matchFiles(prefix string, sortByModTime bool) ([]string, error) {
 	entries, err := os.ReadDir(s.root)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return []string{}, nil
 		}
 		return nil, err

@@ -5,6 +5,7 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 
@@ -18,7 +19,7 @@ type DbHandle struct {
 func NewDb(dbfile string) (*DbHandle, error) {
 	var newDb bool
 	if _, err := os.Stat(dbfile); err != nil {
-		newDb = os.IsNotExist(err)
+		newDb = errors.Is(err, os.ErrNotExist)
 	}
 	db, err := sql.Open("sqlite3", dbfile)
 	if err != nil {

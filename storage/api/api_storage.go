@@ -181,8 +181,18 @@ func (s Storage) GetRollout(tag, updateName, rolloutName string, isProd bool) (r
 	return
 }
 
-func (s Storage) SetUpdateName(uuids []string, updateName string) error {
-	return s.stmtDeviceSetUpdate.run(uuids, updateName)
+func (s Storage) SaveRollout(tag, updateName, rolloutName string, isProd bool, rollout Rollout) error {
+	if data, err := json.Marshal(rollout); err != nil {
+		return err
+	} else if isProd {
+		return s.fs.Updates.Prod.Rollouts.WriteFile(tag, updateName, rolloutName, string(data))
+	} else {
+		return s.fs.Updates.Ci.Rollouts.WriteFile(tag, updateName, rolloutName, string(data))
+	}
+}
+
+func (s Storage) SetUpdateName(updateName string, uuids, groups []string) error {
+	return s.stmtDeviceSetUpdate.run(updateName, uuids, groups)
 }
 
 type stmtDeviceGet storage.DbStmt
@@ -243,17 +253,24 @@ func (s *stmtDeviceSetUpdate) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("apiDeviceSetUpdateName", `
 		UPDATE devices
 		SET update_name=?
-		WHERE uuid IN (SELECT value from json_each(?))`,
+		WHERE
+			uuid IN (SELECT value from json_each(?))
+			OR
+			group_name IN (SELECT value from json_each(?))`,
 	)
 	return
 }
 
-func (s *stmtDeviceSetUpdate) run(uuids []string, updateName string) error {
+func (s *stmtDeviceSetUpdate) run(updateName string, uuids, groups []string) error {
 	uuidsStr, err := json.Marshal(uuids)
 	if err != nil {
 		return fmt.Errorf("unexpected error marshalling UUIDs to JSON: %w", err)
 	}
-	_, err = s.Stmt.Exec(updateName, uuidsStr)
+	groupsStr, err := json.Marshal(groups)
+	if err != nil {
+		return fmt.Errorf("unexpected error marshalling groups to JSON: %w", err)
+	}
+	_, err = s.Stmt.Exec(updateName, uuidsStr, groupsStr)
 	return err
 }
 

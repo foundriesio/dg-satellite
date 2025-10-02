@@ -46,7 +46,7 @@ func TestStorage(t *testing.T) {
 	_, err = dg.DeviceCreate("uuid-2", "pubkey-value-2", false)
 	require.Nil(t, err)
 
-	require.Nil(t, s.SetUpdateName([]string{"uuid-1", "uuid-2"}, "update42"))
+	require.Nil(t, s.SetUpdateName("update42", []string{"uuid-1", "uuid-2"}, nil))
 
 	opts.Limit = 2
 	opts.OrderBy = OrderByDeviceCreatedAsc

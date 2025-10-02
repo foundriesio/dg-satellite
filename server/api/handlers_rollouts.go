@@ -82,6 +82,45 @@ func (h *handlers) rolloutGet(c echo.Context) error {
 	}
 }
 
+// @Summary Create update rollout
+// @Accept json
+// @Param data body Rollout true "Rollout data"
+// @Produce json
+// @Success 202
+// @Router  /updates/{prod}/{tag}/{update}/rollouts/{rollout} [put]
+func (h *handlers) rolloutPut(c echo.Context) error {
+	var isProd bool
+	if !parseProdParam(c.Param("prod"), &isProd) {
+		return c.NoContent(http.StatusNotFound)
+	}
+	tag := c.Param("tag")
+	updateName := c.Param("update")
+	rolloutName := c.Param("rollout")
+	var rollout Rollout
+	if err := c.Bind(&rollout); err != nil {
+		return EchoError(c, err, http.StatusBadRequest, "Bad Request")
+	}
+
+	// Check if rollout with this name already exists
+	if _, err := h.storage.GetRollout(tag, updateName, rolloutName, isProd); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to check if rollout exists")
+		}
+	} else {
+		return EchoError(c, err, http.StatusConflict, "Rollout with this name already exists")
+	}
+
+	// TODO: This is not atomic. Improvement would involve a daemon goroutine watching for data corruption.
+	if err := h.storage.SaveRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
+		return EchoError(c, err, http.StatusInternalServerError, "Failed to save rollout to disk")
+	}
+	// TODO: This may be slow.  Consider spawning a goroutine, probably in a worker pool.
+	if err := h.storage.SetUpdateName(updateName, rollout.Uuids, rollout.Groups); err != nil {
+		return EchoError(c, err, http.StatusInternalServerError, "Failed to update devices for rollout")
+	}
+	return c.NoContent(http.StatusAccepted)
+}
+
 func parseProdParam(param string, isProd *bool) (ok bool) {
 	ok = true
 	switch param {

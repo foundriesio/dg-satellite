@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/foundriesio/dg-satellite/auth"
@@ -90,14 +91,14 @@ func TestApiList(t *testing.T) {
 	var devices []storage.Device
 	require.Nil(t, json.Unmarshal(data, &devices))
 	require.Len(t, devices, 2)
-	require.Equal(t, "test-device-2", devices[0].Uuid)
-	require.Equal(t, "test-device-1", devices[1].Uuid)
+	assert.Equal(t, "test-device-2", devices[0].Uuid)
+	assert.Equal(t, "test-device-1", devices[1].Uuid)
 
 	// test sorting
 	data = tc.GET("/devices?order-by=last-seen-asc", 200)
 	require.Nil(t, json.Unmarshal(data, &devices))
-	require.Equal(t, "test-device-1", devices[0].Uuid)
-	require.Equal(t, "test-device-2", devices[1].Uuid)
+	assert.Equal(t, "test-device-1", devices[0].Uuid)
+	assert.Equal(t, "test-device-2", devices[1].Uuid)
 }
 
 func TestApiGet(t *testing.T) {
@@ -114,11 +115,11 @@ func TestApiGet(t *testing.T) {
 	data := tc.GET("/devices/test-device-1", 200)
 	var device storage.Device
 	require.Nil(t, json.Unmarshal(data, &device))
-	require.Equal(t, "test-device-1", device.Uuid)
-	require.Equal(t, "pubkey1", device.PubKey)
+	assert.Equal(t, "test-device-1", device.Uuid)
+	assert.Equal(t, "pubkey1", device.PubKey)
 
 	data = tc.GET("/devices/test-device-2", 200)
 	require.Nil(t, json.Unmarshal(data, &device))
-	require.Equal(t, "test-device-2", device.Uuid)
-	require.Equal(t, "pubkey2", device.PubKey)
+	assert.Equal(t, "test-device-2", device.Uuid)
+	assert.Equal(t, "pubkey2", device.PubKey)
 }

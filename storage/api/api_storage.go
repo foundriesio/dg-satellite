@@ -28,6 +28,13 @@ var orderByDeviceMap = map[OrderBy]string{
 	OrderByDeviceLastSeenDsc: "last_seen DESC",
 }
 
+var (
+	NewDb = storage.NewDb
+	NewFs = storage.NewFs
+
+	DbFile = storage.DbFile
+)
+
 // DeviceListOpts lets you set the order devices will be returned
 // by the `List` api
 type DeviceListOpts struct {
@@ -47,10 +54,11 @@ type DeviceListItem struct {
 type Device struct {
 	DeviceListItem
 
-	OstreeHash string `json:"ostree-hash"`
-	PubKey     string `json:"pubkey"`
-	Tag        string `json:"tag"`
-	UpdateName string `json:"update-name"`
+	Apps       []string `json:"apps"`
+	OstreeHash string   `json:"ostree-hash"`
+	PubKey     string   `json:"pubkey"`
+	Tag        string   `json:"tag"`
+	UpdateName string   `json:"update-name"`
 
 	Aktoml  string `json:"aktualizr-toml"`
 	HwInfo  string `json:"hardware-info"`
@@ -106,13 +114,19 @@ func (s Storage) DevicesList(opts DeviceListOpts) ([]DeviceListItem, error) {
 
 func (s Storage) DeviceGet(uuid string) (*Device, error) {
 	d := Device{storage: s, DeviceListItem: DeviceListItem{Uuid: uuid}}
+	var apps string
 	if err := s.stmtDeviceGet.run(
-		uuid, &d.CreatedAt, &d.LastSeen, &d.PubKey, &d.UpdateName, &d.Tag, &d.Target, &d.OstreeHash, &d.IsProd,
+		uuid, &d.CreatedAt, &d.LastSeen, &d.PubKey, &d.UpdateName, &d.Tag, &d.Target, &d.OstreeHash, &apps, &d.IsProd,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			err = nil
 		}
 		return nil, err
+	}
+	for _, v := range strings.Split(apps, ",") {
+		if v = strings.TrimSpace(v); len(v) > 0 {
+			d.Apps = append(d.Apps, v)
+		}
 	}
 
 	var err error
@@ -138,7 +152,7 @@ type stmtDeviceGet storage.DbStmt
 func (s *stmtDeviceGet) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("apiDeviceGet", `
 		SELECT
-			created_at, last_seen, pubkey, update_name, tag, target_name, ostree_hash, is_prod
+			created_at, last_seen, pubkey, update_name, tag, target_name, ostree_hash, apps, is_prod
 		FROM devices
 		WHERE uuid = ? AND deleted=false`,
 	)
@@ -148,10 +162,10 @@ func (s *stmtDeviceGet) Init(db storage.DbHandle) (err error) {
 func (s *stmtDeviceGet) run(
 	uuid string,
 	createdAt, lastSeen *int64,
-	pubkey, updateName, tag, targetName, ostreeHash *string,
+	pubkey, updateName, tag, targetName, ostreeHash, apps *string,
 	isProd *bool,
 ) error {
-	return s.Stmt.QueryRow(uuid).Scan(createdAt, lastSeen, pubkey, updateName, tag, targetName, ostreeHash, isProd)
+	return s.Stmt.QueryRow(uuid).Scan(createdAt, lastSeen, pubkey, updateName, tag, targetName, ostreeHash, apps, isProd)
 }
 
 type stmtDeviceList storage.DbStmt

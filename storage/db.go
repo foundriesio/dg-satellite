@@ -5,6 +5,7 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 
@@ -18,7 +19,7 @@ type DbHandle struct {
 func NewDb(dbfile string) (*DbHandle, error) {
 	var newDb bool
 	if _, err := os.Stat(dbfile); err != nil {
-		newDb = os.IsNotExist(err)
+		newDb = errors.Is(err, os.ErrNotExist)
 	}
 	db, err := sql.Open("sqlite3", dbfile)
 	if err != nil {
@@ -54,21 +55,21 @@ func (d DbHandle) InitStmt(stmt ...DbStmtInit) (err error) {
 
 func createTables(db *sql.DB) error {
 	sqlStmt := `
-			CREATE TABLE devices (
-				uuid VARCHAR(48) NOT NULL PRIMARY KEY,
-				pubkey TEXT,
-				deleted BOOL,
-				is_prod BOOL,
-				created_at INT DEFAULT 0,
-				last_seen INT DEFAULT 0,
-				tag VARCHAR(80) DEFAULT "",
-				group_name VARCHAR(80) DEFAULT "",
-				update_name VARCHAR(80) DEFAULT "",
-				target_name VARCHAR(80) DEFAULT "",
-				ostree_hash VARCHAR(80) DEFAULT "",
-				apps VARCHAR(2048) DEFAULT ""
-			);
-		`
+		CREATE TABLE devices (
+			uuid VARCHAR(48) NOT NULL PRIMARY KEY,
+			pubkey TEXT,
+			deleted BOOL,
+			is_prod BOOL,
+			created_at INT DEFAULT 0,
+			last_seen INT DEFAULT 0,
+			tag VARCHAR(80) DEFAULT "",
+			group_name VARCHAR(80) DEFAULT "",
+			update_name VARCHAR(80) DEFAULT "",
+			target_name VARCHAR(80) DEFAULT "",
+			ostree_hash VARCHAR(80) DEFAULT "",
+			apps VARCHAR(2048) DEFAULT ""
+		) WITHOUT ROWID;
+	`
 	if _, err := db.Exec(sqlStmt); err != nil {
 		return fmt.Errorf("unable to create devices db: %w", err)
 	}

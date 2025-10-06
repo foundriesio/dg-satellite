@@ -61,16 +61,16 @@ type Storage struct {
 type Device struct {
 	storage Storage
 
-	Uuid       string
-	Apps       string
-	Deleted    bool
-	IsProd     bool
-	LastSeen   int64
-	OstreeHash string
-	PubKey     string
-	TargetName string
-	Tag        string
-	UpdateName string
+	Uuid       string `json:"uuid"`
+	Apps       string `json:"docker_apps"`
+	Deleted    bool   `json:"-"`
+	IsProd     bool   `json:"is_prod"`
+	LastSeen   int64  `json:"last_seen"`
+	OstreeHash string `json:"ostree_hash"`
+	PubKey     string `json:"pubkey"`
+	TargetName string `json:"target_name"`
+	Tag        string `json:"tag"`
+	UpdateName string `json:"update_name"`
 }
 
 func (d *Device) CheckIn(targetName, tag, ostreeHash string, apps string) error {

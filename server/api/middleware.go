@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/foundriesio/dg-satellite/auth"
-	"github.com/foundriesio/dg-satellite/context"
 	"github.com/labstack/echo/v4"
 )
 
@@ -38,8 +37,8 @@ func authUser(authFunc auth.AuthUserFunc) echo.MiddlewareFunc {
 
 			req := c.Request()
 			ctx := req.Context()
-			log := context.CtxGetLog(ctx).With("user", user.Id())
-			ctx = context.CtxWithLog(ctx, log)
+			log := CtxGetLog(ctx).With("user", user.Id())
+			ctx = CtxWithLog(ctx, log)
 			c.SetRequest(req.WithContext(ctx))
 
 			return next(c)

@@ -36,7 +36,7 @@ type testClient struct {
 }
 
 func (c testClient) Do(req *http.Request) *httptest.ResponseRecorder {
-	req = req.WithContext(context.CtxWithLog(req.Context(), c.log))
+	req = req.WithContext(CtxWithLog(req.Context(), c.log))
 	rec := httptest.NewRecorder()
 	c.e.ServeHTTP(rec, req)
 	return rec

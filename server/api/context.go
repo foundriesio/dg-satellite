@@ -7,9 +7,24 @@ import (
 	"github.com/foundriesio/dg-satellite/context"
 )
 
-type Context = context.Context
+type (
+	Context = context.Context
+	ctxKey  int
+)
 
 var (
 	CtxGetLog  = context.CtxGetLog
 	CtxWithLog = context.CtxWithLog
 )
+
+const (
+	ctxKeyProd ctxKey = iota
+)
+
+func CtxGetIsProd(ctx Context) bool {
+	return ctx.Value(ctxKeyProd).(bool)
+}
+
+func CtxWithIsProd(ctx Context, isProd bool) Context {
+	return context.WithValue(ctx, ctxKeyProd, isProd)
+}

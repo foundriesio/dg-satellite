@@ -24,11 +24,13 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, authFunc auth.Auth
 	e.GET("/devices", h.deviceList, requireScope(auth.ScopeDevicesR))
 	e.GET("/devices/:uuid", h.deviceGet, requireScope(auth.ScopeDevicesR))
 	// In updates APIs :prod path element can be either "prod" or "ci".
-	e.GET("/updates/:prod", h.updateList, requireScope(auth.ScopeDevicesR))
-	e.GET("/updates/:prod/:tag", h.updateList, requireScope(auth.ScopeDevicesR))
+	upd := e.Group("/updates/:prod")
+	upd.Use(validateUpdateParams)
+	upd.GET("", h.updateList, requireScope(auth.ScopeDevicesR))
+	upd.GET("/:tag", h.updateList, requireScope(auth.ScopeDevicesR))
 	// TODO: What data would we want to show for an update?
-	// e.GET("/updates/:prod/:tag/:update", h.updateGet, requireScope(auth.ScopeDevicesR))
-	e.GET("/updates/:prod/:tag/:update/rollouts", h.rolloutList, requireScope(auth.ScopeDevicesR))
-	e.GET("/updates/:prod/:tag/:update/rollouts/:rollout", h.rolloutGet, requireScope(auth.ScopeDevicesR))
-	e.PUT("/updates/:prod/:tag/:update/rollouts/:rollout", h.rolloutPut, requireScope(auth.ScopeDevicesRU))
+	// upd.GET("/:tag/:update", h.updateGet, requireScope(auth.ScopeDevicesR))
+	upd.GET("/:tag/:update/rollouts", h.rolloutList, requireScope(auth.ScopeDevicesR))
+	upd.GET("/:tag/:update/rollouts/:rollout", h.rolloutGet, requireScope(auth.ScopeDevicesR))
+	upd.PUT("/:tag/:update/rollouts/:rollout", h.rolloutPut, requireScope(auth.ScopeDevicesRU))
 }

@@ -194,6 +194,10 @@ func TestApiUpdateList(t *testing.T) {
 	assert.Equal(t, "{}", s(data))
 	data = tc.GET("/updates/prod/tag4", 200)
 	assert.Equal(t, `{"tag4":["update42"]}`, s(data))
+
+	// Synthetic tag validation - create a bad tag on disk - request must still return 404
+	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("bad^tag", "update42", "rollout1", "foo"))
+	tc.GET("/updates/prod/bad^tag", 404)
 }
 
 func TestApiRolloutList(t *testing.T) {
@@ -224,6 +228,12 @@ func TestApiRolloutList(t *testing.T) {
 	assert.Equal(t, `["rollout4"]`, s(data))
 	data = tc.GET("/updates/ci/tag2/update2/rollouts", 200) // tag not exists
 	assert.Equal(t, "[]", s(data))
+
+	// Synthetic tag/update validation - create a bad tag/update on disk - request must still return 404
+	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("bad^tag", "update42", "rollout1", "foo"))
+	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("tag", "update=bad", "rollout1", "foo"))
+	tc.GET("/updates/prod/bad^tag/update42/rollouts", 404)
+	tc.GET("/updates/prod/tag/update=bad/rollouts", 404)
 }
 
 func TestApiRolloutGet(t *testing.T) {
@@ -250,6 +260,14 @@ func TestApiRolloutGet(t *testing.T) {
 	tc.GET("/updates/ci/tag2/update1/rollouts/rollout1", 404) // tag not exists
 	data = tc.GET("/updates/prod/tag/update/rollouts/rollout", 200)
 	assert.Equal(t, `{"uuids":["uh"],"groups":["oh"]}`, s(data))
+
+	// Synthetic tag/update/rollout validation - create a bad tag/update/rollout on disk - request must still return 404
+	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("bad^tag", "update42", "rollout1", "foo"))
+	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("tag", "update=bad", "rollout1", "foo"))
+	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("tag", "update", "omg+", "foo"))
+	tc.GET("/updates/prod/bad^tag/update42/rollouts/rollout1", 404)
+	tc.GET("/updates/prod/tag/update=bad/rollouts/rollout1", 404)
+	tc.GET("/updates/prod/tag/update/rollouts/omg+", 404)
 }
 
 func TestApiRolloutPut(t *testing.T) {
@@ -306,4 +324,11 @@ func TestApiRolloutPut(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "update2", dev.UpdateName)
 
+	// Synthetic tag/update/rollout validation - create a bad tag/update/rollout on disk - request must still return 404
+	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("bad^tag", "update42", "rollout1", "foo"))
+	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("tag", "update=bad", "rollout1", "foo"))
+	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("tag", "update", "omg+", "foo"))
+	tc.PUT("/updates/prod/bad^tag/update42/rollouts/gogogo", 404, "foo")
+	tc.PUT("/updates/prod/tag/update=bad/rollouts/gogogo", 404, "foo")
+	tc.PUT("/updates/prod/tag/update/rollouts/omg+", 404, "foo")
 }

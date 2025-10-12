@@ -42,12 +42,13 @@ func TestStorage(t *testing.T) {
 	d2, err := dg.DeviceCreate("uuid-1", "pubkey-value-1", false)
 	require.Nil(t, err)
 	require.Nil(t, d2.PutFile(storage.AktomlFile, "aktoml content"))
+	require.Nil(t, d2.CheckIn("target", "tag", "hash", ""))
 	time.Sleep(time.Second)
 	_, err = dg.DeviceCreate("uuid-2", "pubkey-value-2", false)
 	require.Nil(t, err)
 
 	require.Nil(t, s.SetGroupName("group137", []string{"uuid-1"}))
-	require.Nil(t, s.SetUpdateName("update42", []string{"uuid-1", "uuid-2"}, nil))
+	require.Nil(t, s.SetUpdateName("tag", "update42", []string{"uuid-1", "uuid-2"}, nil))
 
 	opts.Limit = 2
 	opts.OrderBy = OrderByDeviceCreatedAsc
@@ -66,7 +67,8 @@ func TestStorage(t *testing.T) {
 	d, err = s.DeviceGet("uuid-1")
 	require.Nil(t, err)
 	require.False(t, d.IsProd)
-	require.Equal(t, "", d.OstreeHash)
+	require.Equal(t, "hash", d.OstreeHash)
+	require.Equal(t, "tag", d.Tag)
 	require.Equal(t, "pubkey-value-1", d.PubKey)
 	require.Equal(t, "group137", d.GroupName)
 	require.Equal(t, "update42", d.UpdateName)

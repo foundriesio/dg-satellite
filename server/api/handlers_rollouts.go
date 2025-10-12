@@ -113,14 +113,13 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 	} else {
 		return c.String(http.StatusConflict, "Rollout with this name already exists")
 	}
-	// TODO: Check that a tag for each device matches the rollout tag???
 
 	// TODO: This is not atomic. Improvement would involve a daemon goroutine watching for data corruption.
 	if err := h.storage.SaveRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Failed to save rollout to disk")
 	}
 	// TODO: This may be slow.  Consider spawning a goroutine, probably in a worker pool.
-	if err := h.storage.SetUpdateName(updateName, rollout.Uuids, rollout.Groups); err != nil {
+	if err := h.storage.SetUpdateName(tag, updateName, rollout.Uuids, rollout.Groups); err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Failed to update devices for rollout")
 	}
 	return c.NoContent(http.StatusAccepted)

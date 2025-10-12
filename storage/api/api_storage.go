@@ -201,8 +201,8 @@ func (s Storage) SetGroupName(groupName string, uuids []string) error {
 	return s.stmtDeviceSetGroup.run(groupName, uuids)
 }
 
-func (s Storage) SetUpdateName(updateName string, uuids, groups []string) error {
-	return s.stmtDeviceSetUpdate.run(updateName, uuids, groups)
+func (s Storage) SetUpdateName(tag, updateName string, uuids, groups []string) error {
+	return s.stmtDeviceSetUpdate.run(tag, updateName, uuids, groups)
 }
 
 type stmtDeviceGet storage.DbStmt
@@ -284,15 +284,15 @@ func (s *stmtDeviceSetUpdate) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("apiDeviceSetUpdateName", `
 		UPDATE devices
 		SET update_name=?
-		WHERE
+		WHERE tag=? AND (
 			uuid IN (SELECT value from json_each(?))
 			OR
-			group_name IN (SELECT value from json_each(?))`,
+			group_name IN (SELECT value from json_each(?)))`,
 	)
 	return
 }
 
-func (s *stmtDeviceSetUpdate) run(updateName string, uuids, groups []string) error {
+func (s *stmtDeviceSetUpdate) run(tag, updateName string, uuids, groups []string) error {
 	uuidsStr, err := json.Marshal(uuids)
 	if err != nil {
 		return fmt.Errorf("unexpected error marshalling UUIDs to JSON: %w", err)
@@ -301,7 +301,7 @@ func (s *stmtDeviceSetUpdate) run(updateName string, uuids, groups []string) err
 	if err != nil {
 		return fmt.Errorf("unexpected error marshalling groups to JSON: %w", err)
 	}
-	_, err = s.Stmt.Exec(updateName, uuidsStr, groupsStr)
+	_, err = s.Stmt.Exec(updateName, tag, uuidsStr, groupsStr)
 	return err
 }
 

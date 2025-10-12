@@ -282,21 +282,32 @@ func TestApiRolloutPut(t *testing.T) {
 
 	require.Nil(t, tc.fs.Updates.Ci.Ostree.WriteFile("tag1", "update1", "foo", "bar"))
 	require.Nil(t, tc.fs.Updates.Prod.Ostree.WriteFile("tag2", "update2", "foo", "bar"))
-	_, err := tc.gw.DeviceCreate("ci1", "pubkey1", false)
+	d, err := tc.gw.DeviceCreate("ci1", "pubkey1", false)
 	require.Nil(t, err)
-	_, err = tc.gw.DeviceCreate("ci2", "pubkey1", false)
+	require.Nil(t, d.CheckIn("", "tag1", "", ""))
+	d, err = tc.gw.DeviceCreate("ci2", "pubkey1", false)
 	require.Nil(t, err)
-	_, err = tc.gw.DeviceCreate("prod1", "pubkey2", true)
+	require.Nil(t, d.CheckIn("", "tag1", "", ""))
+	d, err = tc.gw.DeviceCreate("ci3", "pubkey1", false)
 	require.Nil(t, err)
-	_, err = tc.gw.DeviceCreate("prod2", "pubkey2", true)
+	require.Nil(t, d.CheckIn("", "tag2", "", ""))
+	d, err = tc.gw.DeviceCreate("prod1", "pubkey2", true)
 	require.Nil(t, err)
-	_, err = tc.gw.DeviceCreate("prod3", "pubkey2", true)
+	require.Nil(t, d.CheckIn("", "tag2", "", ""))
+	d, err = tc.gw.DeviceCreate("prod2", "pubkey2", true)
 	require.Nil(t, err)
+	require.Nil(t, d.CheckIn("", "tag2", "", ""))
+	d, err = tc.gw.DeviceCreate("prod3", "pubkey2", true)
+	require.Nil(t, err)
+	require.Nil(t, d.CheckIn("", "tag2", "", ""))
+	d, err = tc.gw.DeviceCreate("prod4", "pubkey2", true)
+	require.Nil(t, err)
+	require.Nil(t, d.CheckIn("", "tag3", "", ""))
 
-	require.Nil(t, tc.api.SetGroupName("grp1", []string{"prod3"}))
+	require.Nil(t, tc.api.SetGroupName("grp1", []string{"prod3", "prod4"}))
 
 	tc.PUT("/updates/ci/tag1/update1/rollouts/rocks", 202,
-		`{"uuids":["ci1","ci2"]}`, "content-type", "application/json")
+		`{"uuids":["ci1","ci2","ci3"]}`, "content-type", "application/json")
 	tc.PUT("/updates/ci/tag1/update2/rollouts/rocks", 404,
 		`{"uuids":["ci1","ci2"]}`, "content-type", "application/json")
 	tc.PUT("/updates/ci/tag1/update1/rollouts/rocks", 409,
@@ -311,7 +322,7 @@ func TestApiRolloutPut(t *testing.T) {
 	}
 
 	data := tc.GET("/updates/ci/tag1/update1/rollouts/rocks", 200)
-	assert.Equal(t, `{"uuids":["ci1","ci2"]}`, s(data))
+	assert.Equal(t, `{"uuids":["ci1","ci2","ci3"]}`, s(data))
 	data = tc.GET("/updates/prod/tag2/update2/rollouts/rocks", 200)
 	assert.Equal(t, `{"uuids":["prod2"],"groups":["grp1"]}`, s(data))
 	dev, err := tc.api.DeviceGet("ci1")

@@ -322,9 +322,9 @@ func TestApiRolloutPut(t *testing.T) {
 	}
 
 	data := tc.GET("/updates/ci/tag1/update1/rollouts/rocks", 200)
-	assert.Equal(t, `{"uuids":["ci1","ci2","ci3"]}`, s(data))
+	assert.Equal(t, `{"uuids":["ci1","ci2","ci3"],"effective-uuids":["ci1","ci2"]}`, s(data))
 	data = tc.GET("/updates/prod/tag2/update2/rollouts/rocks", 200)
-	assert.Equal(t, `{"uuids":["prod2"],"groups":["grp1"]}`, s(data))
+	assert.Equal(t, `{"uuids":["prod2"],"groups":["grp1"],"effective-uuids":["prod2","prod3"]}`, s(data))
 	dev, err := tc.api.DeviceGet("ci1")
 	assert.Nil(t, err)
 	assert.Equal(t, "update1", dev.UpdateName)

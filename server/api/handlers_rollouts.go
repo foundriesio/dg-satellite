@@ -90,12 +90,18 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 	tag := c.Param("tag")
 	updateName := c.Param("update")
 	rolloutName := c.Param("rollout")
-	var rollout Rollout
-	if err := c.Bind(&rollout); err != nil {
+	var (
+		rollout Rollout
+		err     error
+	)
+	if err = c.Bind(&rollout); err != nil {
 		return EchoError(c, err, http.StatusBadRequest, "Bad JSON body")
 	}
 	if len(rollout.Uuids) == 0 && len(rollout.Groups) == 0 {
 		return c.String(http.StatusBadRequest, "Either uuids or groups must be set")
+	}
+	if len(rollout.Effect) > 0 {
+		return c.String(http.StatusBadRequest, "Effective uuids are readonly")
 	}
 
 	// Check if update with this name exists
@@ -106,7 +112,7 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 	}
 
 	// Check if rollout with this name already exists
-	if _, err := h.storage.GetRollout(tag, updateName, rolloutName, isProd); err != nil {
+	if _, err = h.storage.GetRollout(tag, updateName, rolloutName, isProd); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return EchoError(c, err, http.StatusInternalServerError, "Failed to check if rollout exists")
 		}
@@ -115,12 +121,15 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 	}
 
 	// TODO: This is not atomic. Improvement would involve a daemon goroutine watching for data corruption.
-	if err := h.storage.SaveRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
+	if err = h.storage.SaveRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Failed to save rollout to disk")
 	}
 	// TODO: This may be slow.  Consider spawning a goroutine, probably in a worker pool.
-	if err := h.storage.SetUpdateName(tag, updateName, rollout.Uuids, rollout.Groups); err != nil {
+	if rollout.Effect, err = h.storage.SetUpdateName(tag, updateName, rollout.Uuids, rollout.Groups); err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Failed to update devices for rollout")
+	}
+	if err = h.storage.SaveRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
+		return EchoError(c, err, http.StatusInternalServerError, "Failed to save rollout to disk")
 	}
 	return c.NoContent(http.StatusAccepted)
 }

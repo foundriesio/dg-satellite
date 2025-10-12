@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/foundriesio/dg-satellite/storage"
 	"github.com/foundriesio/dg-satellite/storage/gateway"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStorage(t *testing.T) {
@@ -48,29 +50,32 @@ func TestStorage(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Nil(t, s.SetGroupName("group137", []string{"uuid-1"}))
-	require.Nil(t, s.SetUpdateName("tag", "update42", []string{"uuid-1", "uuid-2"}, nil))
+	uuids, err := s.SetUpdateName("tag", "update42", []string{"uuid-1", "uuid-2"}, nil)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(uuids))
+	assert.Equal(t, "uuid-1", uuids[0])
 
 	opts.Limit = 2
 	opts.OrderBy = OrderByDeviceCreatedAsc
 	devices, err = s.DevicesList(opts)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(devices))
-	require.Equal(t, "uuid-1", devices[0].Uuid)
-	require.Equal(t, "uuid-2", devices[1].Uuid)
+	assert.Equal(t, "uuid-1", devices[0].Uuid)
+	assert.Equal(t, "uuid-2", devices[1].Uuid)
 
 	opts.OrderBy = OrderByDeviceCreatedDsc
 	devices, err = s.DevicesList(opts)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(devices))
-	require.Equal(t, "uuid-2", devices[0].Uuid)
+	assert.Equal(t, "uuid-2", devices[0].Uuid)
 
 	d, err = s.DeviceGet("uuid-1")
 	require.Nil(t, err)
-	require.False(t, d.IsProd)
-	require.Equal(t, "hash", d.OstreeHash)
-	require.Equal(t, "tag", d.Tag)
-	require.Equal(t, "pubkey-value-1", d.PubKey)
-	require.Equal(t, "group137", d.GroupName)
-	require.Equal(t, "update42", d.UpdateName)
-	require.Equal(t, "aktoml content", d.Aktoml)
+	assert.False(t, d.IsProd)
+	assert.Equal(t, "hash", d.OstreeHash)
+	assert.Equal(t, "tag", d.Tag)
+	assert.Equal(t, "pubkey-value-1", d.PubKey)
+	assert.Equal(t, "group137", d.GroupName)
+	assert.Equal(t, "update42", d.UpdateName)
+	assert.Equal(t, "aktoml content", d.Aktoml)
 }

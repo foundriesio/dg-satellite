@@ -75,6 +75,7 @@ type Device struct {
 type Rollout struct {
 	Uuids  []string `json:"uuids,omitempty"`
 	Groups []string `json:"groups,omitempty"`
+	Effect []string `json:"effective-uuids,omitempty"`
 }
 
 type Storage struct {
@@ -201,8 +202,9 @@ func (s Storage) SetGroupName(groupName string, uuids []string) error {
 	return s.stmtDeviceSetGroup.run(groupName, uuids)
 }
 
-func (s Storage) SetUpdateName(tag, updateName string, uuids, groups []string) error {
-	return s.stmtDeviceSetUpdate.run(tag, updateName, uuids, groups)
+func (s Storage) SetUpdateName(tag, updateName string, uuids, groups []string) (effectiveUuids []string, err error) {
+	err = s.stmtDeviceSetUpdate.run(tag, updateName, uuids, groups, &effectiveUuids)
+	return
 }
 
 type stmtDeviceGet storage.DbStmt
@@ -287,12 +289,13 @@ func (s *stmtDeviceSetUpdate) Init(db storage.DbHandle) (err error) {
 		WHERE tag=? AND (
 			uuid IN (SELECT value from json_each(?))
 			OR
-			group_name IN (SELECT value from json_each(?)))`,
+			group_name IN (SELECT value from json_each(?))
+		) RETURNING uuid`,
 	)
 	return
 }
 
-func (s *stmtDeviceSetUpdate) run(tag, updateName string, uuids, groups []string) error {
+func (s *stmtDeviceSetUpdate) run(tag, updateName string, uuids, groups []string, effectiveUuids *[]string) error {
 	uuidsStr, err := json.Marshal(uuids)
 	if err != nil {
 		return fmt.Errorf("unexpected error marshalling UUIDs to JSON: %w", err)
@@ -301,8 +304,21 @@ func (s *stmtDeviceSetUpdate) run(tag, updateName string, uuids, groups []string
 	if err != nil {
 		return fmt.Errorf("unexpected error marshalling groups to JSON: %w", err)
 	}
-	_, err = s.Stmt.Exec(updateName, tag, uuidsStr, groupsStr)
-	return err
+	if rows, err := s.Stmt.Query(updateName, tag, uuidsStr, groupsStr); err != nil {
+		return err
+	} else {
+		var resUuid string
+		for rows.Next() {
+			if err = rows.Scan(&resUuid); err != nil {
+				return err
+			}
+			*effectiveUuids = append(*effectiveUuids, resUuid)
+		}
+		if err = rows.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d Device) Updates() ([]string, error) {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 
 	"github.com/labstack/echo/v4"
 
@@ -95,6 +96,13 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 	}
 	if len(rollout.Uuids) == 0 && len(rollout.Groups) == 0 {
 		return c.String(http.StatusBadRequest, "Either uuids or groups must be set")
+	}
+
+	// Check if update with this name exists
+	if updates, err := h.storage.ListUpdates(tag, isProd); err != nil {
+		return EchoError(c, err, http.StatusInternalServerError, "Failed to check if update exists")
+	} else if tagUpdates, ok := updates[tag]; !ok || !slices.Contains(tagUpdates, updateName) {
+		return c.String(http.StatusNotFound, "Update with this name does not exist")
 	}
 
 	// Check if rollout with this name already exists

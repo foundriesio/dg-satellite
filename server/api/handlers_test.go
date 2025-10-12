@@ -280,6 +280,8 @@ func TestApiRolloutPut(t *testing.T) {
 	tc.PUT("/updates/prod/tag/update/rollouts/rocks", 400, "{")
 	tc.PUT("/updates/prod/tag/update/rollouts/rocks", 400, "{}")
 
+	require.Nil(t, tc.fs.Updates.Ci.Ostree.WriteFile("tag1", "update1", "foo", "bar"))
+	require.Nil(t, tc.fs.Updates.Prod.Ostree.WriteFile("tag2", "update2", "foo", "bar"))
 	_, err := tc.gw.DeviceCreate("ci1", "pubkey1", false)
 	require.Nil(t, err)
 	_, err = tc.gw.DeviceCreate("ci2", "pubkey1", false)
@@ -295,9 +297,13 @@ func TestApiRolloutPut(t *testing.T) {
 
 	tc.PUT("/updates/ci/tag1/update1/rollouts/rocks", 202,
 		`{"uuids":["ci1","ci2"]}`, "content-type", "application/json")
+	tc.PUT("/updates/ci/tag1/update2/rollouts/rocks", 404,
+		`{"uuids":["ci1","ci2"]}`, "content-type", "application/json")
 	tc.PUT("/updates/ci/tag1/update1/rollouts/rocks", 409,
 		`{"uuids":["ci1"]}`, "content-type", "application/json")
 	tc.PUT("/updates/prod/tag2/update2/rollouts/rocks", 202,
+		`{"uuids":["prod2"],"groups":["grp1"]}`, "content-type", "application/json")
+	tc.PUT("/updates/prod/tag1/update1/rollouts/rocks", 404,
 		`{"uuids":["prod2"],"groups":["grp1"]}`, "content-type", "application/json")
 
 	s := func(data []byte) string {

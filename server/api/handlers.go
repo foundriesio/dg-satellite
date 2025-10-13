@@ -23,6 +23,8 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, authFunc auth.Auth
 
 	e.GET("/devices", h.deviceList, requireScope(auth.ScopeDevicesR))
 	e.GET("/devices/:uuid", h.deviceGet, requireScope(auth.ScopeDevicesR))
+	e.GET("/devices/:uuid/updates", h.deviceUpdatesList, requireScope(auth.ScopeDevicesR))
+	e.GET("/devices/:uuid/updates/:id", h.deviceUpdatesGet, requireScope(auth.ScopeDevicesR))
 	// In updates APIs :prod path element can be either "prod" or "ci".
 	upd := e.Group("/updates/:prod")
 	upd.Use(validateUpdateParams)

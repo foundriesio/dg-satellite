@@ -6,8 +6,10 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -22,14 +24,40 @@ import (
 	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
-	storage "github.com/foundriesio/dg-satellite/storage/api"
+	"github.com/foundriesio/dg-satellite/storage"
+	apiStorage "github.com/foundriesio/dg-satellite/storage/api"
 	gatewayStorage "github.com/foundriesio/dg-satellite/storage/gateway"
 )
 
+func generateUpdateEvents(corId, pack string) []storage.DeviceUpdateEvent {
+	num := rand.Intn(3) + 2
+
+	events := make([]storage.DeviceUpdateEvent, num)
+	for i := 0; i < num; i++ {
+		events[i] = storage.DeviceUpdateEvent{
+			Id:         fmt.Sprintf("%d_%s", i, corId),
+			DeviceTime: "2023-12-12T12:00:00",
+			Event: storage.DeviceEvent{
+				CorrelationId: corId,
+				Ecu:           "",
+				Success:       nil,
+				TargetName:    "intel-corei7-64-lmp-23",
+				Version:       "23",
+				Details:       pack,
+			},
+			EventType: storage.DeviceEventType{
+				Id:      corId,
+				Version: 0,
+			},
+		}
+	}
+	return events
+}
+
 type testClient struct {
 	t   *testing.T
-	fs  *storage.FsHandle
-	api *storage.Storage
+	fs  *apiStorage.FsHandle
+	api *apiStorage.Storage
 	gw  *gatewayStorage.Storage
 	e   *echo.Echo
 	log *slog.Logger
@@ -79,11 +107,11 @@ func (c testClient) marshalBody(data any) io.Reader {
 
 func NewTestClient(t *testing.T) *testClient {
 	tmpDir := t.TempDir()
-	fsS, err := storage.NewFs(tmpDir)
+	fsS, err := apiStorage.NewFs(tmpDir)
 	require.Nil(t, err)
-	db, err := storage.NewDb(filepath.Join(tmpDir, storage.DbFile))
+	db, err := apiStorage.NewDb(filepath.Join(tmpDir, apiStorage.DbFile))
 	require.Nil(t, err)
-	apiS, err := storage.NewStorage(db, fsS)
+	apiS, err := apiStorage.NewStorage(db, fsS)
 	require.Nil(t, err)
 	gwS, err := gatewayStorage.NewStorage(db, fsS)
 	require.Nil(t, err)
@@ -121,7 +149,7 @@ func TestApiDeviceList(t *testing.T) {
 	require.Nil(t, err)
 
 	data = tc.GET("/devices", 200)
-	var devices []storage.Device
+	var devices []apiStorage.Device
 	require.Nil(t, json.Unmarshal(data, &devices))
 	require.Len(t, devices, 2)
 	assert.Equal(t, "test-device-2", devices[0].Uuid)
@@ -146,7 +174,7 @@ func TestApiDeviceGet(t *testing.T) {
 	require.Nil(t, err)
 
 	data := tc.GET("/devices/test-device-1", 200)
-	var device storage.Device
+	var device apiStorage.Device
 	require.Nil(t, json.Unmarshal(data, &device))
 	assert.Equal(t, "test-device-1", device.Uuid)
 	assert.Equal(t, "pubkey1", device.PubKey)
@@ -155,6 +183,41 @@ func TestApiDeviceGet(t *testing.T) {
 	require.Nil(t, json.Unmarshal(data, &device))
 	assert.Equal(t, "test-device-2", device.Uuid)
 	assert.Equal(t, "pubkey2", device.PubKey)
+}
+
+func TestApiDeviceUpdateEvents(t *testing.T) {
+	tc := NewTestClient(t)
+	tc.GET("/devices/foo/updates?deny-has-scope=1", 403)
+
+	_ = tc.GET("/devices/updates/does-not-exist", 404)
+
+	d, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
+	require.Nil(t, err)
+
+	data := tc.GET("/devices/test-device-1/updates", 200)
+	var updates []string
+	require.Nil(t, json.Unmarshal(data, &updates))
+	require.Len(t, updates, 0)
+
+	events := generateUpdateEvents("uuid-1", "first")
+	require.Nil(t, d.ProcessEvents(events))
+	time.Sleep(1 * time.Second)
+	events = generateUpdateEvents("uuid-2", "second")
+	require.Nil(t, d.ProcessEvents(events))
+
+	data = tc.GET("/devices/test-device-1/updates", 200)
+	require.Nil(t, json.Unmarshal(data, &updates))
+	require.Len(t, updates, 2)
+
+	data = tc.GET("/devices/test-device-1/updates/"+updates[1], 200)
+	require.Nil(t, json.Unmarshal(data, &events))
+	assert.Equal(t, "second", events[0].Event.Details)
+
+	data = tc.GET("/devices/test-device-1/updates/"+updates[0], 200)
+	require.Nil(t, json.Unmarshal(data, &events))
+	assert.Equal(t, "first", events[0].Event.Details)
+
+	_ = tc.GET("/devices/test-device-1/updates/doesnoexist", 404)
 }
 
 func TestApiUpdateList(t *testing.T) {

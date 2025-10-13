@@ -19,6 +19,8 @@ const (
 	DevicesDir = "devices"
 	UpdatesDir = "updates"
 
+	partialFileSuffix = "..part"
+
 	CertsCasPemFile = "cas.pem"
 	CertsTlsCsrFile = "tls.csr"
 	CertsTlsKeyFile = "tls.key"
@@ -327,7 +329,21 @@ func (s baseFsHandle) readFile(name string, ignoreNotExist bool) (string, error)
 }
 
 func (s baseFsHandle) writeFile(name, content string, mode os.FileMode) error {
-	return os.WriteFile(filepath.Join(s.root, name), []byte(content), mode)
+	path := filepath.Join(s.root, name)
+	partial := filepath.Join(s.root, name+partialFileSuffix)
+	if fd, err := os.OpenFile(partial, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode); err != nil {
+		return err
+	} else if _, err = fd.WriteString(content); err != nil {
+		_ = fd.Close()
+		return err
+	} else if err = fd.Sync(); err != nil {
+		_ = fd.Close()
+		return err
+	} else if err = fd.Close(); err != nil {
+		return err
+	} else {
+		return os.Rename(partial, path)
+	}
 }
 
 func (s baseFsHandle) appendFile(name, content string, mode os.FileMode) error {
@@ -367,8 +383,14 @@ func (s baseFsHandle) matchFiles(prefix string, sortByModTime bool) ([]string, e
 	for _, entry := range entries {
 		if info, err := entry.Info(); err != nil {
 			return nil, err
-		} else if len(prefix) == 0 || strings.HasPrefix(info.Name(), prefix) {
-			infos = append(infos, info)
+		} else {
+			name := info.Name()
+			if strings.HasSuffix(name, partialFileSuffix) {
+				// Filter out partial files - uploads in progress or data corruptions
+				continue
+			} else if len(prefix) == 0 || strings.HasPrefix(name, prefix) {
+				infos = append(infos, info)
+			}
 		}
 	}
 	if sortByModTime {

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 )
 
 const (
@@ -347,7 +348,9 @@ func (s baseFsHandle) writeFile(name, content string, mode os.FileMode) error {
 }
 
 func (s baseFsHandle) appendFile(name, content string, mode os.FileMode) error {
-	fd, err := os.OpenFile(filepath.Join(s.root, name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, mode)
+	// O_APPEND + O_SYNC on Linux warrants that concurrent file appends up to 1MB are serialized.
+	fd, err := os.OpenFile(filepath.Join(s.root, name),
+		os.O_CREATE|os.O_APPEND|syscall.O_SYNC|os.O_WRONLY, mode)
 	if err == nil {
 		_, err = fd.Write([]byte(content))
 		if err != nil {

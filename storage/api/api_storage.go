@@ -160,28 +160,16 @@ func (s Storage) DeviceGet(uuid string) (*Device, error) {
 }
 
 func (s Storage) ListUpdates(tag string, isProd bool) (map[string][]string, error) {
-	if isProd {
-		return s.fs.Updates.Prod.Rollouts.ListUpdates(tag)
-	} else {
-		return s.fs.Updates.Ci.Rollouts.ListUpdates(tag)
-	}
+	return s.getRolloutsFsHandle(isProd).ListUpdates(tag)
 }
 
 func (s Storage) ListRollouts(tag, updateName string, isProd bool) ([]string, error) {
-	if isProd {
-		return s.fs.Updates.Prod.Rollouts.ListFiles(tag, updateName)
-	} else {
-		return s.fs.Updates.Ci.Rollouts.ListFiles(tag, updateName)
-	}
+	return s.getRolloutsFsHandle(isProd).ListFiles(tag, updateName)
 }
 
 func (s Storage) GetRollout(tag, updateName, rolloutName string, isProd bool) (res Rollout, err error) {
 	var content string
-	if isProd {
-		content, err = s.fs.Updates.Prod.Rollouts.ReadFile(tag, updateName, rolloutName)
-	} else {
-		content, err = s.fs.Updates.Ci.Rollouts.ReadFile(tag, updateName, rolloutName)
-	}
+	content, err = s.getRolloutsFsHandle(isProd).ReadFile(tag, updateName, rolloutName)
 	if err == nil {
 		err = json.Unmarshal([]byte(content), &res)
 	}
@@ -191,10 +179,8 @@ func (s Storage) GetRollout(tag, updateName, rolloutName string, isProd bool) (r
 func (s Storage) SaveRollout(tag, updateName, rolloutName string, isProd bool, rollout Rollout) error {
 	if data, err := json.Marshal(rollout); err != nil {
 		return err
-	} else if isProd {
-		return s.fs.Updates.Prod.Rollouts.WriteFile(tag, updateName, rolloutName, string(data))
 	} else {
-		return s.fs.Updates.Ci.Rollouts.WriteFile(tag, updateName, rolloutName, string(data))
+		return s.getRolloutsFsHandle(isProd).WriteFile(tag, updateName, rolloutName, string(data))
 	}
 }
 
@@ -205,6 +191,14 @@ func (s Storage) SetGroupName(groupName string, uuids []string) error {
 func (s Storage) SetUpdateName(tag, updateName string, isProd bool, uuids, groups []string) (effectiveUuids []string, err error) {
 	err = s.stmtDeviceSetUpdate.run(tag, updateName, isProd, uuids, groups, &effectiveUuids)
 	return
+}
+
+func (s Storage) getRolloutsFsHandle(isProd bool) storage.RolloutsFsHandle {
+	if isProd {
+		return s.fs.Updates.Prod.Rollouts
+	} else {
+		return s.fs.Updates.Ci.Rollouts
+	}
 }
 
 type stmtDeviceGet storage.DbStmt

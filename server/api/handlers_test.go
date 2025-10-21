@@ -316,14 +316,14 @@ func TestApiRolloutGet(t *testing.T) {
 	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("tag", "update", "rollout", `{"uuids":["uh"],"groups":["oh"]}`))
 
 	data := tc.GET("/updates/ci/tag1/update1/rollouts/rollout1", 200)
-	assert.Equal(t, `{"uuids":["123","xyz"]}`, s(data))
+	assert.Equal(t, `{"uuids":["123","xyz"],"committed":false}`, s(data))
 	data = tc.GET("/updates/ci/tag1/update2/rollouts/rollout2", 200)
-	assert.Equal(t, `{"groups":["test","dev"]}`, s(data))
+	assert.Equal(t, `{"groups":["test","dev"],"committed":false}`, s(data))
 	tc.GET("/updates/ci/tag1/update2/rollouts/rollout3", 404) // rollout not exists
 	tc.GET("/updates/ci/tag1/update3/rollouts/rollout1", 404) // update not exists
 	tc.GET("/updates/ci/tag2/update1/rollouts/rollout1", 404) // tag not exists
 	data = tc.GET("/updates/prod/tag/update/rollouts/rollout", 200)
-	assert.Equal(t, `{"uuids":["uh"],"groups":["oh"]}`, s(data))
+	assert.Equal(t, `{"uuids":["uh"],"groups":["oh"],"committed":false}`, s(data))
 
 	// Synthetic tag/update/rollout validation - create a bad tag/update/rollout on disk - request must still return 404
 	require.Nil(t, tc.fs.Updates.Prod.Rollouts.WriteFile("bad^tag", "update42", "rollout1", "foo"))
@@ -389,9 +389,9 @@ func TestApiRolloutPut(t *testing.T) {
 	}
 
 	data := tc.GET("/updates/ci/tag1/update1/rollouts/rocks", 200)
-	assert.Equal(t, `{"uuids":["ci1","ci2","ci3"],"effective-uuids":["ci1","ci2"]}`, s(data))
+	assert.Equal(t, `{"uuids":["ci1","ci2","ci3"],"effective-uuids":["ci1","ci2"],"committed":true}`, s(data))
 	data = tc.GET("/updates/prod/tag2/update2/rollouts/rocks", 200)
-	assert.Equal(t, `{"uuids":["prod2"],"groups":["grp1"],"effective-uuids":["prod2","prod3"]}`, s(data))
+	assert.Equal(t, `{"uuids":["prod2"],"groups":["grp1"],"effective-uuids":["prod2","prod3"],"committed":true}`, s(data))
 	dev, err := tc.api.DeviceGet("ci1")
 	assert.Nil(t, err)
 	assert.Equal(t, "update1", dev.UpdateName)
@@ -415,4 +415,54 @@ func TestApiRolloutPut(t *testing.T) {
 	tc.PUT("/updates/prod/bad^tag/update42/rollouts/gogogo", 404, "foo")
 	tc.PUT("/updates/prod/tag/update=bad/rollouts/gogogo", 404, "foo")
 	tc.PUT("/updates/prod/tag/update/rollouts/omg+", 404, "foo")
+}
+
+func TestApiRolloutDaemon(t *testing.T) {
+	rolloutRolloverInterval = 20 * time.Millisecond
+	tc := NewTestClient(t)
+	daemons := NewDaemons(tc.ctx, tc.api)
+	daemons.Start()
+	defer daemons.Shutdown()
+
+	require.Nil(t, tc.fs.Updates.Ci.Ostree.WriteFile("tag1", "update1", "foo", "bar"))
+	require.Nil(t, tc.fs.Updates.Prod.Ostree.WriteFile("tag2", "update2", "foo", "bar"))
+	d, err := tc.gw.DeviceCreate("ci1", "pubkey1", false)
+	require.Nil(t, err)
+	require.Nil(t, d.CheckIn("", "tag1", "", ""))
+	d, err = tc.gw.DeviceCreate("prod1", "pubkey2", true)
+	require.Nil(t, err)
+	require.Nil(t, d.CheckIn("", "tag2", "", ""))
+
+	s := func(data []byte) string {
+		return strings.TrimSpace(string(data))
+	}
+
+	// Emulate a non-committed rollout (file present, database not updated).
+	require.Nil(t, tc.api.CreateRollout("tag1", "update1", "roll1", false, Rollout{Uuids: []string{"ci1"}}))
+	require.Nil(t, tc.api.CreateRollout("tag2", "update2", "roll2", true, Rollout{Uuids: []string{"prod1"}}))
+
+	// Before the watchdog daemon processing, rollouts are not yet committed.
+	data := tc.GET("/updates/ci/tag1/update1/rollouts/roll1", 200)
+	assert.Equal(t, `{"uuids":["ci1"],"committed":false}`, s(data))
+	data = tc.GET("/updates/prod/tag2/update2/rollouts/roll2", 200)
+	assert.Equal(t, `{"uuids":["prod1"],"committed":false}`, s(data))
+	dev, err := tc.api.DeviceGet("ci1")
+	assert.Nil(t, err)
+	assert.Equal(t, "", dev.UpdateName)
+	dev, err = tc.api.DeviceGet("prod1")
+	assert.Nil(t, err)
+	assert.Equal(t, "", dev.UpdateName)
+
+	// After the watchdog daemon processing, rollouts are committed.
+	time.Sleep(50 * time.Millisecond)
+	data = tc.GET("/updates/ci/tag1/update1/rollouts/roll1", 200)
+	assert.Equal(t, `{"uuids":["ci1"],"effective-uuids":["ci1"],"committed":true}`, s(data))
+	data = tc.GET("/updates/prod/tag2/update2/rollouts/roll2", 200)
+	assert.Equal(t, `{"uuids":["prod1"],"effective-uuids":["prod1"],"committed":true}`, s(data))
+	dev, err = tc.api.DeviceGet("ci1")
+	assert.Nil(t, err)
+	assert.Equal(t, "update1", dev.UpdateName)
+	dev, err = tc.api.DeviceGet("prod1")
+	assert.Nil(t, err)
+	assert.Equal(t, "update2", dev.UpdateName)
 }

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"iter"
 	"strings"
 
 	"github.com/foundriesio/dg-satellite/storage"
@@ -76,6 +77,7 @@ type Rollout struct {
 	Uuids  []string `json:"uuids,omitempty"`
 	Groups []string `json:"groups,omitempty"`
 	Effect []string `json:"effective-uuids,omitempty"`
+	Commit bool     `json:"committed"`
 }
 
 type Storage struct {
@@ -182,6 +184,53 @@ func (s Storage) SaveRollout(tag, updateName, rolloutName string, isProd bool, r
 	} else {
 		return s.getRolloutsFsHandle(isProd).WriteFile(tag, updateName, rolloutName, string(data))
 	}
+}
+
+func (s Storage) CreateRollout(tag, updateName, rolloutName string, isProd bool, rollout Rollout) error {
+	h := s.getRolloutsFsHandle(isProd)
+	log := strings.Join([]string{tag, updateName, rolloutName}, "|")
+	if data, err := json.Marshal(rollout); err != nil {
+		return err
+	} else if err := h.AppendJournal(log); err != nil {
+		return err
+	} else {
+		return h.WriteFile(tag, updateName, rolloutName, string(data))
+	}
+}
+
+func (s Storage) CommitRollout(tag, updateName, rolloutName string, isProd bool, rollout Rollout) (err error) {
+	if rollout.Effect, err = s.SetUpdateName(tag, updateName, isProd, rollout.Uuids, rollout.Groups); err != nil {
+		return err
+	} else {
+		rollout.Commit = true
+		return s.SaveRollout(tag, updateName, rolloutName, isProd, rollout)
+	}
+}
+
+func (s Storage) ReadRolloutJournal(isProd bool) iter.Seq2[*[3]string, error] {
+	h := s.getRolloutsFsHandle(isProd)
+	return func(yield func(*[3]string, error) bool) {
+		for log, err := range h.ReadJournal() {
+			if err != nil {
+				yield(nil, err)
+				break
+			}
+			parts := strings.Split(log, "|")
+			if len(parts) != 3 {
+				// This is impossible; just a sanity check.
+				yield(nil, fmt.Errorf("corrupted journal file line: %s", log))
+				break
+			}
+			// parts are tag, updateName, rolloutName
+			if !yield(&[3]string{parts[0], parts[1], parts[2]}, nil) {
+				break
+			}
+		}
+	}
+}
+
+func (s Storage) RolloverRolloutJournal(isProd bool) error {
+	return s.getRolloutsFsHandle(isProd).RolloverJournal()
 }
 
 func (s Storage) SetGroupName(groupName string, uuids []string) error {

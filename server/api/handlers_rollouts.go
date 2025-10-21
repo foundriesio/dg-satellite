@@ -120,16 +120,13 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 		return c.String(http.StatusConflict, "Rollout with this name already exists")
 	}
 
-	// TODO: This is not atomic. Improvement would involve a daemon goroutine watching for data corruption.
-	if err = h.storage.SaveRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
+	if err = h.storage.CreateRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Failed to save rollout to disk")
 	}
 	// TODO: This may be slow.  Consider spawning a goroutine, probably in a worker pool.
-	if rollout.Effect, err = h.storage.SetUpdateName(tag, updateName, isProd, rollout.Uuids, rollout.Groups); err != nil {
-		return EchoError(c, err, http.StatusInternalServerError, "Failed to update devices for rollout")
-	}
-	if err = h.storage.SaveRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
-		return EchoError(c, err, http.StatusInternalServerError, "Failed to save rollout to disk")
+	if err = h.storage.CommitRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
+		// Background daemon should correct any database inconsistency, so we still return success here.
+		CtxGetLog(ctx).Error("Failed to update devices for rollout", "error", err)
 	}
 	return c.NoContent(http.StatusAccepted)
 }

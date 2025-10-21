@@ -4,8 +4,10 @@
 package storage
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"iter"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,7 +22,8 @@ const (
 	DevicesDir = "devices"
 	UpdatesDir = "updates"
 
-	partialFileSuffix = "..part"
+	partialFileSuffix  = "..part"
+	rolloutJournalFile = "rollouts.journal"
 
 	CertsCasPemFile = "cas.pem"
 	CertsTlsCsrFile = "tls.csr"
@@ -307,6 +310,26 @@ func (s RolloutsFsHandle) ListFiles(tag, update string) ([]string, error) {
 	return h.matchFiles("", true)
 }
 
+func (s RolloutsFsHandle) AppendJournal(content string) error {
+	return s.appendFile(rolloutJournalFile+partialFileSuffix, content, 0o664)
+}
+
+func (s RolloutsFsHandle) RolloverJournal() (err error) {
+	from := filepath.Join(s.root, rolloutJournalFile+partialFileSuffix)
+	to := filepath.Join(s.root, rolloutJournalFile)
+	if err = os.Rename(from, to); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			// No new writes into a journal since the last rollover - that's just fine.
+			err = nil
+		}
+	}
+	return
+}
+
+func (s RolloutsFsHandle) ReadJournal() iter.Seq2[string, error] {
+	return s.readFileLines(rolloutJournalFile, true)
+}
+
 type baseFsHandle struct {
 	root string
 }
@@ -326,6 +349,28 @@ func (s baseFsHandle) readFile(name string, ignoreNotExist bool) (string, error)
 		return "", nil
 	} else {
 		return "", err
+	}
+}
+
+func (s baseFsHandle) readFileLines(name string, ignoreNotExist bool) iter.Seq2[string, error] {
+	// memory efficient way to read lines from a potentially large file
+	return func(yield func(string, error) bool) {
+		if fd, err := os.OpenFile(filepath.Join(s.root, name), os.O_RDONLY, 0); err != nil {
+			if !ignoreNotExist || !errors.Is(err, os.ErrNotExist) {
+				yield("", err)
+			}
+		} else {
+			defer fd.Close()                // nolint:errcheck
+			scanner := bufio.NewScanner(fd) // line reader
+			for scanner.Scan() {
+				if !yield(scanner.Text(), nil) {
+					return
+				}
+			}
+			if err = scanner.Err(); err != nil {
+				yield("", err)
+			}
+		}
 	}
 }
 

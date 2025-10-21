@@ -17,7 +17,12 @@ type daemons struct {
 }
 
 func NewDaemons(context Context, storage *storage.Storage) *daemons {
-	return &daemons{context: context, storage: storage, daemons: []daemonFunc{}}
+	d := &daemons{context: context, storage: storage}
+	d.daemons = []daemonFunc{
+		d.rolloutWatchdog(true),
+		d.rolloutWatchdog(false),
+	}
+	return d
 }
 
 func (d *daemons) Start() {

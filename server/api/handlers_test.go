@@ -387,6 +387,7 @@ func TestApiRolloutPut(t *testing.T) {
 	s := func(data []byte) string {
 		return strings.TrimSpace(string(data))
 	}
+	time.Sleep(50 * time.Millisecond) // Allow async database updates to finish
 
 	data := tc.GET("/updates/ci/tag1/update1/rollouts/rocks", 200)
 	assert.Equal(t, `{"uuids":["ci1","ci2","ci3"],"effective-uuids":["ci1","ci2"],"committed":true}`, s(data))

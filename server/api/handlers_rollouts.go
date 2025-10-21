@@ -123,11 +123,12 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 	if err = h.storage.CreateRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Failed to save rollout to disk")
 	}
-	// TODO: This may be slow.  Consider spawning a goroutine, probably in a worker pool.
-	if err = h.storage.CommitRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
-		// Background daemon should correct any database inconsistency, so we still return success here.
-		CtxGetLog(ctx).Error("Failed to update devices for rollout", "error", err)
-	}
+	go func() {
+		if err := h.storage.CommitRollout(tag, updateName, rolloutName, isProd, rollout); err != nil {
+			// Background daemon should correct any database inconsistency, so we still return success here.
+			CtxGetLog(ctx).Error("Failed to update devices for rollout", "error", err)
+		}
+	}()
 	return c.NoContent(http.StatusAccepted)
 }
 

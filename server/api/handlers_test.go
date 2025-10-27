@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -28,9 +27,7 @@ import (
 	gatewayStorage "github.com/foundriesio/dg-satellite/storage/gateway"
 )
 
-func generateUpdateEvents(corId, pack string) []storage.DeviceUpdateEvent {
-	num := rand.Intn(3) + 2
-
+func generateUpdateEvents(corId, pack string, num int) []storage.DeviceUpdateEvent {
 	events := make([]storage.DeviceUpdateEvent, num)
 	for i := 0; i < num; i++ {
 		events[i] = storage.DeviceUpdateEvent{
@@ -45,7 +42,7 @@ func generateUpdateEvents(corId, pack string) []storage.DeviceUpdateEvent {
 				Details:       pack,
 			},
 			EventType: storage.DeviceEventType{
-				Id:      corId,
+				Id:      "EcuDownloadStarted",
 				Version: 0,
 			},
 		}
@@ -66,6 +63,13 @@ func (c testClient) Do(req *http.Request) *httptest.ResponseRecorder {
 	req = req.WithContext(c.ctx)
 	rec := httptest.NewRecorder()
 	c.e.ServeHTTP(rec, req)
+	return rec
+}
+
+func (c testClient) DoAsync(req *http.Request) *httptest.ResponseRecorder {
+	req = req.WithContext(c.ctx)
+	rec := httptest.NewRecorder()
+	go c.e.ServeHTTP(rec, req)
 	return rec
 }
 
@@ -200,10 +204,9 @@ func TestApiDeviceUpdateEvents(t *testing.T) {
 	require.Nil(t, json.Unmarshal(data, &updates))
 	require.Len(t, updates, 0)
 
-	events := generateUpdateEvents("uuid-1", "first")
+	events := generateUpdateEvents("uuid-1", "first", 2)
 	require.Nil(t, d.ProcessEvents(events))
-	time.Sleep(1 * time.Second)
-	events = generateUpdateEvents("uuid-2", "second")
+	events = generateUpdateEvents("uuid-2", "second", 3)
 	require.Nil(t, d.ProcessEvents(events))
 
 	data = tc.GET("/devices/test-device-1/updates", 200)
@@ -466,4 +469,63 @@ func TestApiRolloutDaemon(t *testing.T) {
 	dev, err = tc.api.DeviceGet("prod1")
 	assert.Nil(t, err)
 	assert.Equal(t, "update2", dev.UpdateName)
+}
+
+func TestApiUpdateTail(t *testing.T) {
+	tc := NewTestClient(t)
+	tc.GET("/updates/prod/tag1/update1/tail?deny-has-scope=1", 403)
+
+	d, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
+	require.Nil(t, err)
+	require.Nil(t, d.CheckIn("", "tag1", "", ""))
+	d, err = tc.gw.DeviceCreate("test-device-2", "pubkey1", true)
+	require.Nil(t, err)
+	require.Nil(t, d.CheckIn("", "tag1", "", ""))
+	d, err = tc.gw.DeviceCreate("test-device-3", "pubkey1", true)
+	require.Nil(t, err)
+	require.Nil(t, d.CheckIn("", "tag1", "", ""))
+	_, err = tc.api.SetUpdateName("tag1", "update1", true, []string{"test-device-1", "test-device-2"}, nil)
+	require.Nil(t, err)
+
+	d1, err := tc.gw.DeviceGet("test-device-1")
+	require.Nil(t, err)
+	d2, err := tc.gw.DeviceGet("test-device-2")
+	require.Nil(t, err)
+	d3, err := tc.gw.DeviceGet("test-device-3")
+	require.Nil(t, err)
+
+	events := generateUpdateEvents("uuid-1", "first", 1)
+	require.Nil(t, d1.ProcessEvents(events))
+	events = generateUpdateEvents("uuid-2", "second", 1)
+	require.Nil(t, d2.ProcessEvents(events))
+	events = generateUpdateEvents("uuid-3", "third", 1)
+	require.Nil(t, d3.ProcessEvents(events))
+
+	// Emulate a real HTTP client holding connection - something a test client apparently does not do.
+	ctx, cancel := context.WithCancel(tc.ctx)
+	tc.ctx = ctx
+
+	expectedStream := `event: log
+data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
+
+event: log
+data: {"uuid":"test-device-2","correlationId":"uuid-2","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
+
+`
+
+	rec := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil))
+	time.Sleep(10 * time.Millisecond)
+	require.Equal(t, 200, rec.Code)
+	require.Equal(t, expectedStream, rec.Body.String())
+
+	// Write to the file and check the new response bytes within the same connection.
+	events = generateUpdateEvents("uuid-1", "forth", 1)
+	require.Nil(t, d1.ProcessEvents(events))
+	time.Sleep(10 * time.Millisecond)
+	expectedStream += `event: log
+data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
+
+`
+	require.Equal(t, expectedStream, rec.Body.String())
+	cancel() // This is where we disconnect, allowing the tailer to exit.
 }

@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const (
@@ -56,7 +57,10 @@ const (
 	LogRolloutsFile = "rollouts.log"
 )
 
-type FsConfig string
+type (
+	FsConfig string
+	DoneChan = <-chan struct{} // Dictated by Context.Done
+)
 
 func (c FsConfig) RootDir() string {
 	return string(c)
@@ -168,7 +172,7 @@ func (s baseFsHandle) readFile(name string, ignoreNotExist bool) (string, error)
 	}
 }
 
-func (s baseFsHandle) readFileLines(name string, ignoreNotExist bool) iter.Seq2[string, error] {
+func (s baseFsHandle) readFileLines(name string, ignoreNotExist bool, infinityStop DoneChan) iter.Seq2[string, error] {
 	// memory efficient way to read lines from a potentially large file
 	return func(yield func(string, error) bool) {
 		if fd, err := os.OpenFile(filepath.Join(s.root, name), os.O_RDONLY, 0); err != nil {
@@ -176,7 +180,8 @@ func (s baseFsHandle) readFileLines(name string, ignoreNotExist bool) iter.Seq2[
 				yield("", err)
 			}
 		} else {
-			defer fd.Close()                // nolint:errcheck
+			defer fd.Close() // nolint:errcheck
+		TAIL:
 			scanner := bufio.NewScanner(fd) // line reader
 			for scanner.Scan() {
 				if !yield(scanner.Text(), nil) {
@@ -185,6 +190,16 @@ func (s baseFsHandle) readFileLines(name string, ignoreNotExist bool) iter.Seq2[
 			}
 			if err = scanner.Err(); err != nil {
 				yield("", err)
+			}
+			if infinityStop != nil {
+				// Tail functionality - simply re-create the scanner with the same fd after some time.
+				// File position remains the same, so a new scanner continues from it.
+				select {
+				case <-infinityStop:
+					return
+				case <-time.After(5 * time.Millisecond):
+					goto TAIL
+				}
 			}
 		}
 	}

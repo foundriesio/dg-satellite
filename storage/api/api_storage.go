@@ -242,6 +242,14 @@ func (s Storage) SetUpdateName(tag, updateName string, isProd bool, uuids, group
 	return
 }
 
+func (s Storage) TailRolloutsLog(tag, updateName string, isProd bool, stop storage.DoneChan) iter.Seq2[string, error] {
+	fs := s.fs.Updates.Ci.Logs
+	if isProd {
+		fs = s.fs.Updates.Prod.Logs
+	}
+	return fs.TailFileLines(tag, updateName, storage.LogRolloutsFile, stop)
+}
+
 func (s Storage) getRolloutsFsHandle(isProd bool) storage.RolloutsFsHandle {
 	if isProd {
 		return s.fs.Updates.Prod.Rollouts

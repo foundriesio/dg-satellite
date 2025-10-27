@@ -5,6 +5,10 @@ package api
 
 import (
 	"errors"
+	"fmt"
+	"io"
+	"iter"
+	"net"
 	"net/http"
 	"os"
 	"regexp"
@@ -34,6 +38,20 @@ func (h *handlers) updateList(c echo.Context) error {
 		}
 		return c.JSON(http.StatusOK, updates)
 	}
+}
+
+// @Summary Tail update logs
+// @Produce text
+// @Success 200
+// @Router  /updates/{prod}/{tag}/{update}/tail [get]
+func (h *handlers) updateTail(c echo.Context) error {
+	ctx := c.Request().Context()
+	isProd := CtxGetIsProd(ctx)
+	tag := c.Param("tag")
+	updateName := c.Param("update")
+	// Read file infinitely until client disconnects (writes to ctx.Done() channel).
+	reader := h.storage.TailRolloutsLog(tag, updateName, isProd, ctx.Done())
+	return streamUpdateLogs(c, reader)
 }
 
 // @Summary List update rollouts
@@ -175,4 +193,46 @@ func parseProdParam(param string, isProd *bool) (ok bool) {
 		ok = false
 	}
 	return
+}
+
+func streamUpdateLogs(c echo.Context, reader iter.Seq2[string, error]) error {
+	log := CtxGetLog(c.Request().Context())
+	r := c.Response()
+	r.Header().Set("Content-Type", "text/event-stream")
+	// Below two headers prevent proxy caching and buffering.
+	r.Header().Set("Cache-Control", "no-cache")
+	r.Header().Set("X-Accel-Buffering", "no")
+
+	eventStreamReader := func(yield func(string, error) bool) {
+		for line, err := range reader {
+			if err != nil {
+				msg := "event: error\nretry: 1000\n"
+				if errors.Is(err, os.ErrNotExist) {
+					msg += "data: No rollout logs for this update yet.\n\n"
+				} else {
+					log.Error("Failed to tail logs", "error", err)
+					msg += "data: Logs tail was interrupted due to server error.\n\n"
+				}
+				_ = yield(msg, nil)
+				break
+			}
+			line = fmt.Sprintf("event: log\ndata: %s\n\n", line)
+			if !yield(line, nil) {
+				break
+			}
+		}
+	}
+
+	// Errors are already handled by the eventStreamReader
+	for line := range eventStreamReader {
+		if _, err := r.Write([]byte(line)); err != nil {
+			// Client disconnected - only log unexpected errors
+			if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
+				log.Error("Failed to write log tail to client", "error", err)
+			}
+			break
+		}
+		r.Flush()
+	}
+	return nil
 }

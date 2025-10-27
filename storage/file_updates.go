@@ -29,6 +29,11 @@ func (s UpdatesFsHandle) ReadFile(tag, update, name string) (string, error) {
 	return content, err
 }
 
+func (s UpdatesFsHandle) TailFileLines(tag, update, name string, stop DoneChan) iter.Seq2[string, error] {
+	h, _ := s.updateLocalHandle(tag, update, false)
+	return h.readFileLines(name, false, stop)
+}
+
 func (s UpdatesFsHandle) WriteFile(tag, update, name, content string) error {
 	if h, err := s.updateLocalHandle(tag, update, true); err != nil {
 		return err
@@ -117,5 +122,5 @@ func (s RolloutsFsHandle) RolloverJournal() (err error) {
 }
 
 func (s RolloutsFsHandle) ReadJournal() iter.Seq2[string, error] {
-	return s.readFileLines(rolloutJournalFile, true)
+	return s.readFileLines(rolloutJournalFile, true, nil)
 }

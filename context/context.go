@@ -15,6 +15,7 @@ type (
 
 var (
 	Background  = context.Background
+	WithCancel  = context.WithCancel
 	WithTimeout = context.WithTimeout
 	WithValue   = context.WithValue
 )

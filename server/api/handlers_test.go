@@ -576,20 +576,38 @@ data: {"uuid":"test-device-2","correlationId":"uuid-2","target-name":"intel-core
 	events = generateUpdateEvents("uuid-1", "forth", 1)
 	require.Nil(t, d1.ProcessEvents(events))
 	time.Sleep(10 * time.Millisecond)
-	expectedStream3 := `event: log
+	expectedStreamX := `event: log
 id: 3
 data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
 
 `
-	expectedStream1 += expectedStream3
-	expectedStream2 += expectedStream3
+	expectedStream1 += expectedStreamX
+	expectedStream2 += expectedStreamX
 	require.Equal(t, expectedStream1, rec1.Body.String())
 	require.Equal(t, expectedStream2, rec2.Body.String())
-
 	tc.assertNotDone(done1)
 	tc.assertNotDone(done2)
+
+	// keepalive test
+	saved := keepaliveResponseInterval
+	keepaliveResponseInterval = 20 * time.Millisecond
+	defer func() { keepaliveResponseInterval = saved }()
+	done3 := make(chan bool)
+	rec3 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil), done3)
+	time.Sleep(50 * time.Millisecond)
+	expectedStream3 := expectedStream1 + keepaliveResponseText + keepaliveResponseText
+	require.Equal(t, 200, rec3.Code)
+	require.Equal(t, expectedStream3, rec3.Body.String())
+	require.Nil(t, d1.ProcessEvents(events))
+	time.Sleep(30 * time.Millisecond)
+	expectedStreamY := strings.Replace(expectedStreamX, "id: 3", "id: 4", 1)
+	expectedStream3 += expectedStreamY + keepaliveResponseText
+	require.Equal(t, expectedStream3, rec3.Body.String())
+	tc.assertNotDone(done3)
+
 	cancel() // This is where we disconnect, closing all holding handlers.
 	time.Sleep(10 * time.Millisecond)
 	tc.assertDone(done1)
 	tc.assertDone(done2)
+	tc.assertDone(done3)
 }

@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -245,7 +246,7 @@ func streamUpdateLogs(c echo.Context, reader iter.Seq2[string, error]) error {
 	}
 
 	// Errors are already handled by the eventStreamReader
-	for line := range eventStreamReader {
+	for line := range keepaliveReader(eventStreamReader) {
 		if _, err := r.Write([]byte(line)); err != nil {
 			// Client disconnected - only log unexpected errors
 			if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
@@ -256,4 +257,60 @@ func streamUpdateLogs(c echo.Context, reader iter.Seq2[string, error]) error {
 		r.Flush()
 	}
 	return nil
+}
+
+var (
+	keepaliveResponseText     = ": idle\n\n"
+	keepaliveResponseInterval = 30 * time.Second
+)
+
+func keepaliveReader(reader iter.Seq2[string, error]) iter.Seq2[string, error] {
+	// An HTTP client will disconnect after an idle time while server does not write annything (usually 5 minutes).
+	// So, in order to keep alive the tail connection, send a comment event, ignored by browser event handlers.
+	return func(yield func(string, error) bool) {
+		type lineStruct struct {
+			line string
+			err  error
+		}
+		lineChan := make(chan lineStruct)
+		done := make(chan bool)
+		go func() {
+		READ:
+			for line, err := range reader {
+				// Non-blocking read to check if keepalive polling was stopped.
+				select {
+				case <-done:
+					break READ
+				default:
+					// No signal to stop => emit a new line.
+					lineChan <- lineStruct{line, err}
+				}
+			}
+			close(lineChan)
+		}()
+	LOOP:
+		for {
+			select {
+			case lineWrap, ok := <-lineChan:
+				if !ok {
+					// Reader finished its loop.
+					break LOOP
+				} else if !yield(lineWrap.line, lineWrap.err) {
+					// Caller signals to stop reading.
+					break LOOP
+				}
+			case <-time.After(keepaliveResponseInterval):
+				if !yield(keepaliveResponseText, nil) {
+					break LOOP
+				}
+			}
+		}
+		// Non-blocking write to signal that keepalive polling stops.
+		// A file reading thread might have already finished by this time.
+		select {
+		case done <- true:
+		default:
+		}
+		close(done)
+	}
 }

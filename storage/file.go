@@ -46,11 +46,14 @@ const (
 	UpdatesOstreeDir   = "ostree_repo"
 	UpdatesAppsDir     = "apps"
 	UpdatesRolloutsDir = "rollouts"
+	UpdatesLogsDir     = "logs"
 	// TUF category files
 	TufRootFile      = "root.json"
 	TufTimestampFile = "timestamp.json"
 	TufSnapshotFile  = "snapshot.json"
 	TufTargetsFile   = "targets.json"
+	// Logs category files
+	LogRolloutsFile = "rollouts.log"
 )
 
 type FsConfig string
@@ -94,12 +97,14 @@ type FsHandle struct {
 			Ostree   UpdatesFsHandle
 			Tuf      UpdatesFsHandle
 			Rollouts RolloutsFsHandle
+			Logs     UpdatesFsHandle
 		}
 		Prod struct {
 			Apps     UpdatesFsHandle
 			Ostree   UpdatesFsHandle
 			Tuf      UpdatesFsHandle
 			Rollouts RolloutsFsHandle
+			Logs     UpdatesFsHandle
 		}
 	}
 }
@@ -116,6 +121,8 @@ func NewFs(root string) (*FsHandle, error) {
 	fs.Updates.Ci.Rollouts.category = UpdatesRolloutsDir
 	fs.Updates.Ci.Tuf.root = fs.Config.UpdatesCiDir()
 	fs.Updates.Ci.Tuf.category = UpdatesTufDir
+	fs.Updates.Ci.Logs.root = fs.Config.UpdatesCiDir()
+	fs.Updates.Ci.Logs.category = UpdatesLogsDir
 	fs.Updates.Prod.Apps.root = fs.Config.UpdatesProdDir()
 	fs.Updates.Prod.Apps.category = UpdatesAppsDir
 	fs.Updates.Prod.Ostree.root = fs.Config.UpdatesProdDir()
@@ -124,6 +131,8 @@ func NewFs(root string) (*FsHandle, error) {
 	fs.Updates.Prod.Rollouts.category = UpdatesRolloutsDir
 	fs.Updates.Prod.Tuf.root = fs.Config.UpdatesProdDir()
 	fs.Updates.Prod.Tuf.category = UpdatesTufDir
+	fs.Updates.Prod.Logs.root = fs.Config.UpdatesProdDir()
+	fs.Updates.Prod.Logs.category = UpdatesLogsDir
 
 	for _, h := range []struct {
 		handle baseFsHandle

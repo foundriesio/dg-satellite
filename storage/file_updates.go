@@ -24,7 +24,7 @@ func (s UpdatesFsHandle) ReadFile(tag, update, name string) (string, error) {
 	h, _ := s.updateLocalHandle(tag, update, false)
 	content, err := h.readFile(name, false)
 	if err != nil {
-		err = fmt.Errorf("unexpected error reading %s file for tag %s update %s: %w", s.category, tag, update, err)
+		err = fmt.Errorf("error reading %s file for tag %s update %s: %w", s.category, tag, update, err)
 	}
 	return content, err
 }
@@ -32,8 +32,17 @@ func (s UpdatesFsHandle) ReadFile(tag, update, name string) (string, error) {
 func (s UpdatesFsHandle) WriteFile(tag, update, name, content string) error {
 	if h, err := s.updateLocalHandle(tag, update, true); err != nil {
 		return err
-	} else if err = h.writeFile(name, content, 0o744); err != nil {
-		return fmt.Errorf("unexpected error writing %s file for tag %s update %s: %w", s.category, tag, update, err)
+	} else if err = h.writeFile(name, content, 0o644); err != nil {
+		return fmt.Errorf("error writing %s file for tag %s update %s: %w", s.category, tag, update, err)
+	}
+	return nil
+}
+
+func (s UpdatesFsHandle) AppendFile(tag, update, name, content string) error {
+	if h, err := s.updateLocalHandle(tag, update, true); err != nil {
+		return err
+	} else if err = h.appendFile(name, content, 0o644); err != nil {
+		return fmt.Errorf("error appending %s file for tag %s update %s: %w", s.category, tag, update, err)
 	}
 	return nil
 }

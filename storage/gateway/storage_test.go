@@ -19,25 +19,50 @@ import (
 
 type UpdateEvents []storage.DeviceUpdateEvent
 
-func (ue UpdateEvents) generate(pack string) UpdateEvents {
-	num := rand.Intn(3) + 2
+var genEventType = map[int]string{
+	0: "EcuDownloadStarted",
+	1: "EcuDownloadCompleted",
+	2: "EcuInstallationStarted",
+	3: "EcuInstallationApplied",
+	4: "EcuInstallationCompleted",
+}
 
+func (ue UpdateEvents) generate(pack string, num int) UpdateEvents {
+	if num > 5 {
+		num = 5 // Protect against rogue tests. We only support at most 5 events per correlation ID below.
+	}
 	corId := uuid.New().String()
 	events := make([]storage.DeviceUpdateEvent, num)
 	for i := 0; i < num; i++ {
+		var success *bool
+		eventType := genEventType[i]
+		if i == num-1 {
+			var asuccess bool
+			success = &asuccess
+			// A last (failed) event must be EcuDownloadCompleted or EcuInstallationCompleted
+			switch num {
+			case 1:
+				eventType = genEventType[1]
+			case 3, 4:
+				eventType = genEventType[4]
+			case 5:
+				asuccess = true
+			}
+		}
 		events[i] = storage.DeviceUpdateEvent{
 			Id:         fmt.Sprintf("%d_%s", i, corId),
 			DeviceTime: "2023-12-12T12:00:00",
 			Event: storage.DeviceEvent{
 				CorrelationId: corId,
 				Ecu:           "",
-				Success:       nil,
-				TargetName:    "intel-corei7-64-lmp-23",
-				Version:       "23",
-				Details:       pack,
+				// The last event in a pack is failed, unless there are 5 events (then all events are success).
+				Success:    success,
+				TargetName: "intel-corei7-64-lmp-23",
+				Version:    "23",
+				Details:    pack,
 			},
 			EventType: storage.DeviceEventType{
-				Id:      corId,
+				Id:      eventType,
 				Version: 0,
 			},
 		}
@@ -102,11 +127,29 @@ func Test_ProcessEvents(t *testing.T) {
 	id := uuid.New().String()
 	d, err := s.DeviceCreate(id, "pubkey", false)
 	require.Nil(t, err)
+	d.UpdateName = "update"
+	d.Tag = "tag"
+
+	stmt, err := db.Prepare("TestProcessEvents", "UPDATE devices SET update_name=?, tag=? WHERE uuid=?")
+	require.Nil(t, err)
+	_, err = stmt.Exec(d.UpdateName, d.Tag, d.Uuid)
+	require.Nil(t, err)
 
 	var events UpdateEvents
+	expectedStatusLog := ""
+	appendExpectedStatusLog := func(events UpdateEvents) {
+		for _, ev := range events {
+			st := ev.ParseStatus()
+			st.Uuid = d.Uuid
+			bytes, err := json.Marshal(st)
+			require.Nil(t, err)
+			expectedStatusLog += string(bytes) + "\n"
+		}
+	}
 	for i := 0; i < s.maxEvents+3; i++ {
 		pack := fmt.Sprintf("test-%d", i)
-		events = events.generate(pack)
+		events = events.generate(pack, i%4+2)
+		appendExpectedStatusLog(events)
 		require.Nil(t, d.ProcessEvents(events))
 		time.Sleep(4 * time.Millisecond)
 	}
@@ -126,6 +169,9 @@ func Test_ProcessEvents(t *testing.T) {
 				require.Equal(t, pack, evt.Event.Details)
 			}
 		}
+		actualStatusLog, err := fs.Updates.Ci.Logs.ReadFile(d.Tag, d.UpdateName, storage.LogRolloutsFile)
+		require.Nil(t, err)
+		require.Equal(t, expectedStatusLog, actualStatusLog)
 	}
 
 	files, err := fs.Devices.ListFiles(d.Uuid, storage.EventsPrefix, true)
@@ -136,9 +182,10 @@ func Test_ProcessEvents(t *testing.T) {
 	lastEventCorrId := events[0].Event.CorrelationId
 	lastEventPack := events[0].Event.Details
 	newPack := fmt.Sprintf("test-%d", s.maxEvents+3)
-	events = events.generate(newPack)
+	events = events.generate(newPack, 5)
 	events[0].Event.CorrelationId = lastEventCorrId
 	events[0].Event.Details = lastEventPack
+	appendExpectedStatusLog(events) // These statuses are quite screwed; but that's fine for a test.
 	require.Nil(t, d.ProcessEvents(events))
 
 	files, err = fs.Devices.ListFiles(d.Uuid, storage.EventsPrefix, true)
@@ -175,7 +222,7 @@ func Benchmark_ProcessEvents(b *testing.B) {
 	b.StartTimer()
 	var events UpdateEvents
 	for i := 0; i < 100000; i++ {
-		events = events.generate("test")
+		events = events.generate("test", 5)
 		deviceIdx := rand.Intn(len(devices) - 1)
 		require.Nil(b, devices[deviceIdx].ProcessEvents(events))
 	}

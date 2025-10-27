@@ -110,6 +110,20 @@ func (d Device) ProcessEvents(events []storage.DeviceUpdateEvent) error {
 		if err := d.storage.fs.Devices.AppendFile(d.Uuid, name, string(bytes)+"\n"); err != nil {
 			return err
 		}
+		if status := evt.ParseStatus(); status != nil && len(d.UpdateName) > 0 && len(d.Tag) > 0 {
+			status.Uuid = d.Uuid
+			bytes, err = json.Marshal(status)
+			if err != nil {
+				return err
+			}
+			fs := d.storage.fs.Updates.Ci.Logs
+			if d.IsProd {
+				fs = d.storage.fs.Updates.Prod.Logs
+			}
+			if err = fs.AppendFile(d.Tag, d.UpdateName, storage.LogRolloutsFile, string(bytes)+"\n"); err != nil {
+				return err
+			}
+		}
 	}
 	return d.storage.fs.Devices.RolloverFiles(d.Uuid, storage.EventsPrefix, d.storage.maxEvents)
 }

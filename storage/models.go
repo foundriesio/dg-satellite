@@ -25,3 +25,43 @@ type DeviceEventType struct {
 	Id      string `json:"id"`
 	Version int    `json:"version"`
 }
+
+type DeviceStatus struct {
+	Uuid          string `json:"uuid"`
+	CorrelationId string `json:"correlationId"`
+	TargetName    string `json:"target-name"`
+	Status        string `json:"status"`
+}
+
+func (e DeviceUpdateEvent) ParseStatus() *DeviceStatus {
+	var status string
+	switch e.EventType.Id {
+	case "EcuDownloadStarted":
+		status = "Download started"
+	case "EcuDownloadCompleted":
+		if e.Event.Success != nil && !*e.Event.Success {
+			status = "Download failed"
+		} else {
+			status = "Download completed"
+		}
+	case "EcuInstallationStarted":
+		status = "Install started"
+	case "EcuInstallationApplied":
+		status = "Install applied, waiting for reboot"
+	case "EcuInstallationCompleted":
+		if e.Event.Success != nil && !*e.Event.Success {
+			status = "Install failed"
+		} else {
+			status = "Install completed"
+		}
+	}
+	if len(status) > 0 {
+		return &DeviceStatus{
+			CorrelationId: e.Event.CorrelationId,
+			TargetName:    e.Event.TargetName,
+			Status:        status,
+		}
+	} else {
+		return nil
+	}
+}

@@ -24,19 +24,24 @@ var (
 
 func RegisterHandlers(e *echo.Echo, storage *storage.Storage) {
 	h := handlers{storage: storage}
-	e.Use(h.authDevice)
-	e.Use(middleware.BodyLimit("100K")) // After TLS authentication but before we read headers.
-	e.Use(h.checkinDevice)
-	e.POST("/apps-states", h.appsStatesInfo)
-	e.GET("/device", h.deviceGet)
-	e.POST("/events", h.eventsUpload)
-	e.POST("/ostree/download-urls", h.ostreeUrls)
-	e.GET("/ostree/*", h.ostreeFileStream)
-	e.GET("/repo/timestamp.json", h.metaTimestamp)
-	e.GET("/repo/snapshot.json", h.metaSnapshot)
-	e.GET("/repo/targets.json", h.metaTargets)
-	e.GET("/repo/:root", h.metaRoot)
-	e.PUT("/system_info", h.hardwareInfo)
-	e.PUT("/system_info/config", h.akTomlInfo)
-	e.PUT("/system_info/network", h.networkInfo)
+
+	mtls := e.Group("/")
+	mtls.Use(
+		h.authDevice,
+		middleware.BodyLimit("100K"), // After TLS authentication but before we read headers.
+		h.checkinDevice,
+	)
+
+	mtls.POST("apps-states", h.appsStatesInfo)
+	mtls.GET("device", h.deviceGet)
+	mtls.POST("events", h.eventsUpload)
+	mtls.POST("ostree/download-urls", h.ostreeUrls)
+	mtls.GET("ostree/*", h.ostreeFileStream)
+	mtls.GET("repo/timestamp.json", h.metaTimestamp)
+	mtls.GET("repo/snapshot.json", h.metaSnapshot)
+	mtls.GET("repo/targets.json", h.metaTargets)
+	mtls.GET("repo/:root", h.metaRoot)
+	mtls.PUT("system_info", h.hardwareInfo)
+	mtls.PUT("system_info/config", h.akTomlInfo)
+	mtls.PUT("system_info/network", h.networkInfo)
 }

@@ -24,9 +24,14 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to load %s storage: %w", serverName, err)
 	}
+
 	e := server.NewEchoServer()
 	srv := server.NewServer(ctx, e, serverName, port, tlsCfg)
-	RegisterHandlers(e, strg)
+
+	dnsName := srv.GetDnsName()
+	url := fmt.Sprintf("https://%s:%d", dnsName, port)
+
+	RegisterHandlers(e, strg, url)
 	return srv, nil
 }
 

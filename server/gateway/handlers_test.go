@@ -110,7 +110,7 @@ func newTestClient(t *testing.T, isProd bool) *testClient {
 	require.Nil(t, err)
 
 	e := server.NewEchoServer()
-	RegisterHandlers(e, gwS)
+	RegisterHandlers(e, gwS, "https://does-not-matter")
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.Nil(t, err)

@@ -8,6 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -61,6 +62,27 @@ func (h handlers) authDevice(next echo.HandlerFunc) echo.HandlerFunc {
 		ctx = CtxWithDevice(ctx, device)
 		c.SetRequest(req.WithContext(ctx))
 
+		return next(c)
+	}
+}
+
+func (h handlers) authToken(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		token := c.Request().URL.Query().Get("token")
+		if len(token) == 0 {
+			return EchoError(c, errors.New("missing token"), http.StatusUnauthorized, "Missing token")
+		}
+
+		device, err := h.storage.DeviceGet(token)
+		if err != nil {
+			return EchoError(c, err, http.StatusBadGateway, "Unable to query for device")
+		} else if device == nil {
+			return EchoError(c, err, http.StatusBadRequest, "Unable to query device")
+		}
+		ctx := CtxWithDevice(c.Request().Context(), device)
+		log := CtxGetLog(ctx).With("device", device.Uuid)
+		ctx = CtxWithLog(ctx, log)
+		c.SetRequest(c.Request().WithContext(ctx))
 		return next(c)
 	}
 }

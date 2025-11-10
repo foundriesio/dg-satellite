@@ -4,6 +4,7 @@
 package gateway
 
 import (
+	"crypto/rand"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -15,7 +16,8 @@ import (
 // @Router  /app-proxy-url [post]
 func (h handlers) appsProxyUrl(c echo.Context) error {
 	d := CtxGetDevice(c.Request().Context())
-	token := d.Uuid // TODO: Generate a real access token
+	token := rand.Text()[:10] // 10 chars, 5 bits of entropy per char = A big number
+	h.tokenCache.Set(token, d.Uuid, 0)
 	url := h.url + "/registry?token=" + token
 	return c.String(http.StatusCreated, url)
 }

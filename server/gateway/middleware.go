@@ -73,15 +73,23 @@ func (h handlers) authToken(next echo.HandlerFunc) echo.HandlerFunc {
 			return EchoError(c, errors.New("missing token"), http.StatusUnauthorized, "Missing token")
 		}
 
-		device, err := h.storage.DeviceGet(token)
-		if err != nil {
-			return EchoError(c, err, http.StatusBadGateway, "Unable to query for device")
-		} else if device == nil {
-			return EchoError(c, err, http.StatusBadRequest, "Unable to query device")
+		uuid, ok := h.tokenCache.Get(token)
+		if !ok {
+			return c.String(http.StatusUnauthorized, "invalid or expired token")
 		}
-		ctx := CtxWithDevice(c.Request().Context(), device)
-		log := CtxGetLog(ctx).With("device", device.Uuid)
+		ctx := c.Request().Context()
+		log := CtxGetLog(ctx).With("device", uuid)
 		ctx = CtxWithLog(ctx, log)
+
+		device, err := h.storage.DeviceGet(uuid)
+		if err != nil {
+			log.Error("Unable to query for device", "error", err)
+			return c.String(http.StatusBadGateway, err.Error())
+		} else if device == nil || device.Deleted {
+			return c.String(http.StatusUnauthorized, "invalid device")
+		}
+
+		ctx = CtxWithDevice(ctx, device)
 		c.SetRequest(c.Request().WithContext(ctx))
 		return next(c)
 	}

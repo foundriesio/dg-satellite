@@ -4,6 +4,9 @@
 package gateway
 
 import (
+	"time"
+
+	cache "github.com/go-pkgz/expirable-cache/v3"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
@@ -14,6 +17,8 @@ import (
 type handlers struct {
 	url     string
 	storage *storage.Storage
+
+	tokenCache cache.Cache[string, string]
 }
 
 var (
@@ -24,7 +29,8 @@ var (
 )
 
 func RegisterHandlers(e *echo.Echo, storage *storage.Storage, url string) {
-	h := handlers{storage: storage, url: url}
+	cache := cache.NewCache[string, string]().WithMaxKeys(10000).WithTTL(time.Hour).WithLRU()
+	h := handlers{storage: storage, url: url, tokenCache: cache}
 
 	mtls := e.Group("/")
 	mtls.Use(

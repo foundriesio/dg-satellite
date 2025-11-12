@@ -13,15 +13,15 @@ import (
 
 	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/server"
-	"github.com/foundriesio/dg-satellite/server/api"
 	"github.com/foundriesio/dg-satellite/server/gateway"
+	"github.com/foundriesio/dg-satellite/server/ui"
 	"github.com/foundriesio/dg-satellite/storage"
 )
 
 type ServeCmd struct {
-	startedCb func(apiAddress, gatewayAddress string)
+	startedCb func(uiAddress, gatewayAddress string)
 
-	ApiPort     uint16 `default:"8080"`
+	UiPort      uint16 `default:"8080"`
 	GatewayPort uint16 `default:"8443"`
 }
 
@@ -34,7 +34,7 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	if err != nil {
 		return fmt.Errorf("failed to load database: %w", err)
 	}
-	apiServer, err := api.NewServer(args.ctx, db, fs, c.ApiPort, auth.FakeAuthUser)
+	uiServer, err := ui.NewServer(args.ctx, db, fs, c.UiPort, auth.FakeAuthUser)
 	if err != nil {
 		return err
 	}
@@ -44,13 +44,13 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	}
 
 	quitErr := make(chan error, 2)
-	apiServer.Start(quitErr)
+	uiServer.Start(quitErr)
 	gtwServer.Start(quitErr)
 
 	if c.startedCb != nil {
 		// Testing code, see serve_test.go
 		time.Sleep(time.Millisecond * 2)
-		c.startedCb(apiServer.GetAddress(), gtwServer.GetAddress())
+		c.startedCb(uiServer.GetAddress(), gtwServer.GetAddress())
 	}
 
 	// setup channel to gracefully terminate server
@@ -65,7 +65,7 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	for _, srv := range []server.Server{apiServer, gtwServer} {
+	for _, srv := range []server.Server{uiServer, gtwServer} {
 		go func() {
 			srv.Shutdown(time.Minute)
 			wg.Done()

@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -110,7 +111,7 @@ func newTestClient(t *testing.T, isProd bool) *testClient {
 	require.Nil(t, err)
 
 	e := server.NewEchoServer()
-	RegisterHandlers(e, gwS)
+	RegisterHandlers(e, gwS, "https://does-not-matter")
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.Nil(t, err)
@@ -159,6 +160,25 @@ func TestApiDevice(t *testing.T) {
 	require.Nil(t, json.Unmarshal(deviceBytes, &device))
 	assert.Equal(t, tc.cert.Subject.CommonName, device.Uuid)
 	assert.Less(t, lastSeen, device.LastSeen)
+}
+
+func TestApiProxy(t *testing.T) {
+	tc := NewTestClient(t)
+	resBytes := tc.POST("/apps-proxy-url", 201, nil)
+	proxyUrl, err := url.Parse(string(resBytes))
+	require.Nil(t, err)
+	token := proxyUrl.Query().Get("token")
+
+	req := httptest.NewRequest(http.MethodHead, "/registry/v2/factory/repo/blobs/sha256:123", nil)
+	rec := tc.Do(req)
+	require.Equal(t, 401, rec.Code, rec.Body.String())
+
+	req = httptest.NewRequest(http.MethodHead, "/registry/v2/factory/repo/blobs/sha256:123", nil)
+	q := req.URL.Query()
+	q.Add("token", token)
+	req.URL.RawQuery = q.Encode()
+	rec = tc.Do(req)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
 }
 
 func TestCheckIn(t *testing.T) {

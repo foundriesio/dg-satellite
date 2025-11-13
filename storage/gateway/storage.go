@@ -125,6 +125,14 @@ func (d Device) SaveAppsStates(content string) error {
 	return d.storage.fs.Devices.RolloverFiles(d.Uuid, storage.StatesPrefix, d.storage.maxStates)
 }
 
+func (d Device) GetAppsFilePath(file string) string {
+	if d.IsProd {
+		return d.storage.fs.Updates.Prod.Apps.FilePath(d.Tag, d.UpdateName, file)
+	} else {
+		return d.storage.fs.Updates.Ci.Apps.FilePath(d.Tag, d.UpdateName, file)
+	}
+}
+
 func (d Device) GetOstreeFilePath(file string) string {
 	if d.IsProd {
 		return d.storage.fs.Updates.Prod.Ostree.FilePath(d.Tag, d.UpdateName, file)

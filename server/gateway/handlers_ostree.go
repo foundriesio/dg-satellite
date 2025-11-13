@@ -4,6 +4,7 @@
 package gateway
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -30,6 +31,10 @@ func (handlers) ostreeFileStream(c echo.Context) error {
 	log := CtxGetLog(ctx).With("file", filePath)
 	c.SetRequest(req.WithContext(CtxWithLog(ctx, log)))
 	d := CtxGetDevice(c.Request().Context())
+	if len(d.UpdateName) == 0 {
+		err := errors.New("device has no updates configured")
+		return EchoError(c, err, http.StatusBadRequest, err.Error())
+	}
 	c.Response().Header().Set(echo.HeaderContentType, ostreeContentType(filePath))
 	return c.File(d.GetOstreeFilePath(filePath))
 }

@@ -3,6 +3,8 @@
 
 package storage
 
+import "time"
+
 // DeviceUpdateEvent represents update events that devices send the
 // device-gateway.
 type DeviceUpdateEvent struct {
@@ -64,4 +66,10 @@ func (e DeviceUpdateEvent) ParseStatus() *DeviceStatus {
 	} else {
 		return nil
 	}
+}
+
+type Timestamp int64
+
+func (t Timestamp) ToTime() time.Time {
+	return time.Unix(int64(t), 0)
 }

@@ -69,6 +69,16 @@ func createTables(db *sql.DB) error {
 			ostree_hash VARCHAR(80) DEFAULT "",
 			apps VARCHAR(2048) DEFAULT ""
 		) WITHOUT ROWID;
+
+		CREATE TABLE users (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			username       TEXT NOT NULL UNIQUE,
+			password       VARCHAR(128),
+			email          TEXT,
+			created        INT DEFAULT 0,
+			deleted        BOOL DEFAULT 0,
+			allowed_scopes INT DEFAULT 0
+		);
 	`
 	if _, err := db.Exec(sqlStmt); err != nil {
 		return fmt.Errorf("unable to create devices db: %w", err)

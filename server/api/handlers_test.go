@@ -494,6 +494,22 @@ func TestApiUpdateTail(t *testing.T) {
 	d3, err := tc.gw.DeviceGet("test-device-3")
 	require.Nil(t, err)
 
+	// Emulate a real HTTP client holding connection - something a test client apparently does not do.
+	ctx, cancel := context.WithCancel(tc.ctx)
+	tc.ctx = ctx
+
+	// Before any events appear, check the correct error event is received.
+	rec := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil))
+	time.Sleep(10 * time.Millisecond)
+	expectedStream := `event: error
+id: 0
+retry: 1000
+data: No rollout logs for this update yet.
+
+`
+	require.Equal(t, 200, rec.Code)
+	require.Equal(t, expectedStream, rec.Body.String())
+
 	events := generateUpdateEvents("uuid-1", "first", 1)
 	require.Nil(t, d1.ProcessEvents(events))
 	events = generateUpdateEvents("uuid-2", "second", 1)
@@ -501,31 +517,46 @@ func TestApiUpdateTail(t *testing.T) {
 	events = generateUpdateEvents("uuid-3", "third", 1)
 	require.Nil(t, d3.ProcessEvents(events))
 
-	// Emulate a real HTTP client holding connection - something a test client apparently does not do.
-	ctx, cancel := context.WithCancel(tc.ctx)
-	tc.ctx = ctx
+	// Check that the original response did not change, meaning that it was closed by server.
+	time.Sleep(10 * time.Millisecond)
+	require.Equal(t, expectedStream, rec.Body.String())
 
-	expectedStream := `event: log
+	// rec1 is plain request, rec2 is request with resumption.
+	rec1 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil))
+	req2 := httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil)
+	req2.Header.Add("Last-Event-ID", "1")
+	rec2 := tc.DoAsync(req2)
+	time.Sleep(10 * time.Millisecond)
+	// A previous error line should not appear in the new response.
+	expectedStream1 := `event: log
+id: 1
 data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
 
-event: log
+`
+	expectedStream2 := `event: log
+id: 2
 data: {"uuid":"test-device-2","correlationId":"uuid-2","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
 
 `
+	expectedStream1 += expectedStream2
+	require.Equal(t, 200, rec1.Code)
+	require.Equal(t, expectedStream1, rec1.Body.String())
+	require.Equal(t, 200, rec2.Code)
+	require.Equal(t, expectedStream2, rec2.Body.String())
 
-	rec := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil))
-	time.Sleep(10 * time.Millisecond)
-	require.Equal(t, 200, rec.Code)
-	require.Equal(t, expectedStream, rec.Body.String())
-
-	// Write to the file and check the new response bytes within the same connection.
+	// Write to the file and check the new response bytes within the same connections.
 	events = generateUpdateEvents("uuid-1", "forth", 1)
 	require.Nil(t, d1.ProcessEvents(events))
 	time.Sleep(10 * time.Millisecond)
-	expectedStream += `event: log
+	expectedStream3 := `event: log
+id: 3
 data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
 
 `
-	require.Equal(t, expectedStream, rec.Body.String())
-	cancel() // This is where we disconnect, allowing the tailer to exit.
+	expectedStream1 += expectedStream3
+	expectedStream2 += expectedStream3
+	require.Equal(t, expectedStream1, rec1.Body.String())
+	require.Equal(t, expectedStream2, rec2.Body.String())
+
+	cancel() // This is where we disconnect, closing all holding handlers.
 }

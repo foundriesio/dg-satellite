@@ -13,6 +13,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 
@@ -195,8 +196,22 @@ func parseProdParam(param string, isProd *bool) (ok bool) {
 	return
 }
 
+func parseLastEventId(c echo.Context) int {
+	r := c.Request()
+	val := r.Header.Get("Last-Event-ID")
+	if len(val) == 0 {
+		return 0
+	} else if res, err := strconv.Atoi(val); err != nil {
+		CtxGetLog(r.Context()).Warn("Invalid Last-Event-ID - ignoring", "value", val)
+		return 0
+	} else {
+		return res
+	}
+}
+
 func streamUpdateLogs(c echo.Context, reader iter.Seq2[string, error]) error {
 	log := CtxGetLog(c.Request().Context())
+	lastId := parseLastEventId(c)
 	r := c.Response()
 	r.Header().Set("Content-Type", "text/event-stream")
 	// Below two headers prevent proxy caching and buffering.
@@ -204,9 +219,12 @@ func streamUpdateLogs(c echo.Context, reader iter.Seq2[string, error]) error {
 	r.Header().Set("X-Accel-Buffering", "no")
 
 	eventStreamReader := func(yield func(string, error) bool) {
+		index := 0
 		for line, err := range reader {
 			if err != nil {
-				msg := "event: error\nretry: 1000\n"
+				// Preserve the same event ID as the last success, so that client resumes at the correct line.
+				// If there was no success yet - index is zero, meaning restart from the beginning.
+				msg := fmt.Sprintf("event: error\nid: %d\nretry: 1000\n", index)
 				if errors.Is(err, os.ErrNotExist) {
 					msg += "data: No rollout logs for this update yet.\n\n"
 				} else {
@@ -216,7 +234,10 @@ func streamUpdateLogs(c echo.Context, reader iter.Seq2[string, error]) error {
 				_ = yield(msg, nil)
 				break
 			}
-			line = fmt.Sprintf("event: log\ndata: %s\n\n", line)
+			if index += 1; index <= lastId {
+				continue
+			}
+			line = fmt.Sprintf("event: log\nid: %d\ndata: %s\n\n", index, line)
 			if !yield(line, nil) {
 				break
 			}

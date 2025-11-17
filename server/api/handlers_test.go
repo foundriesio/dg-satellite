@@ -66,11 +66,35 @@ func (c testClient) Do(req *http.Request) *httptest.ResponseRecorder {
 	return rec
 }
 
-func (c testClient) DoAsync(req *http.Request) *httptest.ResponseRecorder {
+func (c testClient) DoAsync(req *http.Request, done chan<- bool) *httptest.ResponseRecorder {
 	req = req.WithContext(c.ctx)
 	rec := httptest.NewRecorder()
-	go c.e.ServeHTTP(rec, req)
+	go func() {
+		c.e.ServeHTTP(rec, req)
+		if done != nil {
+			done <- true
+			close(done)
+		}
+	}()
 	return rec
+}
+
+func (c testClient) assertDone(done <-chan bool) {
+	select {
+	case <-done:
+		break
+	default:
+		require.Fail(c.t, "Must be done")
+	}
+}
+
+func (c testClient) assertNotDone(done <-chan bool) {
+	select {
+	case <-done:
+		require.Fail(c.t, "Must be not done")
+	default:
+		break
+	}
 }
 
 func (c testClient) GET(resource string, status int, headers ...string) []byte {
@@ -499,7 +523,8 @@ func TestApiUpdateTail(t *testing.T) {
 	tc.ctx = ctx
 
 	// Before any events appear, check the correct error event is received.
-	rec := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil))
+	done := make(chan bool)
+	rec := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil), done)
 	time.Sleep(10 * time.Millisecond)
 	expectedStream := `event: error
 id: 0
@@ -509,6 +534,7 @@ data: No rollout logs for this update yet.
 `
 	require.Equal(t, 200, rec.Code)
 	require.Equal(t, expectedStream, rec.Body.String())
+	tc.assertDone(done)
 
 	events := generateUpdateEvents("uuid-1", "first", 1)
 	require.Nil(t, d1.ProcessEvents(events))
@@ -522,10 +548,12 @@ data: No rollout logs for this update yet.
 	require.Equal(t, expectedStream, rec.Body.String())
 
 	// rec1 is plain request, rec2 is request with resumption.
-	rec1 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil))
+	done1 := make(chan bool)
+	rec1 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil), done1)
+	done2 := make(chan bool)
 	req2 := httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil)
 	req2.Header.Add("Last-Event-ID", "1")
-	rec2 := tc.DoAsync(req2)
+	rec2 := tc.DoAsync(req2, done2)
 	time.Sleep(10 * time.Millisecond)
 	// A previous error line should not appear in the new response.
 	expectedStream1 := `event: log
@@ -558,5 +586,10 @@ data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-core
 	require.Equal(t, expectedStream1, rec1.Body.String())
 	require.Equal(t, expectedStream2, rec2.Body.String())
 
+	tc.assertNotDone(done1)
+	tc.assertNotDone(done2)
 	cancel() // This is where we disconnect, closing all holding handlers.
+	time.Sleep(10 * time.Millisecond)
+	tc.assertDone(done1)
+	tc.assertDone(done2)
 }

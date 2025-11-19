@@ -55,4 +55,17 @@ func TestUsers(t *testing.T) {
 	u3, err := users.Get("nonexistent")
 	require.Nil(t, err)
 	require.Nil(t, u3)
+
+	ul, err := users.List()
+	require.Nil(t, err)
+	require.Len(t, ul, 1)
+	require.Equal(t, u.Username, ul[0].Username)
+
+	u.Username = "seconduser"
+	err = users.Create(&u)
+	require.Nil(t, err)
+
+	ul, err = users.List()
+	require.Nil(t, err)
+	require.Len(t, ul, 2)
 }

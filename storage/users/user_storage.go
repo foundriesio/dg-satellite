@@ -5,6 +5,7 @@ package users
 
 import (
 	"database/sql"
+	"log/slog"
 	"time"
 
 	"github.com/foundriesio/dg-satellite/auth"
@@ -31,6 +32,7 @@ type Storage struct {
 
 	stmtUserCreate    stmtUserCreate
 	stmtUserGetByName stmtUserGetByName
+	stmtUserList      stmtUserList
 }
 
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
@@ -42,6 +44,7 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	if err := db.InitStmt(
 		&handle.stmtUserCreate,
 		&handle.stmtUserGetByName,
+		&handle.stmtUserList,
 	); err != nil {
 		return nil, err
 	}
@@ -66,6 +69,16 @@ func (s Storage) Get(username string) (*User, error) {
 		u.h = s
 	}
 	return u, err
+}
+
+func (s Storage) List() ([]User, error) {
+	users, err := s.stmtUserList.run()
+	if err == nil {
+		for i := range users {
+			users[i].h = s
+		}
+	}
+	return users, err
 }
 
 type stmtUserCreate storage.DbStmt
@@ -122,4 +135,46 @@ func (s *stmtUserGetByName) run(username string) (*User, error) {
 		&u.AllowedScopes,
 	)
 	return &u, err
+}
+
+type stmtUserList storage.DbStmt
+
+func (s *stmtUserList) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("userList", `
+		SELECT id, username, password, email, created, deleted, allowed_scopes
+		FROM users
+		WHERE deleted = false`,
+	)
+	return
+}
+
+func (s *stmtUserList) run() ([]User, error) {
+	var users []User
+	rows, err := s.Stmt.Query()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Error("stmtUserList: failed to close rows", "error", err)
+		}
+	}()
+
+	for rows.Next() {
+		var u User
+		err := rows.Scan(
+			&u.id,
+			&u.Username,
+			&u.Password,
+			&u.Email,
+			&u.Created,
+			&u.Deleted,
+			&u.AllowedScopes,
+		)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
 }

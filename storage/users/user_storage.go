@@ -4,13 +4,27 @@
 package users
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/binary"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/storage"
 )
+
+type Token struct {
+	PublicID    uint32
+	Created     storage.Timestamp
+	Expires     storage.Timestamp
+	Description string
+	Scopes      auth.Scopes
+	Value       string
+}
 
 type User struct {
 	h  Storage
@@ -28,34 +42,92 @@ type User struct {
 
 func (u User) Delete() error {
 	u.Deleted = true
-	return u.h.stmtUserUpdate.run(u)
+	if err := u.h.stmtTokenDeleteAll.run(u); err != nil {
+		return fmt.Errorf("unable to delete user while deleting tokens: %w", err)
+	}
+	return u.Update()
 }
 
 func (u User) Update() error {
 	return u.h.stmtUserUpdate.run(u)
 }
 
+func (u User) GenerateToken(description string, expires int64, scopes auth.Scopes) (*Token, error) {
+	if scopes&u.AllowedScopes != scopes {
+		return nil, fmt.Errorf("requested scopes %s exceed allowed scopes %s", scopes.String(), u.AllowedScopes.String())
+	}
+
+	value := "pat_" + rand.Text()
+
+	hasher := hmac.New(sha256.New, u.h.hmacSecret)
+	if _, err := hasher.Write([]byte(value)); err != nil {
+		return nil, fmt.Errorf("unable to hash token value: %w", err)
+	}
+	hashed := fmt.Sprintf("%x", hasher.Sum(nil))
+
+	t := Token{
+		Created:     storage.Timestamp(time.Now().Unix()),
+		Expires:     storage.Timestamp(expires),
+		Description: description,
+		Scopes:      scopes,
+		Value:       hashed,
+	}
+
+	if err := u.h.stmtTokenCreate.run(u, &t); err != nil {
+		return nil, err
+	}
+	t.Value = value
+	return &t, nil
+}
+
+func (u User) DeleteToken(id uint32) error {
+	return u.h.stmtTokenDelete.run(u, id)
+}
+
+func (u User) ListTokens() ([]Token, error) {
+	return u.h.stmtTokenList.run(u)
+}
+
 type Storage struct {
 	db *storage.DbHandle
 	fs *storage.FsHandle
 
-	stmtUserCreate    stmtUserCreate
-	stmtUserGetByName stmtUserGetByName
-	stmtUserList      stmtUserList
-	stmtUserUpdate    stmtUserUpdate
+	hmacSecret []byte
+
+	stmtUserCreate     stmtUserCreate
+	stmtUserGetById    stmtUserGetById
+	stmtUserGetByName  stmtUserGetByName
+	stmtUserList       stmtUserList
+	stmtUserUpdate     stmtUserUpdate
+	stmtTokenCreate    stmtTokenCreate
+	stmtTokenDelete    stmtTokenDelete
+	stmtTokenDeleteAll stmtTokenDeleteAll
+	stmtTokenList      stmtTokenList
+	stmtTokenLookup    stmtTokenLookup
 }
 
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
+	hmacSecret, err := fs.Certs.ReadFile("hmac.secret")
+	if err != nil {
+		return nil, fmt.Errorf("unable to read HMAC secret for API tokens: %w", err)
+	}
 	handle := Storage{
-		db: db,
-		fs: fs,
+		db:         db,
+		fs:         fs,
+		hmacSecret: hmacSecret,
 	}
 
 	if err := db.InitStmt(
 		&handle.stmtUserCreate,
+		&handle.stmtUserGetById,
 		&handle.stmtUserGetByName,
 		&handle.stmtUserList,
 		&handle.stmtUserUpdate,
+		&handle.stmtTokenCreate,
+		&handle.stmtTokenDelete,
+		&handle.stmtTokenDeleteAll,
+		&handle.stmtTokenList,
+		&handle.stmtTokenLookup,
 	); err != nil {
 		return nil, err
 	}
@@ -78,6 +150,30 @@ func (s Storage) Get(username string) (*User, error) {
 		return nil, nil
 	case nil:
 		u.h = s
+	}
+	return u, err
+}
+
+func (s Storage) GetByToken(token string) (*User, error) {
+	hasher := hmac.New(sha256.New, s.hmacSecret)
+	if _, err := hasher.Write([]byte(token)); err != nil {
+		return nil, fmt.Errorf("unable to hash token value: %w", err)
+	}
+	hashed := fmt.Sprintf("%x", hasher.Sum(nil))
+	t, userID, err := s.stmtTokenLookup.run(hashed)
+	if err != nil {
+		return nil, err
+	} else if t == nil {
+		return nil, nil
+	}
+
+	if t.Expires.ToTime().Before(time.Now()) {
+		return nil, nil
+	}
+	u, err := s.stmtUserGetById.run(userID)
+	if u != nil {
+		u.h = s
+		u.AllowedScopes = t.Scopes & u.AllowedScopes
 	}
 	return u, err
 }
@@ -122,6 +218,30 @@ func (s *stmtUserCreate) run(u *User) error {
 		u.id = id
 	}
 	return nil
+}
+
+type stmtUserGetById storage.DbStmt
+
+func (s *stmtUserGetById) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("userGetId", `
+		SELECT id, username, password, email, created, allowed_scopes
+		FROM users
+		WHERE id = ? and deleted = false`,
+	)
+	return
+}
+
+func (s *stmtUserGetById) run(id int64) (*User, error) {
+	u := User{}
+	err := s.Stmt.QueryRow(id).Scan(
+		&u.id,
+		&u.Username,
+		&u.Password,
+		&u.Email,
+		&u.Created,
+		&u.AllowedScopes,
+	)
+	return &u, err
 }
 
 type stmtUserGetByName storage.DbStmt
@@ -194,8 +314,8 @@ type stmtUserUpdate storage.DbStmt
 
 func (s *stmtUserUpdate) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("userUpdate", `
-		UPDATE users 
-		SET username = ?, password = ?, email = ?, allowed_scopes = ?, deleted = ? 
+		UPDATE users
+		SET username = ?, password = ?, email = ?, allowed_scopes = ?, deleted = ?
 		WHERE id = ?`,
 	)
 	return
@@ -204,4 +324,153 @@ func (s *stmtUserUpdate) Init(db storage.DbHandle) (err error) {
 func (s *stmtUserUpdate) run(u User) error {
 	_, err := s.Stmt.Exec(u.Username, u.Password, u.Email, u.AllowedScopes, u.Deleted, u.id)
 	return err
+}
+
+type stmtTokenCreate storage.DbStmt
+
+func (s *stmtTokenCreate) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("tokenCreate", `
+		INSERT INTO tokens (user_id, public_id, created, expires, description, scopes, value)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+	)
+	return
+}
+
+func generateTimestampTokenID() (uint32, error) {
+	// Use lower 22 bits for timestamp
+	// plus 10 bits for random data
+	now := uint32(time.Now().Unix()) & 0x3FFFFF // (1<<22 -1)
+
+	var randomBuf [2]byte
+	if _, err := rand.Read(randomBuf[:]); err != nil {
+		return 0, err
+	}
+	random := binary.BigEndian.Uint16(randomBuf[:]) & 0x3FF // 10 bits
+
+	return (now << 10) | uint32(random), nil
+}
+
+func (s *stmtTokenCreate) run(u User, t *Token) error {
+	var lastErr error
+	for range 10 {
+		var err error
+		t.PublicID, err = generateTimestampTokenID()
+		if err != nil {
+			return fmt.Errorf("unable to generate token ID: %w", err)
+		}
+		_, err = s.Stmt.Exec(
+			u.id,
+			t.PublicID,
+			t.Created,
+			t.Expires,
+			t.Description,
+			t.Scopes,
+			t.Value,
+		)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+	}
+	return lastErr
+}
+
+type stmtTokenDelete storage.DbStmt
+
+func (s *stmtTokenDelete) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("tokenDelete", `
+		DELETE FROM tokens
+		WHERE user_id = ? and public_id = ?`,
+	)
+	return
+}
+
+func (s *stmtTokenDelete) run(u User, id uint32) error {
+	_, err := s.Stmt.Exec(u.id, id)
+	return err
+}
+
+type stmtTokenDeleteAll storage.DbStmt
+
+func (s *stmtTokenDeleteAll) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("tokenDeleteAll", `
+		DELETE FROM tokens
+		WHERE user_id = ?`,
+	)
+	return
+}
+
+func (s *stmtTokenDeleteAll) run(u User) error {
+	_, err := s.Stmt.Exec(u.id)
+	return err
+}
+
+type stmtTokenList storage.DbStmt
+
+func (s *stmtTokenList) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("tokenList", `
+		SELECT public_id, created, expires, description, scopes
+		FROM tokens
+		WHERE user_id = ?
+		ORDER BY created ASC`,
+	)
+	return
+}
+
+func (s *stmtTokenList) run(u User) ([]Token, error) {
+	var tokens []Token
+	rows, err := s.Stmt.Query(u.id)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Error("stmtTokenList: failed to close rows", "error", err)
+		}
+	}()
+
+	for rows.Next() {
+		var t Token
+		err := rows.Scan(
+			&t.PublicID,
+			&t.Created,
+			&t.Expires,
+			&t.Description,
+			&t.Scopes,
+		)
+		if err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, t)
+	}
+	return tokens, rows.Err()
+}
+
+type stmtTokenLookup storage.DbStmt
+
+func (s *stmtTokenLookup) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("tokenLookup", `
+		SELECT user_id, public_id, created, expires, scopes
+		FROM tokens
+		WHERE value = ?`,
+	)
+	return
+}
+
+func (s *stmtTokenLookup) run(value string) (*Token, int64, error) {
+	var t Token
+	var userID int64
+	err := s.Stmt.QueryRow(value).Scan(
+		&userID,
+		&t.PublicID,
+		&t.Created,
+		&t.Expires,
+		&t.Scopes,
+	)
+	if err == sql.ErrNoRows {
+		return nil, 0, nil
+	} else if err != nil {
+		return nil, 0, err
+	}
+	return &t, userID, nil
 }

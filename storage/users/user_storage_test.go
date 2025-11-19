@@ -13,13 +13,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUsers(t *testing.T) {
+func TestNewStorage(t *testing.T) {
 	tmpdir := t.TempDir()
 	dbFile := filepath.Join(tmpdir, "sql.db")
 	db, err := storage.NewDb(dbFile)
 	require.Nil(t, err)
 	fs, err := storage.NewFs(tmpdir)
 	require.Nil(t, err)
+
+	require.Nil(t, fs.Certs.WriteFile("hmac.secret", []byte("random")))
 
 	users, err := NewStorage(db, fs)
 	require.Nil(t, err)
@@ -82,4 +84,80 @@ func TestUsers(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, u4)
 	require.Equal(t, "devices:delete", u4.AllowedScopes.String())
+}
+
+func TestTokens(t *testing.T) {
+	tmpdir := t.TempDir()
+	dbFile := filepath.Join(tmpdir, "sql.db")
+	db, err := storage.NewDb(dbFile)
+	require.Nil(t, err)
+	fs, err := storage.NewFs(tmpdir)
+	require.Nil(t, err)
+
+	require.Nil(t, fs.Certs.WriteFile("hmac.secret", []byte("random")))
+
+	users, err := NewStorage(db, fs)
+	require.Nil(t, err)
+	require.NotNil(t, users)
+
+	u := User{
+		Username:      "testuser",
+		Password:      "passwordhash",
+		Email:         "testuser@example.com",
+		AllowedScopes: auth.ScopeDevicesRU,
+	}
+	err = users.Create(&u)
+	require.Nil(t, err)
+
+	expires := time.Now().Add(1 * time.Hour).Unix()
+	t1, err := u.GenerateToken("desc", expires, auth.ScopeDevicesR)
+	require.Nil(t, err)
+
+	time.Sleep(time.Second)
+	expired := time.Now().Add(-1 * time.Hour).Unix()
+	t2, err := u.GenerateToken("desc2", expired, auth.ScopeDevicesR)
+	require.Nil(t, err)
+	require.NotEqual(t, t1.Value, t2.Value)
+
+	u2, err := users.GetByToken(t1.Value)
+	require.Nil(t, err)
+	require.NotNil(t, u2)
+	require.Equal(t, u.id, u2.id)
+	require.True(t, u2.AllowedScopes.Has(auth.ScopeDevicesR))
+	require.False(t, u2.AllowedScopes.Has(auth.ScopeDevicesRU))
+
+	u2, err = users.GetByToken(t2.Value)
+	require.Nil(t, err)
+	require.Nil(t, u2)
+
+	tokens, err := u.ListTokens()
+	require.Nil(t, err)
+	require.Len(t, tokens, 2)
+
+	require.Equal(t, t1.PublicID, tokens[0].PublicID)
+	require.Equal(t, t2.PublicID, tokens[1].PublicID)
+	require.Nil(t, u.DeleteToken(tokens[1].PublicID))
+
+	tokens, err = u.ListTokens()
+	require.Nil(t, err)
+	require.Len(t, tokens, 1)
+
+	require.Nil(t, u.Delete())
+	tokens, err = u.ListTokens()
+	require.Nil(t, err)
+	require.Len(t, tokens, 0)
+
+	_, err = u.GenerateToken("invalid scope", expires, auth.ScopeUsersC)
+	require.NotNil(t, err)
+
+	// Generate token with read-update
+	t1, err = u.GenerateToken("desc", expires, auth.ScopeDevicesRU)
+	require.Nil(t, err)
+	// Downgrade user to devices:read
+	u.AllowedScopes = auth.ScopeDevicesR
+	require.Nil(t, u.Update())
+	u2, err = users.GetByToken(t1.Value)
+	require.Nil(t, err)
+	require.True(t, u2.AllowedScopes.Has(auth.ScopeDevicesR))
+	require.False(t, u2.AllowedScopes.Has(auth.ScopeDevicesRU))
 }

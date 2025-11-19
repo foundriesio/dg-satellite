@@ -78,7 +78,7 @@ func TestNewStorage(t *testing.T) {
 	require.Equal(t, "testuser", ul[0].Username)
 
 	ul[0].AllowedScopes = auth.ScopeDevicesD
-	require.Nil(t, ul[0].Update())
+	require.Nil(t, ul[0].Update("changed scopes"))
 
 	u4, err := users.Get("testuser")
 	require.Nil(t, err)
@@ -155,9 +155,16 @@ func TestTokens(t *testing.T) {
 	require.Nil(t, err)
 	// Downgrade user to devices:read
 	u.AllowedScopes = auth.ScopeDevicesR
-	require.Nil(t, u.Update())
+	require.Nil(t, u.Update("test"))
 	u2, err = users.GetByToken(t1.Value)
 	require.Nil(t, err)
 	require.True(t, u2.AllowedScopes.Has(auth.ScopeDevicesR))
 	require.False(t, u2.AllowedScopes.Has(auth.ScopeDevicesRU))
+
+	events, err := fs.Audit.ReadEvents(u.id)
+	require.Nil(t, err)
+	require.Contains(t, events, "User created")
+	require.Contains(t, events, "Token created")
+	require.Contains(t, events, "Token deleted id=")
+	require.Contains(t, events, "User deleted")
 }

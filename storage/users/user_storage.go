@@ -45,11 +45,15 @@ func (u User) Delete() error {
 	if err := u.h.stmtTokenDeleteAll.run(u); err != nil {
 		return fmt.Errorf("unable to delete user while deleting tokens: %w", err)
 	}
-	return u.Update()
+	return u.Update("User deleted")
 }
 
-func (u User) Update() error {
-	return u.h.stmtUserUpdate.run(u)
+func (u User) Update(reason string) error {
+	if err := u.h.stmtUserUpdate.run(u); err != nil {
+		return err
+	}
+	u.h.fs.Audit.AppendEvent(u.id, reason)
+	return nil
 }
 
 func (u User) GenerateToken(description string, expires int64, scopes auth.Scopes) (*Token, error) {
@@ -76,12 +80,19 @@ func (u User) GenerateToken(description string, expires int64, scopes auth.Scope
 	if err := u.h.stmtTokenCreate.run(u, &t); err != nil {
 		return nil, err
 	}
+	msg := fmt.Sprintf("Token created (id=%d, expires=%d, scopes=%s)", t.PublicID, expires, scopes)
+	u.h.fs.Audit.AppendEvent(u.id, msg)
 	t.Value = value
 	return &t, nil
 }
 
 func (u User) DeleteToken(id uint32) error {
-	return u.h.stmtTokenDelete.run(u, id)
+	if err := u.h.stmtTokenDelete.run(u, id); err != nil {
+		return err
+	}
+	msg := fmt.Sprintf("Token deleted id=%d", id)
+	u.h.fs.Audit.AppendEvent(u.id, msg)
+	return nil
 }
 
 func (u User) ListTokens() ([]Token, error) {
@@ -139,6 +150,7 @@ func (s Storage) Create(u *User) error {
 	err := s.stmtUserCreate.run(u)
 	if err == nil {
 		u.h = s
+		s.fs.Audit.AppendEvent(u.id, "User created")
 	}
 	return err
 }

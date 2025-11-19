@@ -96,12 +96,19 @@ func (u User) GenerateToken(description string, expires int64, scopes auth.Scope
 	if err := u.h.stmtTokenCreate.run(u, &t); err != nil {
 		return nil, err
 	}
+	msg := fmt.Sprintf("Token created (id=%d, expires=%d, scopes=%s)", t.PublicID, expires, scopes)
+	u.h.fs.Audit.AppendEvent(u.id, msg)
 	t.Value = value
 	return &t, nil
 }
 
 func (u User) DeleteToken(id int64) error {
-	return u.h.stmtTokenDelete.run(u, id)
+	if err := u.h.stmtTokenDelete.run(u, id); err != nil {
+		return err
+	}
+	msg := fmt.Sprintf("Token deleted id=%d", id)
+	u.h.fs.Audit.AppendEvent(u.id, msg)
+	return nil
 }
 
 func (u User) ListTokens() ([]Token, error) {

@@ -18,6 +18,7 @@ import (
 
 const (
 	// Global files/dirs
+	AuditDir   = "audit"
 	CertsDir   = "certs"
 	DbFile     = "db.sqlite"
 	DevicesDir = "devices"
@@ -67,6 +68,10 @@ func (c FsConfig) RootDir() string {
 	return string(c)
 }
 
+func (c FsConfig) AuditDir() string {
+	return filepath.Join(string(c), AuditDir)
+}
+
 func (c FsConfig) DbFile() string {
 	return filepath.Join(string(c), DbFile)
 }
@@ -94,6 +99,7 @@ func (c FsConfig) UpdatesProdDir() string {
 type FsHandle struct {
 	Config FsConfig
 
+	Audit   AuditLogsFsHandle
 	Certs   CertsFsHandle
 	Devices DevicesFsHandle
 	Updates struct {
@@ -112,6 +118,7 @@ type updatesFsHandleWrap struct {
 
 func NewFs(root string) (*FsHandle, error) {
 	fs := &FsHandle{Config: FsConfig(root)}
+	fs.Audit.root = fs.Config.AuditDir()
 	fs.Certs.root = fs.Config.CertsDir()
 	fs.Devices.root = fs.Config.DevicesDir()
 
@@ -138,6 +145,7 @@ func NewFs(root string) (*FsHandle, error) {
 		handle baseFsHandle
 		mode   os.FileMode
 	}{
+		{fs.Audit.baseFsHandle, 0o744},
 		{fs.Certs.baseFsHandle, 0o744},
 		{fs.Devices.baseFsHandle, 0o740},
 		// All updates categories have the same base dir, so only one of Ci/prod is needed.

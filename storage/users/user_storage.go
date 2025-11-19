@@ -32,11 +32,15 @@ func (u User) Delete() error {
 	if err := u.h.stmtTokenDeleteAll.run(u); err != nil {
 		return fmt.Errorf("unable to delete user while deleting tokens: %w", err)
 	}
-	return u.Update()
+	return u.Update("User deleted")
 }
 
-func (u User) Update() error {
-	return u.h.stmtUserUpdate.run(u)
+func (u User) Update(reason string) error {
+	if err := u.h.stmtUserUpdate.run(u); err != nil {
+		return err
+	}
+	u.h.fs.Audit.AppendEvent(u.id, reason)
+	return nil
 }
 
 type Storage struct {
@@ -91,6 +95,7 @@ func (s Storage) Create(u *User) error {
 	err := s.stmtUserCreate.run(u)
 	if err == nil {
 		u.h = s
+		s.fs.Audit.AppendEvent(u.id, "User created")
 	}
 	return err
 }

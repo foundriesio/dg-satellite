@@ -68,4 +68,18 @@ func TestUsers(t *testing.T) {
 	ul, err = users.List()
 	require.Nil(t, err)
 	require.Len(t, ul, 2)
+
+	require.Nil(t, u.Delete())
+	ul, err = users.List()
+	require.Nil(t, err)
+	require.Len(t, ul, 1)
+	require.Equal(t, "testuser", ul[0].Username)
+
+	ul[0].AllowedScopes = auth.ScopeDevicesD
+	require.Nil(t, ul[0].Update())
+
+	u4, err := users.Get("testuser")
+	require.Nil(t, err)
+	require.NotNil(t, u4)
+	require.Equal(t, "devices:delete", u4.AllowedScopes.String())
 }

@@ -26,6 +26,15 @@ type User struct {
 	AllowedScopes auth.Scopes
 }
 
+func (u User) Delete() error {
+	u.Deleted = true
+	return u.h.stmtUserUpdate.run(u)
+}
+
+func (u User) Update() error {
+	return u.h.stmtUserUpdate.run(u)
+}
+
 type Storage struct {
 	db *storage.DbHandle
 	fs *storage.FsHandle
@@ -33,6 +42,7 @@ type Storage struct {
 	stmtUserCreate    stmtUserCreate
 	stmtUserGetByName stmtUserGetByName
 	stmtUserList      stmtUserList
+	stmtUserUpdate    stmtUserUpdate
 }
 
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
@@ -45,6 +55,7 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 		&handle.stmtUserCreate,
 		&handle.stmtUserGetByName,
 		&handle.stmtUserList,
+		&handle.stmtUserUpdate,
 	); err != nil {
 		return nil, err
 	}
@@ -177,4 +188,20 @@ func (s *stmtUserList) run() ([]User, error) {
 		users = append(users, u)
 	}
 	return users, rows.Err()
+}
+
+type stmtUserUpdate storage.DbStmt
+
+func (s *stmtUserUpdate) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("userUpdate", `
+		UPDATE users 
+		SET username = ?, password = ?, email = ?, allowed_scopes = ?, deleted = ? 
+		WHERE id = ?`,
+	)
+	return
+}
+
+func (s *stmtUserUpdate) run(u User) error {
+	_, err := s.Stmt.Exec(u.Username, u.Password, u.Email, u.AllowedScopes, u.Deleted, u.id)
+	return err
 }

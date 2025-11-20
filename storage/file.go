@@ -18,11 +18,12 @@ import (
 
 const (
 	// Global files/dirs
-	CertsDir   = "certs"
-	DbFile     = "db.sqlite"
-	DevicesDir = "devices"
-	UpdatesDir = "updates"
-	AuditDir   = "audit"
+	AuthConfigFile = "auth-config.json"
+	CertsDir       = "certs"
+	DbFile         = "db.sqlite"
+	DevicesDir     = "devices"
+	UpdatesDir     = "updates"
+	AuditDir       = "audit"
 
 	partialFileSuffix  = "..part"
 	rolloutJournalFile = "rollouts.journal"
@@ -69,6 +70,10 @@ func (c FsConfig) RootDir() string {
 
 func (c FsConfig) AuditDir() string {
 	return filepath.Join(string(c), AuditDir)
+}
+
+func (c FsConfig) AuthConfigFile() string {
+	return filepath.Join(string(c), AuthConfigFile)
 }
 
 func (c FsConfig) DbFile() string {

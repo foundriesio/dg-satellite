@@ -105,16 +105,19 @@ type Storage struct {
 
 	hmacSecret []byte
 
-	stmtUserCreate     stmtUserCreate
-	stmtUserGetById    stmtUserGetById
-	stmtUserGetByName  stmtUserGetByName
-	stmtUserList       stmtUserList
-	stmtUserUpdate     stmtUserUpdate
-	stmtTokenCreate    stmtTokenCreate
-	stmtTokenDelete    stmtTokenDelete
-	stmtTokenDeleteAll stmtTokenDeleteAll
-	stmtTokenList      stmtTokenList
-	stmtTokenLookup    stmtTokenLookup
+	stmtUserCreate         stmtUserCreate
+	stmtUserGetById        stmtUserGetById
+	stmtUserGetByName      stmtUserGetByName
+	stmtUserList           stmtUserList
+	stmtUserUpdate         stmtUserUpdate
+	stmtTokenCreate        stmtTokenCreate
+	stmtTokenDelete        stmtTokenDelete
+	stmtTokenDeleteAll     stmtTokenDeleteAll
+	stmtTokenDeleteExpired stmtTokenDeleteExpired
+	stmtTokenList          stmtTokenList
+	stmtTokenLookup        stmtTokenLookup
+
+	done chan struct{}
 }
 
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
@@ -137,6 +140,7 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 		&handle.stmtTokenCreate,
 		&handle.stmtTokenDelete,
 		&handle.stmtTokenDeleteAll,
+		&handle.stmtTokenDeleteExpired,
 		&handle.stmtTokenList,
 		&handle.stmtTokenLookup,
 	); err != nil {
@@ -144,6 +148,35 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	}
 
 	return &handle, nil
+}
+
+func (s Storage) StartGc() {
+	s.done = make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.runGc()
+			case <-s.done:
+				slog.Info("Stopping user GC")
+				return
+			}
+		}
+	}()
+}
+
+func (s *Storage) StopGc() {
+	close(s.done)
+}
+
+func (s Storage) runGc() {
+	now := time.Now().Unix()
+	slog.Info("Running user token GC")
+	if err := s.stmtTokenDeleteExpired.run(now); err != nil {
+		slog.Error("Unable to run user token GC", "error", err)
+	}
 }
 
 func (s Storage) Create(u *User) error {
@@ -414,6 +447,21 @@ func (s *stmtTokenDeleteAll) Init(db storage.DbHandle) (err error) {
 
 func (s *stmtTokenDeleteAll) run(u User) error {
 	_, err := s.Stmt.Exec(u.id)
+	return err
+}
+
+type stmtTokenDeleteExpired storage.DbStmt
+
+func (s *stmtTokenDeleteExpired) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("tokenDeleteExpired", `
+		DELETE FROM tokens
+		WHERE expires < ?`,
+	)
+	return
+}
+
+func (s *stmtTokenDeleteExpired) run(before int64) error {
+	_, err := s.Stmt.Exec(before)
 	return err
 }
 

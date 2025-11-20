@@ -168,3 +168,37 @@ func TestTokens(t *testing.T) {
 	require.Contains(t, events, "Token deleted id=")
 	require.Contains(t, events, "User deleted")
 }
+
+func TestGc(t *testing.T) {
+	tmpdir := t.TempDir()
+	dbFile := filepath.Join(tmpdir, "sql.db")
+	db, err := storage.NewDb(dbFile)
+	require.Nil(t, err)
+	fs, err := storage.NewFs(tmpdir)
+	require.Nil(t, err)
+
+	require.Nil(t, fs.Certs.WriteFile("hmac.secret", []byte("random")))
+
+	users, err := NewStorage(db, fs)
+	require.Nil(t, err)
+	require.NotNil(t, users)
+
+	u := User{
+		Username:      "testuser",
+		Password:      "passwordhash",
+		Email:         "testuser@example.com",
+		AllowedScopes: auth.ScopeDevicesRU,
+	}
+	err = users.Create(&u)
+	require.Nil(t, err)
+
+	expires := time.Now().Add(-time.Hour).Unix()
+	_, err = u.GenerateToken("desc", expires, auth.ScopeDevicesR)
+	require.Nil(t, err)
+
+	users.runGc()
+
+	tokens, err := u.ListTokens()
+	require.Nil(t, err)
+	require.Len(t, tokens, 0)
+}

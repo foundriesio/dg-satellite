@@ -15,9 +15,10 @@ import (
 type CommonArgs struct {
 	DataDir string `arg:"required" help:"Directory to store data"`
 
-	Csr     *CsrCmd     `arg:"subcommand:create-csr" help:"Create a TLS certificate signing request for this server"`
-	SignCsr *CsrSignCmd `arg:"subcommand:sign-csr" help:"Create the TLS certificate from the signing request"`
-	Serve   *ServeCmd   `arg:"subcommand:serve" help:"Run the REST API and device-gateway services"`
+	AuthInit *AuthInitCmd `arg:"subcommand:auth-init" help:"Initialize authentication configuration for this server"`
+	Csr      *CsrCmd      `arg:"subcommand:create-csr" help:"Create a TLS certificate signing request for this server"`
+	SignCsr  *CsrSignCmd  `arg:"subcommand:sign-csr" help:"Create the TLS certificate from the signing request"`
+	Serve    *ServeCmd    `arg:"subcommand:serve" help:"Run the REST API and device-gateway services"`
 
 	ctx context.Context
 }
@@ -42,6 +43,8 @@ func main() {
 		err = args.SignCsr.Run(args)
 	case args.Serve != nil:
 		err = args.Serve.Run(args)
+	case args.AuthInit != nil:
+		err = args.AuthInit.Run(args)
 	default:
 		p.Fail("missing required subcommand")
 	}

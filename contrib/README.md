@@ -21,6 +21,9 @@ communicate with. In order to use this you must first:
     --cakey <PATH TO FACTORY PKI>/factory_ca.key \
     --cacert <PATH TO FACTORY PKI>/factory_ca.pem
  $ fioctl keys ca show --just-device-cas > .compose-server-data/certs/cas.pem
+ 
+ $ go run github.com/foundriesio/dg-satellite/cmd \
+    --datadir .compose-server-data auth-init
 ```
 
 ## gen-certs.sh / fake-device.py

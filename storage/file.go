@@ -24,6 +24,8 @@ const (
 	DevicesDir = "devices"
 	UpdatesDir = "updates"
 
+	AuthConfigFile = "auth-config.json"
+
 	partialFileSuffix  = "..part"
 	rolloutJournalFile = "rollouts.journal"
 
@@ -70,6 +72,10 @@ func (c FsConfig) RootDir() string {
 
 func (c FsConfig) AuditDir() string {
 	return filepath.Join(string(c), AuditDir)
+}
+
+func (c FsConfig) AuthConfigFile() string {
+	return filepath.Join(string(c), AuthConfigFile)
 }
 
 func (c FsConfig) DbFile() string {

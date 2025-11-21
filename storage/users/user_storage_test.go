@@ -196,9 +196,17 @@ func TestGc(t *testing.T) {
 	_, err = u.GenerateToken("desc", expires, auth.ScopeDevicesR)
 	require.Nil(t, err)
 
+	session, err := u.CreateSession("127.0.0.1", expires, auth.ScopeDevicesR)
+	require.Nil(t, err)
+	require.NotEmpty(t, session)
+
 	users.runGc()
 
 	tokens, err := u.ListTokens()
 	require.Nil(t, err)
 	require.Len(t, tokens, 0)
+
+	u2, err := users.GetBySession(session)
+	require.Nil(t, err)
+	require.Nil(t, u2)
 }

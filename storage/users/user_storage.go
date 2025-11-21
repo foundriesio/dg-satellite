@@ -26,6 +26,13 @@ type Token struct {
 	Value       string
 }
 
+type session struct {
+	UserID   int64
+	RemoteIP string
+	Expires  storage.Timestamp
+	Scopes   auth.Scopes
+}
+
 type User struct {
 	h  Storage
 	id int64
@@ -99,23 +106,50 @@ func (u User) ListTokens() ([]Token, error) {
 	return u.h.stmtTokenList.run(u)
 }
 
+func (u User) CreateSession(remoteIP string, expires int64, scopes auth.Scopes) (string, error) {
+	if scopes&u.AllowedScopes != scopes {
+		return "", fmt.Errorf("requested scopes %s exceed allowed scopes %s", scopes.String(), u.AllowedScopes.String())
+	}
+	idStr := rand.Text()
+	if err := u.h.stmtSessionCreate.run(u, idStr, remoteIP, time.Now().Unix(), expires, scopes); err != nil {
+		return "", fmt.Errorf("unable to create session: %w", err)
+	}
+
+	msg := fmt.Sprintf("Session created (ip=%s, expires=%d, scopes=%s)", remoteIP, expires, scopes)
+	u.h.fs.Audit.AppendEvent(u.id, msg)
+	return idStr, nil
+}
+
+func (u User) DeleteSession(id string) error {
+	if err := u.h.stmtSessionDelete.run(id); err != nil {
+		return fmt.Errorf("unable to delete session: %w", err)
+	}
+	msg := fmt.Sprintf("Session deleted id=%s", id)
+	u.h.fs.Audit.AppendEvent(u.id, msg)
+	return nil
+}
+
 type Storage struct {
 	db *storage.DbHandle
 	fs *storage.FsHandle
 
 	hmacSecret []byte
 
-	stmtUserCreate         stmtUserCreate
-	stmtUserGetById        stmtUserGetById
-	stmtUserGetByName      stmtUserGetByName
-	stmtUserList           stmtUserList
-	stmtUserUpdate         stmtUserUpdate
-	stmtTokenCreate        stmtTokenCreate
-	stmtTokenDelete        stmtTokenDelete
-	stmtTokenDeleteAll     stmtTokenDeleteAll
-	stmtTokenDeleteExpired stmtTokenDeleteExpired
-	stmtTokenList          stmtTokenList
-	stmtTokenLookup        stmtTokenLookup
+	stmtUserCreate           stmtUserCreate
+	stmtUserGetById          stmtUserGetById
+	stmtUserGetByName        stmtUserGetByName
+	stmtUserList             stmtUserList
+	stmtUserUpdate           stmtUserUpdate
+	stmtSessionCreate        stmtSessionCreate
+	stmtSessionDelete        stmtSessionDelete
+	stmtSessionDeleteExpired stmtSessionDeleteExpired
+	stmtSessionGet           stmtSessionGet
+	stmtTokenCreate          stmtTokenCreate
+	stmtTokenDelete          stmtTokenDelete
+	stmtTokenDeleteAll       stmtTokenDeleteAll
+	stmtTokenDeleteExpired   stmtTokenDeleteExpired
+	stmtTokenList            stmtTokenList
+	stmtTokenLookup          stmtTokenLookup
 
 	done chan struct{}
 }
@@ -137,6 +171,10 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 		&handle.stmtUserGetByName,
 		&handle.stmtUserList,
 		&handle.stmtUserUpdate,
+		&handle.stmtSessionCreate,
+		&handle.stmtSessionDelete,
+		&handle.stmtSessionDeleteExpired,
+		&handle.stmtSessionGet,
 		&handle.stmtTokenCreate,
 		&handle.stmtTokenDelete,
 		&handle.stmtTokenDeleteAll,
@@ -176,6 +214,11 @@ func (s Storage) runGc() {
 	slog.Info("Running user token GC")
 	if err := s.stmtTokenDeleteExpired.run(now); err != nil {
 		slog.Error("Unable to run user token GC", "error", err)
+	}
+
+	slog.Info("Running user session GC")
+	if err := s.stmtSessionDeleteExpired.run(now); err != nil {
+		slog.Error("Unable to run user session GC", "error", err)
 	}
 }
 
@@ -220,6 +263,25 @@ func (s Storage) GetByToken(token string) (*User, error) {
 		u.h = s
 		u.AllowedScopes = t.Scopes & u.AllowedScopes
 	}
+	return u, err
+}
+
+func (s Storage) GetBySession(id string) (*User, error) {
+	sess, err := s.stmtSessionGet.run(id)
+	if err != nil {
+		return nil, err
+	} else if sess == nil {
+		return nil, nil
+	}
+	if sess.Expires.ToTime().Before(time.Now()) {
+		return nil, nil
+	}
+	u, err := s.stmtUserGetById.run(sess.UserID)
+	if u != nil {
+		u.h = s
+		u.AllowedScopes = sess.Scopes & u.AllowedScopes
+	}
+
 	return u, err
 }
 
@@ -369,6 +431,84 @@ func (s *stmtUserUpdate) Init(db storage.DbHandle) (err error) {
 func (s *stmtUserUpdate) run(u User) error {
 	_, err := s.Stmt.Exec(u.Username, u.Password, u.Email, u.AllowedScopes, u.Deleted, u.id)
 	return err
+}
+
+type stmtSessionCreate storage.DbStmt
+
+func (s *stmtSessionCreate) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("sessionCreate", `
+		INSERT INTO session (id, user_id, remote_ip, created, expires, scopes)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+	)
+	return
+}
+
+func (s *stmtSessionCreate) run(u User, id, remoteIP string, created, expires int64, scopes auth.Scopes) error {
+	_, err := s.Stmt.Exec(
+		id,
+		u.id,
+		remoteIP,
+		created,
+		expires,
+		scopes,
+	)
+	return err
+}
+
+type stmtSessionDelete storage.DbStmt
+
+func (s *stmtSessionDelete) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("sessionDelete", `
+		DELETE FROM session
+		WHERE id = ?`,
+	)
+	return
+}
+
+func (s *stmtSessionDelete) run(id string) error {
+	_, err := s.Stmt.Exec(id)
+	return err
+}
+
+type stmtSessionDeleteExpired storage.DbStmt
+
+func (s *stmtSessionDeleteExpired) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("sessionDeleteExpired", `
+		DELETE FROM session
+		WHERE expires < ?`,
+	)
+	return
+}
+
+func (s *stmtSessionDeleteExpired) run(before int64) error {
+	_, err := s.Stmt.Exec(before)
+	return err
+}
+
+type stmtSessionGet storage.DbStmt
+
+func (s *stmtSessionGet) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("sessionGet", `
+		SELECT user_id, expires, scopes
+		FROM session
+		WHERE id = ?`,
+	)
+	return
+}
+
+func (s *stmtSessionGet) run(id string) (*session, error) {
+	var sess session
+	err := s.Stmt.QueryRow(id).Scan(
+		&sess.UserID,
+		&sess.Expires,
+		&sess.Scopes,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &sess, nil
 }
 
 type stmtTokenCreate storage.DbStmt

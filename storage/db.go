@@ -91,6 +91,17 @@ func createTables(db *sql.DB) error {
 
 			FOREIGN KEY(user_id) REFERENCES user(id)
 		) WITHOUT ROWID;
+
+		CREATE TABLE session (
+			id             VARCHAR(64) NOT NULL PRIMARY KEY,
+			user_id        INT,
+			remote_ip      VARCHAR(39),
+			created        INT,
+			expires        INT,
+			scopes         INT,
+
+			FOREIGN KEY(user_id) REFERENCES user(id)
+		) WITHOUT ROWID;
 	`
 	if _, err := db.Exec(sqlStmt); err != nil {
 		return fmt.Errorf("unable to create devices db: %w", err)

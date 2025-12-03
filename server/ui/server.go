@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/foundriesio/dg-satellite/auth"
+	"github.com/foundriesio/dg-satellite/auth/providers"
 	"github.com/foundriesio/dg-satellite/server"
 	apiHandlers "github.com/foundriesio/dg-satellite/server/ui/api"
 	"github.com/foundriesio/dg-satellite/server/ui/daemons"
 	"github.com/foundriesio/dg-satellite/storage"
 	"github.com/foundriesio/dg-satellite/storage/api"
+	"github.com/foundriesio/dg-satellite/storage/users"
 )
 
 const serverName = "rest-api"
@@ -29,6 +31,23 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 		return nil, fmt.Errorf("failed to load %s storage: %w", serverName, err)
 	}
 	e := server.NewEchoServer()
+
+	authConfig, err := fs.GetAuthConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth config: %w", err)
+	}
+
+	userStorage, err := users.NewStorage(db, fs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load users storage: %w", err)
+	}
+	provider := providers.GetProvider(authConfig.Type)
+	if provider == nil {
+		return nil, fmt.Errorf("authentication provider not found: %s", authConfig.Type)
+	} else if err = provider.Configure(e, userStorage, authConfig); err != nil {
+		return nil, fmt.Errorf("failed to configure authentication provider: %w", err)
+	}
+
 	srv := server.NewServer(ctx, e, serverName, port, nil)
 	apiHandlers.RegisterHandlers(e, strg, authFunc)
 	return &apiServer{server: srv, daemons: daemons.New(ctx, strg)}, nil

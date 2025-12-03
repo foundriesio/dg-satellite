@@ -144,6 +144,7 @@ func NewTestClient(t *testing.T) *testClient {
 	require.Nil(t, err)
 	gwS, err := gatewayStorage.NewStorage(db, fsS)
 	require.Nil(t, err)
+	require.Nil(t, fsS.Certs.WriteFile("hmac.secret", []byte("random")))
 
 	log, err := context.InitLogger("debug")
 	require.Nil(t, err)

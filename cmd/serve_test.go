@@ -6,6 +6,8 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"syscall"
 	"testing"
 
@@ -20,6 +22,9 @@ func TestServe(t *testing.T) {
 	common := CommonArgs{DataDir: tmpDir}
 	fs, err := storage.NewFs(common.DataDir)
 	require.Nil(t, err)
+	require.Nil(t, fs.Certs.WriteFile("hmac.secret", []byte("random")))
+	authConfig := `{"Type": "noauth"}`
+	require.Nil(t, os.WriteFile(filepath.Join(tmpDir, "auth-config.json"), []byte(authConfig), 0o640))
 	apiAddress := ""
 	gatewayAddress := ""
 	wait := make(chan bool)

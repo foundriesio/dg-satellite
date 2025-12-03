@@ -1,0 +1,26 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <fieldset>
+        <legend><strong>Username</strong></legend>
+        <p>{{.User.Username}}</p>
+      </fieldset>
+
+      <fieldset>
+        <legend><strong>Email</strong></legend>
+        <p>{{if .User.Email}}{{.User.Email}}{{else}}<em>Not configured</em>{{end}}</p>
+      </fieldset>
+
+      <fieldset>
+        <legend><strong>Allowed scopes</strong></legend>
+        <ul>
+          {{range .User.AllowedScopes.ToSlice}}
+          <li>{{.}}</li>
+          {{end}}
+        </ul>
+      </fieldset>
+
+    </section>
+
+{{ template "footer"}}

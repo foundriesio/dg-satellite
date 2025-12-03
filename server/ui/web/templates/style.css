@@ -1,0 +1,92 @@
+:root {
+    font-size: 15px;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #f2f2f2; /* light gray */
+}
+
+nav#topbar {
+    background-color: rgb(2, 11, 64);
+    padding: 0.75rem 0;
+}
+
+nav#topbar .container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: white;
+}
+
+/* Larger brand text */
+#topbar .brand {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: white;
+}
+
+nav#topbar a,
+nav#topbar summary {
+    color: white;
+}
+
+nav#topbar a:hover,
+nav#topbar summary:hover {
+    color: #d0d8ff;
+}
+
+/* User dropdown */
+nav#topbar details.dropdown summary {
+    color: black; /* dropdown label */
+    cursor: pointer; /* ensures pointer cursor */
+}
+
+nav#topbar details.dropdown ul a {
+    color: black;
+}
+
+nav#subnav {
+    background: white;
+    padding: 0.5rem 0;
+}
+
+nav#subnav .container {
+    display: flex;
+    gap: 1.5rem; /* spacing between tabs */
+}
+
+nav#subnav a {
+    color: rgb(2, 11, 64);
+    font-size: 1.2rem;
+    text-decoration: none !important;   /* remove underline */
+    padding-bottom: 2px;
+    border-bottom: 2px solid transparent;
+}
+
+nav#subnav a:hover {
+    text-decoration: none !important;
+    border-bottom-color: rgb(2, 11, 64);
+}
+
+nav#subnav a.selected {
+    border-bottom: 2px solid rgb(2, 11, 64);
+}
+
+.content-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-bottom: 1.5rem;
+}
+
+i.user {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><circle cx="10" cy="6" r="4" fill="%23000"/><path d="M3 17c0-3.3 2.7-6 7-6s7 2.7 7 6H3z" fill="%23000"/></svg>');
+    vertical-align: middle;
+}

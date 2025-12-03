@@ -1,0 +1,49 @@
+{{define "header"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+
+    <title>{{.Title}} - Satellite Server</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/picocss/2.1.1/pico.min.css" integrity="sha512-+4kjFgVD0n6H3xt19Ox84B56MoS7srFn60tgdWFuO4hemtjhySKyW4LnftYZn46k3THUEiTTsbVjrHai+0MOFw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="/style.css">
+  </head>
+
+  <body>
+    <nav id="topbar">
+      <div class="container">
+        <strong class="brand">Satellite Server</strong>
+
+        <div style="display: flex; align-items: center; gap: 1rem;">
+        <a href="#" style="color: white; text-decoration: none;">Docs</a>
+
+        <details class="dropdown">
+          <summary><i class="user"></i>{{.User.Username}}</summary>
+          <ul>
+            <li><a href="/settings">Settings</a></li>
+            <li><a href="/auth/logout">Logout</a></li>
+          </ul>
+        </details>
+      </div>
+    </nav>
+
+    <nav id="subnav">
+      <div class="container">
+        {{ range .NavItems }}
+          <a href="{{.Href}}" {{if .Selected}}class="selected"{{end}}>{{.Title}}</a>
+        {{ end }}
+      </div>
+    </nav>
+
+    <main class="container">
+    
+{{end}}
+
+{{define "footer"}}
+    </main>
+  </body>
+</html>
+{{end}}

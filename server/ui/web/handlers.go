@@ -4,48 +4,93 @@
 package web
 
 import (
+	"crypto/md5"
+	"fmt"
+	"html/template"
+	"io"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/foundriesio/dg-satellite/auth"
-	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
+	"github.com/foundriesio/dg-satellite/server/ui/web/templates"
 	"github.com/foundriesio/dg-satellite/storage/users"
 )
 
 type handlers struct {
-	users    *users.Storage
-	provider auth.Provider
+	users     *users.Storage
+	provider  auth.Provider
+	templates *template.Template
+	styleEtag string
 }
 
 var EchoError = server.EchoError
 
 func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Provider) {
-	h := handlers{users: storage, provider: authProvider}
+	cssBytes, _ := templates.Assets.ReadFile("style.css")
+	h := handlers{
+		users:     storage,
+		provider:  authProvider,
+		styleEtag: fmt.Sprintf("%x", md5.Sum(cssBytes)),
+		templates: templates.Templates,
+	}
+
+	e.Renderer = h
 
 	e.GET("/", h.index, h.requireSession)
+	e.GET("/style.css", h.css)
+	e.GET("/auth/logout", h.authLogout, h.requireSession)
+	e.GET("/settings", h.settings, h.requireSession)
 }
 
-func (h handlers) requireSession(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		session, err := h.provider.GetSession(c)
-		if err != nil {
-			return EchoError(c, err, http.StatusInternalServerError, err.Error())
-		} else if session == nil {
-			return nil // The provider sent the response (e.g., redirect to login)
-		}
+type baseCtx struct {
+	User     *users.User
+	Title    string
+	NavItems []navItem
+}
 
-		ctx := c.Request().Context()
-		log := context.CtxGetLog(ctx).With("user", session.User.Username)
-		ctx = context.CtxWithLog(ctx, log)
-		ctx = CtxWithSession(ctx, session)
-		c.SetRequest(c.Request().WithContext(ctx))
-		return next(c)
+func (h handlers) baseCtx(c echo.Context, title, selected string) baseCtx {
+	return baseCtx{
+		User:     CtxGetSession(c.Request().Context()).User,
+		Title:    title,
+		NavItems: h.genNavItems(selected),
 	}
 }
 
+func (h handlers) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	return h.templates.ExecuteTemplate(w, name, data)
+}
+
+func (h handlers) css(c echo.Context) error {
+	if eTag := c.Request().Header.Get("If-None-Match"); eTag == h.styleEtag {
+		return c.NoContent(http.StatusNotModified)
+	}
+	c.Response().Header().Set("ETag", h.styleEtag)
+	c.Response().Header().Set("Cache-Control", "public, max-age=3600") // 1 hour in seconds
+	c.Response().Header().Set("Content-Type", "text/css")
+	return h.Render(c.Response(), "style.css", nil, c)
+}
+
 func (h handlers) index(c echo.Context) error {
-	session := CtxGetSession(c.Request().Context())
-	return c.HTML(http.StatusOK, "<h1>Hello "+session.User.Username+"</h1>\n")
+	return c.Redirect(http.StatusTemporaryRedirect, "/settings")
+}
+
+type navItem struct {
+	Title    string
+	Href     string
+	Selected bool
+}
+
+func (h handlers) genNavItems(selected string) []navItem {
+	navItems := []navItem{
+		{Title: "Devices", Href: "/devices", Selected: selected == "devices"},
+		{Title: "Users", Href: "/users", Selected: selected == "users"},
+	}
+	return navItems
+}
+
+func (h *handlers) authLogout(c echo.Context) error {
+	h.provider.DropSession(c, CtxGetSession(c.Request().Context()))
+	return c.Redirect(http.StatusTemporaryRedirect, "/")
 }

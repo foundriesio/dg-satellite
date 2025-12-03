@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/auth/providers"
 	"github.com/foundriesio/dg-satellite/server"
 	apiHandlers "github.com/foundriesio/dg-satellite/server/ui/api"
@@ -25,7 +24,7 @@ type daemon interface {
 	Shutdown()
 }
 
-func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, port uint16, authFunc auth.AuthUserFunc) (server.Server, error) {
+func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, port uint16) (server.Server, error) {
 	strg, err := api.NewStorage(db, fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load %s storage: %w", serverName, err)
@@ -49,7 +48,7 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 	}
 
 	srv := server.NewServer(ctx, e, serverName, port, nil)
-	apiHandlers.RegisterHandlers(e, strg, authFunc)
+	apiHandlers.RegisterHandlers(e, strg, provider)
 	return &apiServer{server: srv, daemons: daemons.New(ctx, strg)}, nil
 }
 

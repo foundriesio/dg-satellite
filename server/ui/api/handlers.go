@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/foundriesio/dg-satellite/auth"
+	"github.com/foundriesio/dg-satellite/auth/providers"
 	"github.com/foundriesio/dg-satellite/server"
 	storage "github.com/foundriesio/dg-satellite/storage/api"
 )
@@ -17,10 +18,10 @@ type handlers struct {
 
 var EchoError = server.EchoError
 
-func RegisterHandlers(e *echo.Echo, storage *storage.Storage, authFunc auth.AuthUserFunc) {
+func RegisterHandlers(e *echo.Echo, storage *storage.Storage, provider providers.Provider) {
 	h := handlers{storage: storage}
 	g := e.Group("/v1")
-	g.Use(authUser(authFunc))
+	g.Use(authUser(provider))
 
 	g.GET("/devices", h.deviceList, requireScope(auth.ScopeDevicesR))
 	g.GET("/devices/:uuid", h.deviceGet, requireScope(auth.ScopeDevicesR))

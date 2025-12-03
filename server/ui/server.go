@@ -25,7 +25,7 @@ type daemon interface {
 	Shutdown()
 }
 
-func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, port uint16, authFunc auth.AuthUserFunc) (server.Server, error) {
+func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, port uint16) (server.Server, error) {
 	strg, err := api.NewStorage(db, fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load %s storage: %w", serverName, err)
@@ -43,7 +43,7 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 	slog.Info("Using authentication provider", "name", provider.Name())
 
 	srv := server.NewServer(ctx, e, serverName, port, nil)
-	apiHandlers.RegisterHandlers(e, strg, authFunc)
+	apiHandlers.RegisterHandlers(e, strg, provider)
 	return &apiServer{server: srv, daemons: daemons.New(ctx, strg)}, nil
 }
 

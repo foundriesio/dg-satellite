@@ -26,6 +26,7 @@ import (
 	"github.com/foundriesio/dg-satellite/storage"
 	apiStorage "github.com/foundriesio/dg-satellite/storage/api"
 	gatewayStorage "github.com/foundriesio/dg-satellite/storage/gateway"
+	"github.com/foundriesio/dg-satellite/storage/users"
 )
 
 func generateUpdateEvents(corId, pack string, num int) []storage.DeviceUpdateEvent {
@@ -57,6 +58,7 @@ type testClient struct {
 	fs  *apiStorage.FsHandle
 	api *apiStorage.Storage
 	gw  *gatewayStorage.Storage
+	u   *users.User
 	e   *echo.Echo
 }
 
@@ -133,6 +135,29 @@ func (c testClient) marshalBody(data any) io.Reader {
 	}
 }
 
+type testAuthProvider struct {
+	user *users.User
+}
+
+func (testAuthProvider) Name() string {
+	return "test"
+}
+
+func (p testAuthProvider) Configure(e *echo.Echo, userS *users.Storage, config *storage.AuthConfig) error {
+	return nil
+}
+
+func (p testAuthProvider) GetUser(c echo.Context) (*users.User, error) {
+	return p.user, nil
+}
+
+func (p testAuthProvider) GetSession(c echo.Context) (*auth.Session, error) {
+	return &auth.Session{}, nil
+}
+
+func (testAuthProvider) DropSession(echo.Context, *auth.Session) {
+}
+
 func NewTestClient(t *testing.T) *testClient {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
@@ -150,7 +175,12 @@ func NewTestClient(t *testing.T) *testClient {
 	ctx = CtxWithLog(ctx, log)
 
 	e := server.NewEchoServer()
-	RegisterHandlers(e, apiS, auth.FakeAuthUser)
+	require.Nil(t, err)
+	u := &users.User{
+		Username:      "root",
+		AllowedScopes: 0,
+	}
+	RegisterHandlers(e, apiS, &testAuthProvider{user: u})
 
 	tc := testClient{
 		t:   t,
@@ -158,6 +188,7 @@ func NewTestClient(t *testing.T) *testClient {
 		fs:  fsS,
 		api: apiS,
 		gw:  gwS,
+		u:   u,
 		e:   e,
 	}
 	return &tc
@@ -165,7 +196,8 @@ func NewTestClient(t *testing.T) *testClient {
 
 func TestApiDeviceList(t *testing.T) {
 	tc := NewTestClient(t)
-	tc.GET("/devices?deny-has-scope=1", 403)
+	tc.GET("/devices", 403)
+	tc.u.AllowedScopes = users.ScopeDevicesR
 
 	// No devices
 	data := tc.GET("/devices", 200)
@@ -194,7 +226,8 @@ func TestApiDeviceList(t *testing.T) {
 
 func TestApiDeviceGet(t *testing.T) {
 	tc := NewTestClient(t)
-	tc.GET("/devices/foo?deny-has-scope=1", 403)
+	tc.GET("/devices/foo", 403)
+	tc.u.AllowedScopes = users.ScopeDevicesR
 
 	_ = tc.GET("/devices/does-not-exist", 404)
 
@@ -217,7 +250,8 @@ func TestApiDeviceGet(t *testing.T) {
 
 func TestApiAppsStates(t *testing.T) {
 	tc := NewTestClient(t)
-	tc.GET("/devices/test-device-1/apps-states?deny-has-scope=1", 403)
+	tc.GET("/devices/test-device-1/apps-states", 403)
+	tc.u.AllowedScopes = users.ScopeDevicesR
 
 	_ = tc.GET("/devices/test-device-1/apps-states", 404)
 
@@ -249,7 +283,8 @@ func TestApiAppsStates(t *testing.T) {
 
 func TestApiDeviceUpdateEvents(t *testing.T) {
 	tc := NewTestClient(t)
-	tc.GET("/devices/foo/updates?deny-has-scope=1", 403)
+	tc.GET("/devices/foo/updates", 403)
+	tc.u.AllowedScopes = users.ScopeDevicesR
 
 	_ = tc.GET("/devices/updates/does-not-exist", 404)
 
@@ -283,10 +318,11 @@ func TestApiDeviceUpdateEvents(t *testing.T) {
 
 func TestApiUpdateList(t *testing.T) {
 	tc := NewTestClient(t)
-	tc.GET("/updates/ci?deny-has-scope=1", 403)
-	tc.GET("/updates/ci/tag?deny-has-scope=1", 403)
-	tc.GET("/updates/prod?deny-has-scope=1", 403)
-	tc.GET("/updates/prod/tag?deny-has-scope=1", 403)
+	tc.GET("/updates/ci", 403)
+	tc.GET("/updates/ci/tag", 403)
+	tc.GET("/updates/prod", 403)
+	tc.GET("/updates/prod/tag", 403)
+	tc.u.AllowedScopes = users.ScopeDevicesR
 
 	tc.GET("/updates/non-prod", 404)
 	tc.GET("/updates/non-prod/tag", 404)
@@ -326,8 +362,9 @@ func TestApiUpdateList(t *testing.T) {
 
 func TestApiRolloutList(t *testing.T) {
 	tc := NewTestClient(t)
-	tc.GET("/updates/ci/tag/update/rollouts?deny-has-scope=1", 403)
-	tc.GET("/updates/prod/tag/update/rollouts?deny-has-scope=1", 403)
+	tc.GET("/updates/ci/tag/update/rollouts", 403)
+	tc.GET("/updates/prod/tag/update/rollouts", 403)
+	tc.u.AllowedScopes = users.ScopeDevicesR
 
 	tc.GET("/updates/non-prod/tag/update/rollouts", 404)
 
@@ -362,8 +399,9 @@ func TestApiRolloutList(t *testing.T) {
 
 func TestApiRolloutGet(t *testing.T) {
 	tc := NewTestClient(t)
-	tc.GET("/updates/ci/tag/update/rollouts/rolling?deny-has-scope=1", 403)
-	tc.GET("/updates/prod/tag/update/rollouts/stones?deny-has-scope=1", 403)
+	tc.GET("/updates/ci/tag/update/rollouts/rolling", 403)
+	tc.GET("/updates/prod/tag/update/rollouts/stones", 403)
+	tc.u.AllowedScopes = users.ScopeDevicesR
 
 	tc.GET("/updates/non-prod/tag/update/rollouts/rocks", 404)
 
@@ -396,8 +434,9 @@ func TestApiRolloutGet(t *testing.T) {
 
 func TestApiRolloutPut(t *testing.T) {
 	tc := NewTestClient(t)
-	tc.PUT("/updates/ci/tag/update/rollouts/rolling?deny-has-scope=1", 403, "{}")
-	tc.PUT("/updates/prod/tag/update/rollouts/stones?deny-has-scope=1", 403, "{}")
+	tc.PUT("/updates/ci/tag/update/rollouts/rolling", 403, "{}")
+	tc.PUT("/updates/prod/tag/update/rollouts/stones", 403, "{}")
+	tc.u.AllowedScopes = users.ScopeDevicesRU
 
 	tc.PUT("/updates/non-prod/tag/update/rollouts/rocks", 404, "{}")
 
@@ -483,6 +522,7 @@ func TestApiRolloutDaemon(t *testing.T) {
 	daemons := daemons.New(tc.ctx, tc.api, daemons.WithRolloverInterval(20*time.Millisecond))
 	daemons.Start()
 	defer daemons.Shutdown()
+	tc.u.AllowedScopes = users.ScopeDevicesR
 
 	require.Nil(t, tc.fs.Updates.Ci.Ostree.WriteFile("tag1", "update1", "foo", "bar"))
 	require.Nil(t, tc.fs.Updates.Prod.Ostree.WriteFile("tag2", "update2", "foo", "bar"))
@@ -529,7 +569,8 @@ func TestApiRolloutDaemon(t *testing.T) {
 
 func TestApiUpdateTail(t *testing.T) {
 	tc := NewTestClient(t)
-	tc.GET("/updates/prod/tag1/update1/tail?deny-has-scope=1", 403)
+	tc.GET("/updates/prod/tag1/update1/tail", 403)
+	tc.u.AllowedScopes = users.ScopeDevicesR
 
 	d, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
 	require.Nil(t, err)

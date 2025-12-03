@@ -18,10 +18,10 @@ type handlers struct {
 
 var EchoError = server.EchoError
 
-func RegisterHandlers(e *echo.Echo, storage *storage.Storage, authFunc auth.AuthUserFunc) {
+func RegisterHandlers(e *echo.Echo, storage *storage.Storage, a auth.Provider) {
 	h := handlers{storage: storage}
 	g := e.Group("/v1")
-	g.Use(authUser(authFunc))
+	g.Use(authUser(a))
 
 	g.GET("/devices", h.deviceList, requireScope(users.ScopeDevicesR))
 	g.GET("/devices/:uuid", h.deviceGet, requireScope(users.ScopeDevicesR))

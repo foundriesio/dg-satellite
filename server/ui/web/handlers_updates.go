@@ -4,6 +4,8 @@
 package web
 
 import (
+	"fmt"
+
 	"github.com/labstack/echo/v4"
 )
 
@@ -27,4 +29,25 @@ func (h handlers) updatesList(c echo.Context) error {
 		Prod:    prod,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "updates.html", ctx)
+}
+
+func (h handlers) updatesGet(c echo.Context) error {
+	url := fmt.Sprintf("/v1/updates/%s/%s/%s/rollouts", c.Param("prod"), c.Param("tag"), c.Param("name"))
+
+	var rollouts []string
+	if err := CtxGetJson(c.Request().Context(), url, &rollouts); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+	ctx := struct {
+		baseCtx
+		Tag      string
+		Name     string
+		Rollouts []string
+	}{
+		baseCtx:  h.baseCtx(c, "Update Details", "update"),
+		Tag:      c.Param("tag"),
+		Name:     c.Param("name"),
+		Rollouts: rollouts,
+	}
+	return h.templates.ExecuteTemplate(c.Response(), "update.html", ctx)
 }

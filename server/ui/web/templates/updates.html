@@ -16,7 +16,7 @@
           <tr>
             <td>Production</td>
             <td>{{ $key }}</td>
-            <td>{{ $update }}</td>
+            <td><a href="/updates/prod/{{$key}}/{{ $update }}">{{ $update }}</a></td>
           </tr>
           {{ end }}
           {{ end }}
@@ -25,7 +25,7 @@
           <tr>
             <td>CI</td>
             <td>{{ $key }}</td>
-            <td>{{ $update }}</td>
+            <td><a href="/updates/ci/{{$key}}/{{ $update }}">{{ $update }}</a></td>
           </tr>
           {{ end }}
           {{ end }}

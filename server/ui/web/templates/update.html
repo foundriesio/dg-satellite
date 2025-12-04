@@ -1,0 +1,26 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <fieldset>
+        <legend><strong>Tag</strong></legend>
+        <p>{{.Tag}}</p>
+      </fieldset>
+
+      <fieldset>
+        <legend><strong>Name</strong></legend>
+        <p>{{.Name}}</p>
+      </fieldset>
+    </section>
+
+    <section class="content-section">
+      <h2>Rollout history</h3>
+      <ul>
+      {{ range .Rollouts }}
+        <li>{{.}}</li>
+      {{ end }}
+      </ul>
+    </section>
+
+
+{{ template "footer"}}

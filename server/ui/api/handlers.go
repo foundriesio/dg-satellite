@@ -19,14 +19,15 @@ var EchoError = server.EchoError
 
 func RegisterHandlers(e *echo.Echo, storage *storage.Storage, authFunc auth.AuthUserFunc) {
 	h := handlers{storage: storage}
-	e.Use(authUser(authFunc))
+	g := e.Group("/v1")
+	g.Use(authUser(authFunc))
 
-	e.GET("/devices", h.deviceList, requireScope(auth.ScopeDevicesR))
-	e.GET("/devices/:uuid", h.deviceGet, requireScope(auth.ScopeDevicesR))
-	e.GET("/devices/:uuid/updates", h.deviceUpdatesList, requireScope(auth.ScopeDevicesR))
-	e.GET("/devices/:uuid/updates/:id", h.deviceUpdatesGet, requireScope(auth.ScopeDevicesR))
+	g.GET("/devices", h.deviceList, requireScope(auth.ScopeDevicesR))
+	g.GET("/devices/:uuid", h.deviceGet, requireScope(auth.ScopeDevicesR))
+	g.GET("/devices/:uuid/updates", h.deviceUpdatesList, requireScope(auth.ScopeDevicesR))
+	g.GET("/devices/:uuid/updates/:id", h.deviceUpdatesGet, requireScope(auth.ScopeDevicesR))
 	// In updates APIs :prod path element can be either "prod" or "ci".
-	upd := e.Group("/updates/:prod")
+	upd := g.Group("/updates/:prod")
 	upd.Use(validateUpdateParams)
 	upd.GET("", h.updateList, requireScope(auth.ScopeDevicesR))
 	upd.GET("/:tag", h.updateList, requireScope(auth.ScopeDevicesR))

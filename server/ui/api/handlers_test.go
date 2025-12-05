@@ -99,7 +99,7 @@ func (c testClient) assertNotDone(done <-chan bool) {
 }
 
 func (c testClient) GET(resource string, status int, headers ...string) []byte {
-	req := httptest.NewRequest(http.MethodGet, resource, nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1"+resource, nil)
 	c.marshalHeaders(headers, req)
 	rec := c.Do(req)
 	require.Equal(c.t, status, rec.Code)
@@ -107,7 +107,7 @@ func (c testClient) GET(resource string, status int, headers ...string) []byte {
 }
 
 func (c testClient) PUT(resource string, status int, data any, headers ...string) []byte {
-	req := httptest.NewRequest(http.MethodPut, resource, c.marshalBody(data))
+	req := httptest.NewRequest(http.MethodPut, "/v1"+resource, c.marshalBody(data))
 	c.marshalHeaders(headers, req)
 	rec := c.Do(req)
 	require.Equal(c.t, status, rec.Code)
@@ -524,7 +524,7 @@ func TestApiUpdateTail(t *testing.T) {
 
 	// Before any events appear, check the correct error event is received.
 	done := make(chan bool)
-	rec := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil), done)
+	rec := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/v1/updates/prod/tag1/update1/tail", nil), done)
 	time.Sleep(10 * time.Millisecond)
 	expectedStream := `event: error
 id: 0
@@ -549,9 +549,9 @@ data: No rollout logs for this update yet.
 
 	// rec1 is plain request, rec2 is request with resumption.
 	done1 := make(chan bool)
-	rec1 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil), done1)
+	rec1 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/v1/updates/prod/tag1/update1/tail", nil), done1)
 	done2 := make(chan bool)
-	req2 := httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/updates/prod/tag1/update1/tail", nil)
 	req2.Header.Add("Last-Event-ID", "1")
 	rec2 := tc.DoAsync(req2, done2)
 	time.Sleep(10 * time.Millisecond)
@@ -593,7 +593,7 @@ data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-core
 	keepaliveResponseInterval = 20 * time.Millisecond
 	defer func() { keepaliveResponseInterval = saved }()
 	done3 := make(chan bool)
-	rec3 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/updates/prod/tag1/update1/tail", nil), done3)
+	rec3 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/v1/updates/prod/tag1/update1/tail", nil), done3)
 	time.Sleep(50 * time.Millisecond)
 	expectedStream3 := expectedStream1 + keepaliveResponseText + keepaliveResponseText
 	require.Equal(t, 200, rec3.Code)

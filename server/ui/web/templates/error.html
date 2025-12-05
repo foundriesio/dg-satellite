@@ -1,0 +1,8 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+      <p>HTTP Code: {{.Status}}</p>
+      <pre>{{.Message}}</pre>
+    </section>
+
+{{ template "footer"}}

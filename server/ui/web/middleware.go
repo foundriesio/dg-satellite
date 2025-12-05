@@ -4,11 +4,13 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/foundriesio/dg-satellite/context"
+	"github.com/foundriesio/dg-satellite/storage/users"
 )
 
 func (h handlers) requireSession(next echo.HandlerFunc) echo.HandlerFunc {
@@ -26,5 +28,18 @@ func (h handlers) requireSession(next echo.HandlerFunc) echo.HandlerFunc {
 		ctx = CtxWithSession(ctx, session)
 		c.SetRequest(c.Request().WithContext(ctx))
 		return next(c)
+	}
+}
+
+func (h handlers) requireScope(scope users.Scopes) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			session := CtxGetSession(c.Request().Context())
+			if !session.User.AllowedScopes.Has(scope) {
+				err := fmt.Errorf("user missing required scope: %s", scope)
+				return h.handleError(c, http.StatusForbidden, err)
+			}
+			return next(c)
+		}
 	}
 }

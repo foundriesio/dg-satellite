@@ -4,7 +4,6 @@
 package auth
 
 import (
-	"errors"
 	"net/http"
 )
 
@@ -16,11 +15,11 @@ func (fakeUser) Id() string {
 	return "fake-user"
 }
 
-func (u fakeUser) HasScope(Scope) error {
+func (u fakeUser) Scopes() Scopes {
 	if u.denyHasScope {
-		return errors.New("fakeUser has denyHashScope set")
+		return 0
 	}
-	return nil
+	return 0xFFFFFFFFFFFFFFFF
 }
 
 func FakeAuthUser(w http.ResponseWriter, r *http.Request) (User, error) {

@@ -7,18 +7,9 @@ import (
 	"net/http"
 )
 
-// Scope helps simplify how we check for role-based access. For example,
-// if you want to list devices you need `devices:read` *or* `devices:read-update`.
-// Scope allows us to define a "devices-list" that covers them both
-type Scope []string
-
-var ScopeDevicesR = Scope{"devices:read", "devices:read-update"}
-var ScopeDevicesRU = Scope{"devices:read-update"}
-var ScopeDevicesD = Scope{"devices:delete"}
-
 type User interface {
 	Id() string
-	HasScope(Scope) error
+	Scopes() Scopes
 }
 
 // AuthUserFunc allows us to define a generic way for middleware to do

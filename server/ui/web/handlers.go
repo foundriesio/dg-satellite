@@ -41,6 +41,7 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 	e.GET("/", h.index, h.requireSession)
 	e.GET("/style.css", h.css)
 	e.GET("/auth/logout", h.authLogout, h.requireSession)
+	e.GET("/devices", h.devicesList, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/settings", h.settings, h.requireSession)
 }
 
@@ -73,7 +74,7 @@ func (h handlers) css(c echo.Context) error {
 }
 
 func (h handlers) index(c echo.Context) error {
-	return c.Redirect(http.StatusTemporaryRedirect, "/settings")
+	return c.Redirect(http.StatusTemporaryRedirect, "/devices")
 }
 
 type navItem struct {

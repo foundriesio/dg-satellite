@@ -1,0 +1,30 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <table class="striped">
+        <thead>
+          <tr>
+            <th>UUID</th>
+            <th>Created at</th>
+            <th>Last seen</th>
+            <th>Target</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Devices }}
+          <tr>
+            <td>{{.Uuid}}</td>
+            <td>{{tsToString .CreatedAt}}</td>
+            <td>{{tsToString .LastSeen}}</td>
+            <td>{{.Target}}</td>
+            <td>{{ if .IsProd}}<i class="check" title="Production device"></i>{{ end }}</td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+
+    </section>
+
+{{ template "footer"}}

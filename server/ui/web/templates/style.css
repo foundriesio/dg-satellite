@@ -90,3 +90,10 @@ i.user {
     background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><circle cx="10" cy="6" r="4" fill="%23000"/><path d="M3 17c0-3.3 2.7-6 7-6s7 2.7 7 6H3z" fill="%23000"/></svg>');
     vertical-align: middle;
 }
+
+i.check {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5 10l4 4 6-8" stroke="%23000" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+}

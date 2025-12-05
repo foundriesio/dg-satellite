@@ -48,10 +48,12 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 		return nil, fmt.Errorf("failed to configure authentication provider: %w", err)
 	}
 
+	daemons := daemons.New(ctx, strg, daemons.WithUserGc(userStorage))
+
 	srv := server.NewServer(ctx, e, serverName, port, nil)
 	apiHandlers.RegisterHandlers(e, strg, provider)
 	webHandlers.RegisterHandlers(e, userStorage, provider)
-	return &apiServer{server: srv, daemons: daemons.New(ctx, strg)}, nil
+	return &apiServer{server: srv, daemons: daemons}, nil
 }
 
 type apiServer struct {

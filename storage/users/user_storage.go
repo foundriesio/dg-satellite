@@ -188,7 +188,7 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	return &handle, nil
 }
 
-func (s Storage) StartGc() {
+func (s *Storage) StartGc() {
 	s.done = make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)

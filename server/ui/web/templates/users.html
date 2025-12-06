@@ -1,0 +1,26 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+      <table class="striped">
+        <thead>
+            <tr>
+            <th>Username</th>
+            <th>Created at</th>
+            <th>Email</th>
+            <th>Allowed scopes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ range .Users}}
+            <tr>
+            <td>{{.Username}}</td>
+            <td>{{tsToString .CreatedAt}}</td>
+            <td>{{.Email}}</td>
+            <td>{{.AllowedScopes}}</td>
+            </tr>
+            {{ end }}
+        </tbody>
+      </table>
+    </section>
+
+{{ template "footer"}}

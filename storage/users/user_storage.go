@@ -42,6 +42,10 @@ func (u User) Update(reason string) error {
 	return nil
 }
 
+func (u User) GetAuditLog() (string, error) {
+	return u.h.fs.Audit.ReadEvents(u.id)
+}
+
 type Storage struct {
 	db *storage.DbHandle
 	fs *storage.FsHandle

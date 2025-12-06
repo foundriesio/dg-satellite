@@ -75,6 +75,13 @@ nav#subnav a.selected {
     border-bottom: 2px solid rgb(2, 11, 64);
 }
 
+div.device-details dt {
+    font-weight: bold;
+}
+div.device-details dd {
+    margin-left: 0px;
+}
+
 .content-section {
     background: white;
     padding: 1.5rem;

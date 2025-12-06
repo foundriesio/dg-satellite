@@ -15,7 +15,7 @@
         <tbody>
           {{ range .Devices }}
           <tr>
-            <td>{{.Uuid}}</td>
+            <td><a href="/devices/{{.Uuid}}">{{.Uuid}}</a></td>
             <td>{{tsToString .CreatedAt}}</td>
             <td>{{tsToString .LastSeen}}</td>
             <td>{{.Target}}</td>
@@ -24,7 +24,6 @@
           {{ end }}
         </tbody>
       </table>
-
     </section>
 
 {{ template "footer"}}

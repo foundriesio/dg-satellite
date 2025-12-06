@@ -1,0 +1,54 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <fieldset>
+        <legend><strong>Tag</strong></legend>
+        <p>{{.Tag}}</p>
+      </fieldset>
+
+      <fieldset>
+        <legend><strong>Name</strong></legend>
+        <p>{{.Name}}</p>
+      </fieldset>
+      
+      <fieldset>
+        <legend><strong>Rollout</strong></legend>
+        <p>{{.Rollout}}</p>
+      </fieldset>
+    </section>
+
+    <section class="content-section">
+      <h2>UUIDs</h2>
+      <p><i><small>Rollouts are created asynchronously. &quot;Effective&quot; means the rollout was applicable to the device.
+        Not effective means the device did not meet the criteria for the rollout (e.g., wrong Tag).
+      </small></i></p>
+      <table>
+        <thead>
+          <tr>
+            <th>UUID</th>
+            <th>Effective</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range $k, $v := .Effective }}
+          <tr>
+            <td><a href="/devices/{{ $k }}">{{ $k }}</a></td>
+            <td>{{ if $v }}<i class="fa-solid fa-check" title="yes"></i>{{ end }}</td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </section>
+    
+    <section class="content-section">
+      <h2>Groups</h2>
+      <ul>
+        {{ range .Details.Groups }}
+        <li>{{.}}</li>
+        {{ end }}
+      </ul>
+    </section>
+
+
+{{ template "footer"}}

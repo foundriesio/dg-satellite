@@ -17,7 +17,7 @@
       <h2>Rollout history</h3>
       <ul>
       {{ range .Rollouts }}
-        <li>{{.}}</li>
+        <li><a href="/updates/{{$.Prod}}/{{$.Tag}}/{{$.Name}}/rollouts/{{.}}">{{.}}</a></li>
       {{ end }}
       </ul>
     </section>

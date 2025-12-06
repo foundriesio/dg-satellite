@@ -6,6 +6,7 @@ package web
 import (
 	"fmt"
 
+	"github.com/foundriesio/dg-satellite/server/ui/api"
 	"github.com/labstack/echo/v4"
 )
 
@@ -42,12 +43,48 @@ func (h handlers) updatesGet(c echo.Context) error {
 		baseCtx
 		Tag      string
 		Name     string
+		Prod     string
 		Rollouts []string
 	}{
 		baseCtx:  h.baseCtx(c, "Update Details", "update"),
 		Tag:      c.Param("tag"),
 		Name:     c.Param("name"),
+		Prod:     c.Param("prod"),
 		Rollouts: rollouts,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "update.html", ctx)
+}
+
+func (h handlers) updatesRollout(c echo.Context) error {
+	url := fmt.Sprintf("/v1/updates/%s/%s/%s/rollouts/%s", c.Param("prod"), c.Param("tag"), c.Param("name"), c.Param("rollout"))
+
+	var details api.Rollout
+	if err := CtxGetJson(c.Request().Context(), url, &details); err != nil {
+		return EchoError(c, err, 500, err.Error())
+	}
+
+	effective := make(map[string]bool)
+	for _, u := range details.Uuids {
+		effective[u] = false
+	}
+	for _, u := range details.Effect {
+		effective[u] = true
+	}
+
+	ctx := struct {
+		baseCtx
+		Tag       string
+		Name      string
+		Rollout   string
+		Details   api.Rollout
+		Effective map[string]bool
+	}{
+		baseCtx:   h.baseCtx(c, "Rollout Details", "updates"),
+		Tag:       c.Param("tag"),
+		Name:      c.Param("name"),
+		Rollout:   c.Param("rollout"),
+		Details:   details,
+		Effective: effective,
+	}
+	return h.templates.ExecuteTemplate(c.Response(), "update_rollout.html", ctx)
 }

@@ -27,4 +27,33 @@
       <h3>Actions</h3>
       <button onclick="location.href='/users/{{.User.Username}}/audit-log';">View audit log</button>
     </section>
+
+    <section class="content-section">
+      <h3>API Tokens</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Created</th>
+            <th>Expires</th>
+            <th>Scopes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Tokens}}
+          <tr>
+            <td>{{.Description}}</td>
+            <td>{{tsToString .CreatedAt}}</td>
+            <td>{{tsToString .ExpiresAt}}</td>
+            <td>
+              {{range .Scopes.ToSlice}}
+              {{.}}
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </section>
+
 {{ template "footer"}}

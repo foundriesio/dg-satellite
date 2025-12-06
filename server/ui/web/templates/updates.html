@@ -1,0 +1,36 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Tag</th>
+            <th>Update name</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range $key, $value := .Prod }}
+          {{ range $update := $value }}
+          <tr>
+            <td>Production</td>
+            <td>{{ $key }}</td>
+            <td>{{ $update }}</td>
+          </tr>
+          {{ end }}
+          {{ end }}
+          {{ range $key, $value := .CI }}
+          {{ range $update := $value }}
+          <tr>
+            <td>CI</td>
+            <td>{{ $key }}</td>
+            <td>{{ $update }}</td>
+          </tr>
+          {{ end }}
+          {{ end }}
+        </tbody>
+      </table>
+    </section>
+
+{{ template "footer"}}

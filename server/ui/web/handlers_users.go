@@ -4,6 +4,8 @@
 package web
 
 import (
+	"net/http"
+
 	"github.com/foundriesio/dg-satellite/storage/users"
 	"github.com/labstack/echo/v4"
 )
@@ -21,4 +23,18 @@ func (h handlers) usersList(c echo.Context) error {
 		Users:   user,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "users.html", ctx)
+}
+
+func (h handlers) usersAuditLog(c echo.Context) error {
+	username := c.Param("username")
+	user, err := h.users.Get(username)
+	if err != nil {
+		return h.handleError(c, http.StatusNotFound, err)
+	}
+
+	log, err := user.GetAuditLog()
+	if err != nil {
+		return h.handleUnexpected(c, err)
+	}
+	return c.String(http.StatusOK, log)
 }

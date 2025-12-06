@@ -8,6 +8,7 @@
             <th>Created at</th>
             <th>Email</th>
             <th>Allowed scopes</th>
+            <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -17,6 +18,9 @@
             <td>{{tsToString .CreatedAt}}</td>
             <td>{{.Email}}</td>
             <td>{{.AllowedScopes}}</td>
+            <td>
+              <a href="/users/{{.Username}}/audit-log"><i title="View audit log" class="history"></i></a>
+            </td>
             </tr>
             {{ end }}
         </tbody>

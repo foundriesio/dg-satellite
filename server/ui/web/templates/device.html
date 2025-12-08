@@ -72,19 +72,21 @@
           <dl>
             <dt>Update history</dt>
             <dd>
-              <table>
-                <tbody>
-                  {{range .Updates}}
-                  <tr>
-                    <td>{{.}}</td>
-                  </tr>
-                  {{else}}
-                  <tr>
-                    <td><i>No updates applied</i></td>
-                  </tr>
-                  {{end}}
-                </tbody>
-              </table>
+              <div class="updates-history-container">
+                <table>
+                  <tbody>
+                    {{range .Updates}}
+                    <tr>
+                      <td>{{.}}</td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                      <td><i>No updates applied</i></td>
+                    </tr>
+                    {{end}}
+                  </tbody>
+                </table>
+              </div>
             </dd>
           </dl>
         </div>
@@ -152,5 +154,23 @@
       <h3>SOTA config</h3>
       <pre>{{.Device.Aktoml}}</pre>
     </section>
+
+    <style>
+      .updates-history-container {
+        max-height: calc(6 * 2.5em); /* Approximate height for 6 table rows */
+        overflow-y: auto;
+        border: 1px solid var(--muted-border-color, #e0e0e0);
+        border-radius: 4px;
+      }
+
+      .updates-history-container table {
+        margin: 0;
+        border: none;
+      }
+
+      .updates-history-container tbody tr:last-child td {
+        border-bottom: none;
+      }
+    </style>
 
 {{ template "footer"}}

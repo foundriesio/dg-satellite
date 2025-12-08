@@ -17,6 +17,7 @@ type (
 	DbHandle = storage.DbHandle
 	FsHandle = storage.FsHandle
 
+	AppsStates        = storage.AppsStates
 	DeviceUpdateEvent = storage.DeviceUpdateEvent
 )
 

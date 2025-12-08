@@ -8,6 +8,7 @@ import (
 
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server/ui/api"
+	"github.com/foundriesio/dg-satellite/storage"
 	"github.com/labstack/echo/v4"
 )
 
@@ -77,4 +78,33 @@ func (h handlers) devicesGet(c echo.Context) error {
 		Updates: updates,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "device.html", ctx)
+}
+
+func (h handlers) devicesUpdateGet(c echo.Context) error {
+	var events []storage.DeviceUpdateEvent
+	if err := CtxGetJson(c.Request().Context(), "/v1/devices/"+c.Param("uuid")+"/updates/"+c.Param("update"), &events); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+
+	raw, err := json.MarshalIndent(events, "", "  ")
+	if err != nil {
+		return h.handleUnexpected(c, err)
+	}
+
+	ctx := struct {
+		baseCtx
+		Raw       string
+		StartTime string
+		EndTime   string
+		Target    string
+		Events    []storage.DeviceUpdateEvent
+	}{
+		baseCtx:   h.baseCtx(c, "Device - "+c.Param("uuid"), "update: "+c.Param("update")),
+		Raw:       string(raw),
+		Events:    events,
+		Target:    events[0].Event.TargetName,
+		StartTime: events[0].DeviceTime,
+		EndTime:   events[len(events)-1].DeviceTime,
+	}
+	return h.templates.ExecuteTemplate(c.Response(), "device_update.html", ctx)
 }

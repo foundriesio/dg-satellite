@@ -1,0 +1,62 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+      
+      <fieldset>
+        <legend><strong>Start time</strong></legend>
+        <p>{{.StartTime}}</p>
+      </fieldset>
+      
+      <fieldset>
+        <legend><strong>End time</strong></legend>
+        <p>{{.EndTime}}</p>
+      </fieldset>
+      
+      <fieldset>
+        <legend><strong>Target</strong></legend>
+        <p>{{.Target}}</p>
+      </fieldset>
+
+    </section>
+
+    <section class="content-section">
+      <h2>Events</h2>
+      {{ range .Events }}
+      <section>
+        <h3>{{.EventType.Id}}</h3>
+        <dl class="inline">
+          <dt><strong>Device time</strong></dt>
+          <dd>{{.DeviceTime}}</dd>
+          {{ if .Event.Success }}
+          <dt><strong>Success</strong></dt>
+          <dd>{{.Event.Success}}</dd>
+          {{ end }}
+          <dt><strong>Details</strong></dt>
+          <dd><pre>{{.Event.Details}}</pre></dd>
+        </dl>
+      </section>
+      {{ end }}
+    </section>
+
+    <section class="content-section">
+      <h3>Raw Events</h3>
+      <pre>{{.Raw}}</pre>
+    </section>
+
+    <style>
+      dl.inline {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: start;
+      }
+      
+      .content-section pre {
+        padding: .75em;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        max-width: 100%;
+      }
+    </style>
+
+{{ template "footer"}}

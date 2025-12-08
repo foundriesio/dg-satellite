@@ -11,6 +11,8 @@
         <legend><strong>Name</strong></legend>
         <p>{{.Name}}</p>
       </fieldset>
+
+      <button onclick='location.href="/updates/{{$.Prod}}/{{$.Tag}}/{{$.Name}}/tail";'>Follow progress</button>
     </section>
 
     <section class="content-section">

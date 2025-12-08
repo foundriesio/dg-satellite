@@ -215,6 +215,38 @@ func TestApiDeviceGet(t *testing.T) {
 	assert.Equal(t, "pubkey2", device.PubKey)
 }
 
+func TestApiAppsStates(t *testing.T) {
+	tc := NewTestClient(t)
+	tc.GET("/devices/test-device-1/apps-states?deny-has-scope=1", 403)
+
+	_ = tc.GET("/devices/test-device-1/apps-states", 404)
+
+	d, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
+	require.Nil(t, err)
+
+	state1 := storage.AppsStates{
+		DeviceTime: "1",
+	}
+	stateBytes, err := json.Marshal(state1)
+	require.Nil(t, err)
+	require.Nil(t, d.SaveAppsStates(string(stateBytes)))
+
+	state2 := storage.AppsStates{
+		DeviceTime: "2",
+	}
+	stateBytes, err = json.Marshal(state2)
+	require.Nil(t, err)
+	require.Nil(t, d.SaveAppsStates(string(stateBytes)))
+
+	res := tc.GET("/devices/test-device-1/apps-states", 200)
+	var statesResp AppsStatesResp
+	require.Nil(t, json.Unmarshal(res, &statesResp))
+	require.Len(t, statesResp.AppsStates, 2)
+
+	require.Equal(t, "1", statesResp.AppsStates[1].DeviceTime)
+	require.Equal(t, "2", statesResp.AppsStates[0].DeviceTime)
+}
+
 func TestApiDeviceUpdateEvents(t *testing.T) {
 	tc := NewTestClient(t)
 	tc.GET("/devices/foo/updates?deny-has-scope=1", 403)

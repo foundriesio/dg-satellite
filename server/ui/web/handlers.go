@@ -60,6 +60,7 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 	e.GET("/updates/:prod/:tag/:name/rollouts/:rollout/tail", h.updatesRolloutTail, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/users", h.usersList, h.requireSession, h.requireScope(users.ScopeUsersR))
 	e.GET("/users/:username/audit-log", h.usersAuditLog, h.requireSession, h.requireScope(users.ScopeUsersR))
+	e.POST("/users/:username/tokens", h.userTokenCreate, h.requireSession)
 }
 
 type baseCtx struct {

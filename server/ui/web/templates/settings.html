@@ -30,6 +30,7 @@
 
     <section class="content-section">
       <h3>API Tokens</h3>
+      <button onclick="tokenModal.show();">New Token</button>
       <table>
         <thead>
           <tr>
@@ -54,6 +55,123 @@
           {{end}}
         </tbody>
       </table>
+
+      <dialog id="tokenModal">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" onclick="tokenModal.close()"></button>
+            <h3>Create new API token</h3>
+          </header>
+          <form method="dialog">
+            <label for="description">Description:</label>
+            <input type="text" id="description" name="description" maxlength="80" required>
+            <label for="scopes">Scopes (comma separated):</label>
+            <input type="text" id="scopes" name="scopes" placeholder="devices:read" required>
+            <label for="expires">Expires (days):</label>
+            <input type="text" id="expires" name="expires" required>
+          </form>
+          <footer>
+            <button role="button" onclick="tokenModal.close()">Cancel</button>
+            <button autofocus="" role="button" onclick="createToken()">Confirm</button>
+          </footer>
+        </article>
+      </dialog>
+
+      <dialog id="tokenCreatedModal">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" onclick="tokenCreatedModal.close(); window.location.reload();"></button>
+            <h3>Token Created Successfully</h3>
+          </header>
+          <p><strong>Important:</strong> This is the only time you will see this token. Please copy and save it securely.</p>
+          <fieldset>
+            <legend><strong>Your New API Token</strong></legend>
+            <textarea id="createdTokenValue" readonly style="font-family: monospace;"></textarea>
+            <button onclick="copyTokenToClipboard(this)">Copy to Clipboard</button>
+          </fieldset>
+          <footer>
+            <button autofocus="" role="button" onclick="tokenCreatedModal.close(); window.location.reload();">Close</button>
+          </footer>
+        </article>
+      </dialog>
+
     </section>
+
+    <script>
+      function createToken() {
+        // Get form values
+        const description = document.getElementById('description').value;
+        const scopes = document.getElementById('scopes').value;
+        const expires = document.getElementById('expires').value;
+
+        // Validate required fields
+        if (!description || !scopes || !expires) {
+          alert('Please fill in all required fields.');
+          return;
+        }
+
+        // Validate expires field
+        const expiresInt = parseInt(expires);
+        if (isNaN(expiresInt) || expiresInt <= 0 || expiresInt >= 365) {
+          alert('Expires must be a positive integer less than 365 days.');
+          return;
+        }
+
+        // Prepare request data
+        const tokenData = {
+          description: description,
+          scopes: scopes.split(',').map(s => s.trim()).filter(s => s), // Split by comma and trim whitespace
+          expires: expiresInt
+        };
+
+        // Make POST request
+        fetch('/users/{{.User.Username}}/tokens', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(tokenData)
+        })
+        .then(async response => {
+          text = await response.text();
+          if (response.ok) {
+            return text;
+          } else {
+            throw new Error('HTTP_' + response.status + ': ' + text);
+          }
+        })
+        .then(data => {
+          // Display the created token to the user
+          document.getElementById('createdTokenValue').value = data.token || data;
+          document.getElementById('tokenCreatedModal').showModal();
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('An error occurred while creating the token: ' + error.message);
+        })
+        .finally(() => {
+          // Clear form and close modal
+          document.getElementById('description').value = '';
+          document.getElementById('scopes').value = '';
+          document.getElementById('expires').value = '';
+          document.getElementById('tokenModal').close();
+        });
+      }
+
+      function copyTokenToClipboard(button) {
+        const tokenTextarea = document.getElementById('createdTokenValue');
+        tokenTextarea.select();
+        tokenTextarea.setSelectionRange(0, 99999); // For mobile devices
+
+        navigator.clipboard.writeText(tokenTextarea.value).then(() => {
+          // Temporarily change button text to show success
+          button.textContent = 'Copied!';
+        }).catch(err => {
+          console.error('Failed to copy token: ', err);
+          alert('Failed to copy token to clipboard. Please select and copy manually.');
+        });
+      }
+    </script>
+
 
 {{ template "footer"}}

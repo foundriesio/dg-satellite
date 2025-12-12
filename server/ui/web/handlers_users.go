@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/foundriesio/dg-satellite/storage/users"
@@ -80,4 +81,17 @@ func (h *handlers) userTokenCreate(c echo.Context) error {
 		return EchoError(c, err, http.StatusBadRequest, err.Error())
 	}
 	return c.String(http.StatusCreated, tok.Value)
+}
+
+func (h *handlers) userTokenDelete(c echo.Context) error {
+	session := CtxGetSession(c.Request().Context())
+	tokenIDStr := c.Param("tokenID")
+	tokenID, err := strconv.ParseUint(tokenIDStr, 10, 64)
+	if err != nil {
+		return EchoError(c, err, http.StatusBadRequest, "Invalid token ID format")
+	}
+	if err := session.User.DeleteToken(int64(tokenID)); err != nil {
+		return EchoError(c, err, http.StatusInternalServerError, "Failed to delete token")
+	}
+	return c.NoContent(http.StatusNoContent)
 }

@@ -38,6 +38,7 @@
             <th>Created</th>
             <th>Expires</th>
             <th>Scopes</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -50,6 +51,9 @@
               {{range .Scopes.ToSlice}}
               {{.}}
               {{end}}
+            </td>
+            <td>
+              <i title="Revoke" id="{{.PublicID}}" class="trash"></i>
             </td>
           </tr>
           {{end}}
@@ -98,9 +102,86 @@
         </article>
       </dialog>
 
+      <dialog id="revokeModal">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" onclick="revokeModal.close()"></button>
+            <h3>Revoke API Token</h3>
+          </header>
+          <p>Are you sure you want to revoke this API token? This action cannot be undone.</p>
+          <fieldset>
+            <legend><strong>Token Details</strong></legend>
+            <p><strong>ID:</strong> <span id="revokeTokenId"></span></p>
+            <p><strong>Description:</strong> <span id="revokeTokenDescription"></span></p>
+            <p><strong>Scopes:</strong> <span id="revokeTokenScopes"></span></p>
+          </fieldset>
+          <footer>
+            <button role="button" onclick="revokeModal.close()">Cancel</button>
+            <button autofocus="" role="button" onclick="confirmRevoke()">Revoke Token</button>
+          </footer>
+        </article>
+      </dialog>
+
     </section>
 
+    <style>
+      i[title="Revoke"] {
+        cursor: pointer;
+      }
+    </style>
+
     <script>
+      let currentTokenId = null;
+      const revokeModal = document.getElementById('revokeModal');
+
+      // Add click event listeners to all revoke icons
+      document.addEventListener('DOMContentLoaded', function() {
+        const revokeIcons = document.querySelectorAll('i[title="Revoke"]');
+        revokeIcons.forEach(icon => {
+          icon.addEventListener('click', function() {
+            currentTokenId = this.id;
+            
+            // Get the parent row to extract token details
+            const row = this.closest('tr');
+            const cells = row.querySelectorAll('td');
+            
+            // Populate modal with token details
+            document.getElementById('revokeTokenId').textContent = currentTokenId
+            document.getElementById('revokeTokenDescription').textContent = cells[0].textContent;
+            document.getElementById('revokeTokenScopes').textContent = cells[3].textContent.trim();
+            
+            revokeModal.showModal();
+          });
+        });
+      });
+
+      function confirmRevoke() {
+        if (currentTokenId) {
+          fetch(`/users/{{.User.Username}}/tokens/${currentTokenId}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+              // Reload the page to reflect the changes
+              window.location.reload();
+            } else {
+              alert('Failed to revoke token:\n\nHTTP_' + response.status + ': ' + response.statusText);
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while revoking the token: ' + error.message);
+          })
+          .finally(() => {
+            revokeModal.close();
+            currentTokenId = null;
+          });
+        }
+      }
+
       function createToken() {
         // Get form values
         const description = document.getElementById('description').value;

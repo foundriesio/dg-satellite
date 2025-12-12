@@ -78,7 +78,7 @@ func (s *stmtSessionCreate) run(u User, id, remoteIP string, created, expires in
 		remoteIP,
 		created,
 		expires,
-		scopes,
+		scopes.String(),
 	)
 	return err
 }
@@ -126,15 +126,21 @@ func (s *stmtSessionGet) Init(db storage.DbHandle) (err error) {
 
 func (s *stmtSessionGet) run(id string) (*session, error) {
 	var sess session
+	var scopesStr string
 	err := s.Stmt.QueryRow(id).Scan(
 		&sess.UserID,
 		&sess.ExpiresAt,
-		&sess.Scopes,
+		&scopesStr,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
+	} else {
+		sess.Scopes, err = ScopesFromString(scopesStr)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse scopes: %w", err)
+		}
 	}
 	return &sess, nil
 }

@@ -164,7 +164,7 @@ func (s *stmtUserCreate) run(u *User) error {
 		u.Email,
 		u.CreatedAt,
 		u.Deleted,
-		u.AllowedScopes,
+		u.AllowedScopes.String(),
 	)
 	if err != nil {
 		return err
@@ -189,14 +189,21 @@ func (s *stmtUserGetById) Init(db storage.DbHandle) (err error) {
 
 func (s *stmtUserGetById) run(id int64) (*User, error) {
 	u := User{}
+	scopeStr := ""
 	err := s.Stmt.QueryRow(id).Scan(
 		&u.id,
 		&u.Username,
 		&u.Password,
 		&u.Email,
 		&u.CreatedAt,
-		&u.AllowedScopes,
+		&scopeStr,
 	)
+	if err == nil {
+		u.AllowedScopes, err = ScopesFromString(scopeStr)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse scopes: %w", err)
+		}
+	}
 	return &u, err
 }
 
@@ -213,14 +220,21 @@ func (s *stmtUserGetByName) Init(db storage.DbHandle) (err error) {
 
 func (s *stmtUserGetByName) run(username string) (*User, error) {
 	u := User{}
+	var scopesStr string
 	err := s.Stmt.QueryRow(username).Scan(
 		&u.id,
 		&u.Username,
 		&u.Password,
 		&u.Email,
 		&u.CreatedAt,
-		&u.AllowedScopes,
+		&scopesStr,
 	)
+	if err == nil {
+		u.AllowedScopes, err = ScopesFromString(scopesStr)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse scopes: %w", err)
+		}
+	}
 	return &u, err
 }
 
@@ -249,6 +263,7 @@ func (s *stmtUserList) run() ([]User, error) {
 
 	for rows.Next() {
 		var u User
+		var scopesStr string
 		err := rows.Scan(
 			&u.id,
 			&u.Username,
@@ -256,10 +271,14 @@ func (s *stmtUserList) run() ([]User, error) {
 			&u.Email,
 			&u.CreatedAt,
 			&u.Deleted,
-			&u.AllowedScopes,
+			&scopesStr,
 		)
 		if err != nil {
 			return nil, err
+		}
+		u.AllowedScopes, err = ScopesFromString(scopesStr)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse scopes: %w", err)
 		}
 		users = append(users, u)
 	}
@@ -278,6 +297,6 @@ func (s *stmtUserUpdate) Init(db storage.DbHandle) (err error) {
 }
 
 func (s *stmtUserUpdate) run(u User) error {
-	_, err := s.Stmt.Exec(u.Username, u.Password, u.Email, u.AllowedScopes, u.Deleted, u.id)
+	_, err := s.Stmt.Exec(u.Username, u.Password, u.Email, u.AllowedScopes.String(), u.Deleted, u.id)
 	return err
 }

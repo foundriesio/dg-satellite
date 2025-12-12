@@ -77,7 +77,7 @@ func createTables(db *sql.DB) error {
 			email          TEXT,
 			created_at     INT DEFAULT 0,
 			deleted        BOOL DEFAULT 0,
-			allowed_scopes INT DEFAULT 0
+			allowed_scopes TEXT DEFAULT ""
 		);
 
 		CREATE TABLE tokens (
@@ -86,7 +86,7 @@ func createTables(db *sql.DB) error {
 			created_at     INT,
 			expires_at     INT,
 			description    VARCHAR(80),
-			scopes         INT,
+			scopes         TEXT,
 			value          VARCHAR(60) NOT NULL UNIQUE,
 
 			FOREIGN KEY(user_id) REFERENCES user(id)
@@ -98,7 +98,7 @@ func createTables(db *sql.DB) error {
 			remote_ip      VARCHAR(39),
 			created_at     INT,
 			expires_at     INT,
-			scopes         INT,
+			scopes         TEXT,
 			FOREIGN KEY(user_id) REFERENCES user(id)
 		) WITHOUT ROWID;
 	`

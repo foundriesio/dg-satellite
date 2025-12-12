@@ -130,7 +130,7 @@ func (s *stmtTokenCreate) run(u User, t *Token) error {
 		t.CreatedAt,
 		t.ExpiresAt,
 		t.Description,
-		t.Scopes,
+		t.Scopes.String(),
 		t.Value,
 	)
 	if err != nil {
@@ -213,16 +213,21 @@ func (s *stmtTokenList) run(u User) ([]Token, error) {
 	}()
 
 	for rows.Next() {
+		var scopesStr string
 		var t Token
 		err := rows.Scan(
 			&t.PublicID,
 			&t.CreatedAt,
 			&t.ExpiresAt,
 			&t.Description,
-			&t.Scopes,
+			&scopesStr,
 		)
 		if err != nil {
 			return nil, err
+		}
+		t.Scopes, err = ScopesFromString(scopesStr)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse scopes: %w", err)
 		}
 		tokens = append(tokens, t)
 	}
@@ -243,17 +248,23 @@ func (s *stmtTokenLookup) Init(db storage.DbHandle) (err error) {
 func (s *stmtTokenLookup) run(value string) (*Token, int64, error) {
 	var t Token
 	var userID int64
+	var scopesStr string
 	err := s.Stmt.QueryRow(value).Scan(
 		&userID,
 		&t.PublicID,
 		&t.CreatedAt,
 		&t.ExpiresAt,
-		&t.Scopes,
+		&scopesStr,
 	)
 	if err == sql.ErrNoRows {
 		return nil, 0, nil
 	} else if err != nil {
 		return nil, 0, err
+	} else {
+		t.Scopes, err = ScopesFromString(scopesStr)
+		if err != nil {
+			return nil, 0, fmt.Errorf("unable to parse scopes: %w", err)
+		}
 	}
 	return &t, userID, nil
 }

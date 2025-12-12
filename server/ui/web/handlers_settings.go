@@ -16,12 +16,15 @@ func (h handlers) settings(c echo.Context) error {
 	if err != nil {
 		return h.handleUnexpected(c, err)
 	}
+
 	ctx := struct {
 		baseCtx
-		Tokens []users.Token
+		Tokens     []users.Token
+		ScopesList []string
 	}{
-		baseCtx: h.baseCtx(c, "Settings", "settings"),
-		Tokens:  tokens,
+		baseCtx:    h.baseCtx(c, "Settings", "settings"),
+		Tokens:     tokens,
+		ScopesList: session.User.AllowedScopes.ToSlice(),
 	}
 	return c.Render(http.StatusOK, "settings.html", ctx)
 }

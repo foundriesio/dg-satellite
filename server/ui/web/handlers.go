@@ -61,6 +61,7 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 	e.GET("/users", h.usersList, h.requireSession, h.requireScope(users.ScopeUsersR))
 	e.GET("/users/:username/audit-log", h.usersAuditLog, h.requireSession, h.requireScope(users.ScopeUsersR))
 	e.POST("/users/:username/tokens", h.userTokenCreate, h.requireSession)
+	e.DELETE("/users/:username/tokens/:tokenID", h.userTokenDelete, h.requireSession)
 }
 
 type baseCtx struct {

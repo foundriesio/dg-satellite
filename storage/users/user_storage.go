@@ -127,6 +127,22 @@ func (s Storage) Create(u *User) error {
 	return err
 }
 
+func (s Storage) Upsert(username, email string, scopes Scopes) (*User, error) {
+	u, err := s.stmtUserGetByName.run(username)
+	switch err {
+	case sql.ErrNoRows:
+		u = &User{
+			Username:      username,
+			Email:         email,
+			AllowedScopes: scopes,
+		}
+		return u, s.Create(u)
+	case nil:
+		u.h = s
+	}
+	return u, err
+}
+
 func (s Storage) Get(username string) (*User, error) {
 	u, err := s.stmtUserGetByName.run(username)
 	switch err {

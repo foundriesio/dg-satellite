@@ -1,7 +1,7 @@
 {{ template "header"}}
     <section class="content-section">
     <h2>{{.Title}}</h2>
-    <p>Please login with your SSO provider {{if .LoginTip}}{{.LoginTip}}{{end}}</p>
+    <p>Please login with your SSO provider. {{if .LoginTip}}{{.LoginTip}}{{end}}</p>
 
       <section>
         <a href="/auth/login">{{.Name}}</a>

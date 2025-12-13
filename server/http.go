@@ -40,6 +40,8 @@ func NewServer(ctx context.Context, echo *echo.Echo, name string, port uint16, t
 		ConnContext: adjustConnContext,
 		TLSConfig:   tlsConfig,
 	}
+	// We cannot push request context, but at least make it JSON, show the server name and error file line.
+	echo.StdLogger = context.StdLogAdapter(log, true)
 	return &server{context: ctx, name: name, echo: echo, server: srv}
 }
 

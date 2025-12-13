@@ -5,6 +5,7 @@ package context
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
 	"os"
 	"strings"
@@ -42,4 +43,26 @@ func InitLogger(level string) (*slog.Logger, error) {
 	// Let's keep this at Warn, as we do want to eventually clean up all these sneaky logs.
 	_ = slog.SetLogLoggerLevel(slog.LevelWarn)
 	return logger, nil
+}
+
+func StdLogAdapter(logger *slog.Logger, showLine bool) *log.Logger {
+	// Use this adapter when some library requires a standard logger
+	stdLog := slog.NewLogLogger(logger.Handler(), getLogLevel(logger))
+	if showLine {
+		stdLog.SetFlags(log.Lshortfile)
+	}
+	return stdLog
+}
+
+func getLogLevel(logger *slog.Logger) slog.Level {
+	// It's a pity slog does not expose the logger/handler level; so make an educated guess.
+	for _, level := range []slog.Level{
+		slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError,
+	} {
+		if logger.Handler().Enabled(Background(), level) {
+			return level
+		}
+	}
+	// Disabled at all known levels - return something big. Just kidding, this is unreachable.
+	return slog.LevelError + 42
 }

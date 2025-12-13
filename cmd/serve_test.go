@@ -29,6 +29,7 @@ func TestServe(t *testing.T) {
 	gatewayAddress := ""
 	wait := make(chan bool)
 	server := ServeCmd{
+		GatewayIntf: "lo",
 		startedCb: func(apiAddr, gwAddr string) {
 			apiAddress = apiAddr
 			gatewayAddress = gwAddr

@@ -13,6 +13,7 @@ import (
 
 	"github.com/foundriesio/dg-satellite/server"
 	"github.com/foundriesio/dg-satellite/server/gateway"
+	"github.com/foundriesio/dg-satellite/server/mdns"
 	"github.com/foundriesio/dg-satellite/server/ui"
 	"github.com/foundriesio/dg-satellite/storage"
 )
@@ -20,8 +21,11 @@ import (
 type ServeCmd struct {
 	startedCb func(uiAddress, gatewayAddress string)
 
-	UiPort      uint16 `default:"8080"`
+	GatewayAddr string `default:""`
+	GatewayIntf string `default:""`
 	GatewayPort uint16 `default:"8443"`
+	GatewayTld  string `default:"foundries.io."`
+	UiPort      uint16 `default:"8080"`
 }
 
 func (c *ServeCmd) Run(args CommonArgs) error {
@@ -41,10 +45,23 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	if err != nil {
 		return err
 	}
+	mdnsServer, err := mdns.NewServer(
+		args.ctx,
+		mdns.ServerParams{
+			Addr: c.GatewayAddr,
+			Intf: c.GatewayIntf,
+			Port: c.GatewayPort,
+			Tld:  c.GatewayTld,
+		},
+	)
+	if err != nil {
+		return err
+	}
 
-	quitErr := make(chan error, 2)
+	quitErr := make(chan error, 3)
 	uiServer.Start(quitErr)
 	gtwServer.Start(quitErr)
+	mdnsServer.Start(quitErr)
 
 	if c.startedCb != nil {
 		// Testing code, see serve_test.go
@@ -63,8 +80,8 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-	for _, srv := range []server.Server{uiServer, gtwServer} {
+	wg.Add(3)
+	for _, srv := range []server.Server{uiServer, gtwServer, mdnsServer} {
 		go func() {
 			srv.Shutdown(time.Minute)
 			wg.Done()

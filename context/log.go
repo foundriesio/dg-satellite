@@ -36,7 +36,8 @@ func InitLogger(level string) (*slog.Logger, error) {
 	opts := &slog.HandlerOptions{Level: logLevel}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, opts))
 	// This sets a default global logger for both slog and legacy log packages.
-	slog.SetDefault(logger)
+	// We should use logger from the context, so make it easy to find such messages.
+	slog.SetDefault(logger.With("log-source", "default"))
 	// This tells the log level at which standard log messages should be logged.
 	// Let's keep this at Warn, as we do want to eventually clean up all these sneaky logs.
 	_ = slog.SetLogLoggerLevel(slog.LevelWarn)

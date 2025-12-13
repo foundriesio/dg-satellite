@@ -24,7 +24,7 @@ func InitLogger(level string) (*slog.Logger, error) {
 			level = "info"
 		}
 	}
-	logLevel, ok := levelMap[level]
+	logLevel, ok := levelMap[strings.ToLower(level)]
 	if !ok {
 		var valid []string
 		for k := range levelMap {
@@ -33,9 +33,12 @@ func InitLogger(level string) (*slog.Logger, error) {
 		return nil, fmt.Errorf("invalid log level: %s; supported: %s", level, strings.Join(valid, ", "))
 	}
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	opts := &slog.HandlerOptions{Level: logLevel}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, opts))
 	// This sets a default global logger for both slog and legacy log packages.
 	slog.SetDefault(logger)
-	_ = slog.SetLogLoggerLevel(logLevel)
+	// This tells the log level at which standard log messages should be logged.
+	// Let's keep this at Warn, as we do want to eventually clean up all these sneaky logs.
+	_ = slog.SetLogLoggerLevel(slog.LevelWarn)
 	return logger, nil
 }

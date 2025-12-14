@@ -4,16 +4,16 @@
 package gateway
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	mrand "math/rand"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/foundriesio/dg-satellite/storage"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +31,7 @@ func (ue UpdateEvents) generate(pack string, num int) UpdateEvents {
 	if num > 5 {
 		num = 5 // Protect against rogue tests. We only support at most 5 events per correlation ID below.
 	}
-	corId := uuid.New().String()
+	corId := rand.Text()
 	events := make([]storage.DeviceUpdateEvent, num)
 	for i := 0; i < num; i++ {
 		var success *bool
@@ -124,7 +124,7 @@ func Test_ProcessEvents(t *testing.T) {
 	require.Nil(t, err)
 
 	// Create fake device
-	id := uuid.New().String()
+	id := rand.Text()
 	d, err := s.DeviceCreate(id, "pubkey", false)
 	require.Nil(t, err)
 	d.UpdateName = "update"
@@ -212,7 +212,7 @@ func Benchmark_ProcessEvents(b *testing.B) {
 	// Create fake devices
 	var devices []*Device
 	for i := 0; i < 10; i++ {
-		id := uuid.New().String()
+		id := rand.Text()
 		d, err := s.DeviceCreate(id, "pubkey", false)
 		require.Nil(b, err)
 		devices = append(devices, d)
@@ -223,7 +223,7 @@ func Benchmark_ProcessEvents(b *testing.B) {
 	var events UpdateEvents
 	for i := 0; i < 100000; i++ {
 		events = events.generate("test", 5)
-		deviceIdx := rand.Intn(len(devices) - 1)
+		deviceIdx := mrand.Intn(len(devices) - 1)
 		require.Nil(b, devices[deviceIdx].ProcessEvents(events))
 	}
 	b.StopTimer()
@@ -247,7 +247,7 @@ func Benchmark_CheckIn(b *testing.B) {
 	// Create fake devices
 	var devices []*Device
 	for range 100 {
-		id := uuid.New().String()
+		id := rand.Text()
 		d, err := s.DeviceCreate(id, "pubkey"+id, false)
 		require.Nil(b, err)
 		devices = append(devices, d)
@@ -255,7 +255,7 @@ func Benchmark_CheckIn(b *testing.B) {
 
 	b.StartTimer()
 	for range 100000 {
-		deviceIdx := rand.Intn(len(devices) - 1)
+		deviceIdx := mrand.Intn(len(devices) - 1)
 		require.Nil(b, devices[deviceIdx].CheckIn("target", "tag", "hash", ""))
 	}
 	b.StopTimer()

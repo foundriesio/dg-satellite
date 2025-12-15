@@ -47,7 +47,7 @@ func (e DeviceUpdateEvent) ParseStatus() *DeviceStatus {
 	case "EcuInstallationStarted":
 		status = "Install started"
 	case "EcuInstallationApplied":
-		status = "Install applied, waiting for reboot"
+		status = "Install applied, awaiting update finalization"
 	case "EcuInstallationCompleted":
 		if e.Event.Success != nil && !*e.Event.Success {
 			status = "Install failed"

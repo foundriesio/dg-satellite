@@ -108,3 +108,22 @@ func (h handlers) devicesUpdateGet(c echo.Context) error {
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "device_update.html", ctx)
 }
+
+func (h handlers) devicesAppsStates(c echo.Context) error {
+	type appState struct {
+		AppsStates []storage.AppsStates `json:"apps_states"`
+	}
+	var states appState
+	if err := CtxGetJson(c.Request().Context(), "/v1/devices/"+c.Param("uuid")+"/apps-states", &states); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+
+	ctx := struct {
+		baseCtx
+		Apps []storage.AppsStates
+	}{
+		baseCtx: h.baseCtx(c, "Device - "+c.Param("uuid")+" Apps States", "devices"),
+		Apps:    states.AppsStates,
+	}
+	return h.templates.ExecuteTemplate(c.Response(), "device_apps_states.html", ctx)
+}

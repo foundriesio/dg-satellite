@@ -1,0 +1,43 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+    {{ range $idx, $item := .Apps}}
+      <details {{ if eq $idx 0 }}open{{end}}>
+        <summary role="button" class="secondary">{{$item.DeviceTime}}</summary>
+        <h3>OSTree Hash - {{$item.Ostree}}</h3>
+        <dl>
+        {{ range $app, $state := $item.Apps }}
+          <dt><strong>{{ $app }}</strong></dt>
+          <dd>
+            <dl>
+              <dt>State</dt>
+              <dd>{{ $state.State }}</dd>
+              <dt>URI</dt>
+              <dd>{{ $state.Uri }}</dd>
+              <dt>Services</dt>
+              <dd>
+                <dl>
+                  {{ range $service := $state.Services }}
+                    <dt>Name</dt>
+                    <dd>{{ $service.Name }}</dd>
+                    <dt>State</dt>
+                    <dd>{{ $service.State }}</dd>
+                    <dt>Health</dt>
+                    <dd>{{ $service.Health }}</dd>
+                    <dt>Status</dt>
+                    <dd>{{ $service.Status }}</dd>
+                    <dt>Image</dt>
+                    <dd>{{ $service.ImageUri }}</dd>
+                  {{ end }}
+                </dl>
+              </dd>
+            </dl>
+          </dd>
+        {{ end }}
+        </dl>
+      </details>
+    {{ end }}
+    </section>
+      
+{{ template "footer"}}

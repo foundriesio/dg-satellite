@@ -20,11 +20,93 @@
             <td>{{.AllowedScopes}}</td>
             <td>
               <a href="/users/{{.Username}}/audit-log"><i title="View audit log" class="history"></i></a>
+              <i title="Change scopes" class="edit" onclick="showScopesModal('{{.Username}}', '{{.AllowedScopes}}')"></i>
             </td>
             </tr>
             {{ end }}
         </tbody>
       </table>
+      <dialog id="scopesModal">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" onclick="scopesModal.close()"></button>
+            <h3>Update user scopes</h3>
+          </header>
+          <form method="dialog">
+            <label for="scopes">Scopes:</label>
+            {{range .ScopesList}}
+            <input type="checkbox" id="scope-{{.}}" name="scopes" value="{{.}}">
+            <label for="scope-{{.}}">{{.}}</label><br>
+            {{end}}
+          </form>
+          <footer>
+            <button role="button" onclick="scopesModal.close()">Cancel</button>
+            <button autofocus="" role="button" onclick="updateScopes()">Confirm</button>
+          </footer>
+        </article>
+      </dialog>
     </section>
+
+    <script>
+      let currentUser = null;
+
+      function showScopesModal(username, currentScopes) {
+        currentUser = username;
+
+        const checkboxes = document.getElementsByName('scopes');
+        Array.from(checkboxes).forEach(checkbox => {
+          checkbox.checked = false;
+        });
+
+        if (currentScopes) {
+          const scopesArray = currentScopes.split(',').map(s => s.trim());
+          scopesArray.forEach(scope => {
+            const checkbox = document.getElementById('scope-' + scope);
+            if (checkbox) {
+              checkbox.checked = true;
+            }
+          });
+        }
+
+        scopesModal.show();
+      }
+
+      function updateScopes() {
+        if (!currentUser) {
+          alert('No user selected.');
+          return;
+        }
+
+        const scopeCheckboxes = document.getElementsByName('scopes');
+        const scopes = Array.from(scopeCheckboxes)
+          .filter(checkbox => checkbox.checked)
+          .map(checkbox => checkbox.value);
+
+        const updateData = {
+          scopes: scopes
+        };
+
+        fetch('/users/' + currentUser + '/scopes', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData)
+        })
+        .then(async response => {
+          if (response.ok) {
+            scopesModal.close();
+            window.location.reload(); // Refresh to show updated scopes
+          } else {
+            const errorText = await response.text();
+            alert('Error updating scopes: ' + errorText);
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Error updating scopes: ' + error.message);
+        });
+      }
+    </script>
 
 {{ template "footer"}}

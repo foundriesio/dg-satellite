@@ -21,10 +21,12 @@ func (h handlers) usersList(c echo.Context) error {
 	}
 	ctx := struct {
 		baseCtx
-		Users []users.User
+		Users      []users.User
+		ScopesList []string
 	}{
-		baseCtx: h.baseCtx(c, "Users", "users"),
-		Users:   user,
+		baseCtx:    h.baseCtx(c, "Users", "users"),
+		Users:      user,
+		ScopesList: users.ScopesAvailable(),
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "users.html", ctx)
 }
@@ -41,6 +43,45 @@ func (h handlers) usersAuditLog(c echo.Context) error {
 		return h.handleUnexpected(c, err)
 	}
 	return c.String(http.StatusOK, log)
+}
+func (h *handlers) userScopesUpdate(c echo.Context) error {
+	session := CtxGetSession(c.Request().Context())
+	// Check this scope here rather than middleware so that we can return a JSON error
+	// to the JS caller.
+	if !session.User.AllowedScopes.Has(users.ScopeUsersRU) {
+		err := fmt.Errorf("user missing required scope: %s", users.ScopeUsersRU)
+		return EchoError(c, err, http.StatusForbidden, err.Error())
+	}
+
+	type request struct {
+		Scopes []string `json:"scopes"`
+	}
+	var req request
+	if err := c.Bind(&req); err != nil {
+		return EchoError(c, err, http.StatusBadRequest, "Could not parse request")
+	}
+
+	if len(req.Scopes) == 0 {
+		err := errors.New("at least one scope is required")
+		return EchoError(c, err, http.StatusBadRequest, err.Error())
+	}
+
+	scopes, err := users.ScopesFromSlice(req.Scopes)
+	if err != nil {
+		return EchoError(c, err, http.StatusBadRequest, fmt.Sprintf("Invalid scope: %s", err))
+	}
+
+	username := c.Param("username")
+	user, err := h.users.Get(username)
+	if err != nil {
+		return h.handleError(c, http.StatusNotFound, err)
+	}
+
+	user.AllowedScopes = scopes
+	if err := user.Update("Scopes changed by " + session.User.Username); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 
 func (h *handlers) userTokenCreate(c echo.Context) error {

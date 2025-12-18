@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
+	"log/slog"
 	"strings"
 
 	"github.com/foundriesio/dg-satellite/storage"
@@ -300,6 +301,11 @@ func (s *stmtDeviceList) run(limit, offset int, dl *[]DeviceListItem) error {
 	if rows, err := s.Stmt.Query(limit, offset); err != nil {
 		return err
 	} else {
+		defer func() {
+			if err := rows.Close(); err != nil {
+				slog.Error("failed to close rows in device list", "error", err)
+			}
+		}()
 		for rows.Next() {
 			var d DeviceListItem
 			if err = rows.Scan(&d.Uuid, &d.CreatedAt, &d.LastSeen, &d.Target, &d.IsProd); err != nil {

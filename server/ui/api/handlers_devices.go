@@ -52,17 +52,9 @@ func (h *handlers) deviceList(c echo.Context) error {
 // @Success 200 Device
 // @Router  /devices/:uuid [get]
 func (h *handlers) deviceGet(c echo.Context) error {
-	uuid := c.Param("uuid")
-
-	device, err := h.storage.DeviceGet(uuid)
-	if err != nil {
-		return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device")
-	}
-
-	if device == nil {
-		return c.NoContent(http.StatusNotFound)
-	}
-	return c.JSON(http.StatusOK, device)
+	return h.handleDevice(c, func(device *Device) error {
+		return c.JSON(http.StatusOK, device)
+	})
 }
 
 // @Summary Get a list of updates for a device
@@ -70,21 +62,13 @@ func (h *handlers) deviceGet(c echo.Context) error {
 // @Success 200 []string
 // @Router  /devices/:uuid/updates [get]
 func (h *handlers) deviceUpdatesList(c echo.Context) error {
-	uuid := c.Param("uuid")
-
-	device, err := h.storage.DeviceGet(uuid)
-	if err != nil {
-		return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device")
-	}
-
-	if device == nil {
-		return c.NoContent(http.StatusNotFound)
-	}
-	updates, err := device.Updates()
-	if err != nil {
-		return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device updates")
-	}
-	return c.JSON(http.StatusOK, updates)
+	return h.handleDevice(c, func(device *Device) error {
+		updates, err := device.Updates()
+		if err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device updates")
+		}
+		return c.JSON(http.StatusOK, updates)
+	})
 }
 
 // @Summary Get details of update events for a devices
@@ -92,25 +76,17 @@ func (h *handlers) deviceUpdatesList(c echo.Context) error {
 // @Success 200 []DeviceUpdateEvent
 // @Router  /devices/:uuid/updates/:id [get]
 func (h *handlers) deviceUpdatesGet(c echo.Context) error {
-	uuid := c.Param("uuid")
-	updateId := c.Param("id")
-
-	device, err := h.storage.DeviceGet(uuid)
-	if err != nil {
-		return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device")
-	}
-
-	if device == nil {
-		return c.NoContent(http.StatusNotFound)
-	}
-	events, err := device.Events(updateId)
-	if err != nil {
-		return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device update events")
-	}
-	if len(events) == 0 {
-		return c.NoContent(http.StatusNotFound)
-	}
-	return c.JSON(http.StatusOK, events)
+	return h.handleDevice(c, func(device *Device) error {
+		updateId := c.Param("id")
+		events, err := device.Events(updateId)
+		if err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device update events")
+		}
+		if len(events) == 0 {
+			return c.NoContent(http.StatusNotFound)
+		}
+		return c.JSON(http.StatusOK, events)
+	})
 }
 
 // @Summary Get a list of Apps states reported by the device
@@ -118,20 +94,22 @@ func (h *handlers) deviceUpdatesGet(c echo.Context) error {
 // @Success 200 AppsStatesResp
 // @Router  /devices/:uuid/apps-states [get]
 func (h *handlers) deviceAppsStatesGet(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		appsStates, err := device.AppsStates()
+		if err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device updates")
+		}
+		return c.JSON(http.StatusOK, AppsStatesResp{AppsStates: appsStates})
+	})
+}
+
+func (h *handlers) handleDevice(c echo.Context, next func(*Device) error) error {
 	uuid := c.Param("uuid")
-
-	device, err := h.storage.DeviceGet(uuid)
-	if err != nil {
+	if device, err := h.storage.DeviceGet(uuid); err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device")
-	}
-
-	if device == nil {
+	} else if device == nil {
 		return c.NoContent(http.StatusNotFound)
+	} else {
+		return next(device)
 	}
-
-	appsStates, err := device.AppsStates()
-	if err != nil {
-		return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device updates")
-	}
-	return c.JSON(http.StatusOK, AppsStatesResp{AppsStates: appsStates})
 }

@@ -52,3 +52,6 @@ jobs:
       - name: Test no DNS
         run: |
           ./contrib/dev-shell sh -x contrib/test-nodns.sh
+      - name: Test mDNS
+        run: |
+          ./contrib/dev-shell sh -x contrib/test-mdns.sh

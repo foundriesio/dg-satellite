@@ -17,6 +17,7 @@ fi
 
 docker run --rm ${ttyarg} \
 	--network=host \
+	--cap-add=NET_ADMIN \
 	-v `pwd`:`pwd` \
 	-w `pwd` \
 	${container} $cmd

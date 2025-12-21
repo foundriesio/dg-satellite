@@ -95,6 +95,7 @@ type Storage struct {
 	stmtDeviceGet       stmtDeviceGet
 	stmtDeviceList      map[OrderBy]stmtDeviceList
 	stmtDeviceSetGroup  stmtDeviceSetGroup
+	stmtDeviceSetLabels stmtDeviceSetLabels
 	stmtDeviceSetUpdate stmtDeviceSetUpdate
 }
 
@@ -158,6 +159,7 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	if err := db.InitStmt(
 		&handle.stmtDeviceGet,
 		&handle.stmtDeviceSetGroup,
+		&handle.stmtDeviceSetLabels,
 		&handle.stmtDeviceSetUpdate,
 	); err != nil {
 		return nil, err
@@ -308,6 +310,12 @@ func (s Storage) SetGroupName(groupName string, uuids []string) error {
 	return s.stmtDeviceSetGroup.run(groupName, uuids)
 }
 
+func (s Storage) PatchDeviceLabels(labels map[string]*string, uuids []string) error {
+	// This function applies a merge-patch on top of existing labels:
+	// new labels are added, updated labels are replaced, null labels are removed, missing labels are left intact.
+	return s.stmtDeviceSetLabels.run(labels, uuids)
+}
+
 func (s Storage) SetUpdateName(tag, updateName string, isProd bool, uuids, groups []string) (effectiveUuids []string, err error) {
 	err = s.stmtDeviceSetUpdate.run(tag, updateName, isProd, uuids, groups, &effectiveUuids)
 	return
@@ -412,6 +420,30 @@ func (s *stmtDeviceSetGroup) run(groupName string, uuids []string) error {
 		return fmt.Errorf("unexpected error marshalling UUIDs to JSON: %w", err)
 	}
 	_, err = s.Stmt.Exec(groupName, uuidsStr)
+	return err
+}
+
+type stmtDeviceSetLabels storage.DbStmt
+
+func (s *stmtDeviceSetLabels) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("apiDeviceSetName", `
+		UPDATE devices
+		SET labels=jsonb_patch(labels,?)
+		WHERE uuid IN (SELECT value from json_each(?))`,
+	)
+	return
+}
+
+func (s *stmtDeviceSetLabels) run(labels map[string]*string, uuids []string) error {
+	labelsStr, err := json.Marshal(labels)
+	if err != nil {
+		return fmt.Errorf("unexpected error marshalling labels to JSON: %w", err)
+	}
+	uuidsStr, err := json.Marshal(uuids)
+	if err != nil {
+		return fmt.Errorf("unexpected error marshalling UUIDs to JSON: %w", err)
+	}
+	_, err = s.Stmt.Exec(labelsStr, uuidsStr)
 	return err
 }
 

@@ -108,6 +108,14 @@ func (c testClient) GET(resource string, status int, headers ...string) []byte {
 	return rec.Body.Bytes()
 }
 
+func (c testClient) PATCH(resource string, status int, data any, headers ...string) []byte {
+	req := httptest.NewRequest(http.MethodPatch, "/v1"+resource, c.marshalBody(data))
+	c.marshalHeaders(headers, req)
+	rec := c.Do(req)
+	require.Equal(c.t, status, rec.Code)
+	return rec.Body.Bytes()
+}
+
 func (c testClient) PUT(resource string, status int, data any, headers ...string) []byte {
 	req := httptest.NewRequest(http.MethodPut, "/v1"+resource, c.marshalBody(data))
 	c.marshalHeaders(headers, req)
@@ -246,6 +254,45 @@ func TestApiDeviceGet(t *testing.T) {
 	require.Nil(t, json.Unmarshal(data, &device))
 	assert.Equal(t, "test-device-2", device.Uuid)
 	assert.Equal(t, "pubkey2", device.PubKey)
+}
+
+func TestApiDeviceLabelsPatch(t *testing.T) {
+	tc := NewTestClient(t)
+	_, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
+	require.Nil(t, err)
+
+	headers := []string{"content-type", "application/json"}
+	data := `{"upserts":{"name":"test","foo":"bar"}}`
+	tc.PATCH("/devices/test-device-1/labels", 403, data, headers...)
+	tc.u.AllowedScopes = users.ScopeDevicesR
+	tc.PATCH("/devices/test-device-1/labels", 403, data, headers...)
+	tc.u.AllowedScopes = users.ScopeDevicesRU
+	tc.PATCH("/devices/test-device-1/labels", 200, data, headers...)
+
+	var device apiStorage.Device
+	require.Nil(t, json.Unmarshal(tc.GET("/devices/test-device-1", 200), &device))
+	assert.Equal(t, "test", device.Labels["name"])
+	assert.Equal(t, "bar", device.Labels["foo"])
+
+	data = `{"upserts":{"bar":"baz"},"deletes":["foo"]}}`
+	tc.PATCH("/devices/test-device-1/labels", 200, data, headers...)
+
+	device = apiStorage.Device{}
+	require.Nil(t, json.Unmarshal(tc.GET("/devices/test-device-1", 200), &device))
+	assert.Equal(t, "test", device.Labels["name"])
+	assert.Equal(t, "", device.Labels["foo"])
+	assert.Equal(t, "baz", device.Labels["bar"])
+
+	data = `Bad JSON`
+	tc.PATCH("/devices/test-device-1/labels", 400, data, headers...)
+	data = `{"upserts":{"label-name-too-long-should-fail":"foo"}}`
+	tc.PATCH("/devices/test-device-1/labels", 400, data, headers...)
+	data = `{"upserts":{"foo":"label-value-too-long-should-also-fail-but-its-allowed-length-limit-is-much-much-higher"}}`
+	tc.PATCH("/devices/test-device-1/labels", 400, data, headers...)
+	data = `{"upserts":{"special+name":"baz"}}`
+	tc.PATCH("/devices/test-device-1/labels", 400, data, headers...)
+	data = `{"upserts":{"foo":"special&value"}}`
+	tc.PATCH("/devices/test-device-1/labels", 400, data, headers...)
 }
 
 func TestApiAppsStates(t *testing.T) {

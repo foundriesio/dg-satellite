@@ -4,7 +4,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/labstack/echo/v4"
 
@@ -20,6 +22,11 @@ type (
 
 type AppsStatesResp struct {
 	AppsStates []storage.AppsStates `json:"apps_states"`
+}
+
+type LabelsReq struct {
+	Upserts map[string]string
+	Deletes []string
 }
 
 // @Summary List devices
@@ -103,6 +110,26 @@ func (h *handlers) deviceAppsStatesGet(c echo.Context) error {
 	})
 }
 
+// @Summary Patch device labels
+// @Accept json
+// @Param data body LabelsReq true "Labels to upsert or delete"
+// @Success 200
+// @Router  /devices/:uuid/labels [patch]
+func (h *handlers) deviceLabelsPatch(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		var labelsReq LabelsReq
+		if err := c.Bind(&labelsReq); err != nil {
+			return EchoError(c, err, http.StatusBadRequest, "Bad JSON body")
+		}
+		if labels, err := parseLabels(labelsReq); err != nil {
+			return EchoError(c, err, http.StatusBadRequest, "Bad Request")
+		} else if err = h.storage.PatchDeviceLabels(labels, []string{device.Uuid}); err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to update device labels")
+		}
+		return c.NoContent(http.StatusOK)
+	})
+}
+
 func (h *handlers) handleDevice(c echo.Context, next func(*Device) error) error {
 	uuid := c.Param("uuid")
 	if device, err := h.storage.DeviceGet(uuid); err != nil {
@@ -112,4 +139,48 @@ func (h *handlers) handleDevice(c echo.Context, next func(*Device) error) error 
 	} else {
 		return next(device)
 	}
+}
+
+const (
+	// Together with a 2048 limit on total labels JSONB size,
+	// these constraints allow at least 24 labels per device (realistic limit is around 60-70).
+	maxLabelName  = 20
+	maxLabelValue = 60
+	// Label names are lowercase only; label values are case-sensitive.
+	validLabelNameRegex  = `^[a-z0-9_\-\.]+$`
+	validLabelValueRegex = `^[a-zA-Z0-9_\-\.]+$`
+)
+
+var (
+	validateLabelName  = regexp.MustCompile(validLabelNameRegex).MatchString
+	validateLabelValue = regexp.MustCompile(validLabelValueRegex).MatchString
+)
+
+func parseLabels(req LabelsReq) (map[string]*string, error) {
+	if len(req.Upserts) == 0 && len(req.Deletes) == 0 {
+		return nil, fmt.Errorf("at least one label change must be requested")
+	}
+	labels := make(map[string]*string, len(req.Upserts)+len(req.Deletes))
+	for k, v := range req.Upserts {
+		labels[k] = &v
+	}
+	for _, k := range req.Deletes {
+		if _, ok := labels[k]; ok {
+			return nil, fmt.Errorf("a label %s cannot be both updated and deleted at once", k)
+		}
+		labels[k] = nil
+	}
+	for k, v := range labels {
+		switch {
+		case len(k) > maxLabelName:
+			return nil, fmt.Errorf("label %s exceeds maximum label name limit %d", k, maxLabelName)
+		case v != nil && len(*v) > maxLabelValue:
+			return nil, fmt.Errorf("label %s exceeds maximum label value limit %d", k, maxLabelValue)
+		case !validateLabelName(k):
+			return nil, fmt.Errorf("label %s name must match a given regexp: %s", k, validLabelNameRegex)
+		case v != nil && !validateLabelValue(*v):
+			return nil, fmt.Errorf("label %s value must match a given regexp: %s", k, validLabelValueRegex)
+		}
+	}
+	return labels, nil
 }

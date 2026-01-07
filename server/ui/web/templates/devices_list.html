@@ -23,7 +23,7 @@
             <td>{{tsToString .LastSeen}}</td>
             <td>{{.Target}}</td>
             <td>{{.Tag}}</td>
-            <td>{{.Group}}</td>
+            <td>{{.GroupName}}</td>
             <td>
               {{/* A name label (if present) is always the first one */}}
               {{ if .Labels.name }}<p><strong>name:</strong> {{.Labels.name}}</p>{{ end }}

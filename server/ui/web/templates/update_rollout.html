@@ -1,0 +1,68 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <fieldset>
+        <legend><strong>Tag</strong></legend>
+        <p>{{.Tag}}</p>
+      </fieldset>
+
+      <fieldset>
+        <legend><strong>Name</strong></legend>
+        <p>{{.Name}}</p>
+      </fieldset>
+      
+      <fieldset>
+        <legend><strong>Rollout</strong></legend>
+        <p>{{.Rollout}}</p>
+      </fieldset>
+
+      <button onclick='location.href="/updates/{{$.Prod}}/{{$.Tag}}/{{$.Name}}/rollouts/{{.Rollout}}/tail";'>Follow progress</button>
+    </section>
+
+    <section class="content-section">
+      <h2>User provided UUIDs and Groups</h2>
+      <p><i><small>Rollouts are created asynchronously. 
+        This section shows the UUIDs and Groups that were requested to be part of the rollout.
+      </small></i></p>
+      <h3>UUIDs</h3>
+      <table>
+        <tbody>
+          {{ range .Details.Uuids }}
+          <tr>
+            <td><a href="/devices/{{ . }}">{{ . }}</a></td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    
+      <h3>Groups</h3>
+      <ul>
+        {{ range .Details.Groups }}
+        <li>{{.}}</li>
+        {{ end }}
+      </ul>
+    </section>
+
+    <section class="content-section">
+      <h2>Scheduled UUIDs</h2>
+      {{ if not .Details.Effect }}
+        Devices are scheduled for the Rollout asynchronously. 
+        They will appear here when the scheduling process is finished.
+      {{ else }}
+      <p><i><small>This section shows the UUIDs scheduled to receive the update based on the input above.
+        If a UUID is missing from this list, it means it did not qualify for the update (e.g., wrong Tag).
+      </small></i></p>
+      <table>
+        <tbody>
+          {{ range .Details.Effect}}
+          <tr>
+            <td><a href="/devices/{{ . }}">{{ . }}</a></td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+      {{ end }}
+    </section>
+
+{{ template "footer"}}

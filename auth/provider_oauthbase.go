@@ -94,7 +94,7 @@ func (p oauth2BaseProvider) GetUser(c echo.Context) (*users.User, error) {
 	}
 
 	session, err := p.GetSession(c)
-	if err != nil {
+	if err != nil || session == nil {
 		return nil, err
 	}
 	return session.User, nil
@@ -127,6 +127,12 @@ func (p oauth2BaseProvider) GetSession(c echo.Context) (*Session, error) {
 }
 
 func (p oauth2BaseProvider) renderLoginPage(c echo.Context, reason string) error {
+	accepts := c.Request().Header.Get("Accept")
+	if !strings.Contains(accepts, "text/html") {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "authentication required",
+		})
+	}
 	context := struct {
 		Title    string
 		LoginTip string

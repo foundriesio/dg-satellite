@@ -127,3 +127,19 @@ func (h handlers) devicesAppsStates(c echo.Context) error {
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "device_apps_states.html", ctx)
 }
+
+func (h handlers) devicesLabelsGet(c echo.Context) error {
+	var device api.Device
+	if err := getJson(c.Request().Context(), "/v1/devices/"+c.Param("uuid"), &device); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+
+	ctx := struct {
+		baseCtx
+		Device api.Device
+	}{
+		baseCtx: h.baseCtx(c, "Manage labels for - "+device.Uuid, "devices"),
+		Device:  device,
+	}
+	return h.templates.ExecuteTemplate(c.Response(), "device_labels.html", ctx)
+}

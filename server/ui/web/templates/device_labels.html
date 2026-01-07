@@ -1,0 +1,98 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <form>
+        <fieldset class="grid">
+          <label style="font-weight: bold;">Key</label>
+          <label style="font-weight: bold;">Value</label>
+        </fieldset>
+
+        <div id="labelsContainer">
+          {{ range $key, $value := .Device.Labels }}
+          <fieldset class="grid">
+            <input value="{{$key}}"/>
+            <input value="{{$value}}"/>
+            <i class="trash" title="Remove label"></i>
+          </fieldset>
+          {{ end }}
+        </div>
+
+        <button type="button" onclick="addNewLabel()">Add new label</button>
+      </form>
+    </section>
+    
+    <section class="content-section">
+      <button onclick="location.href='/devices/{{.Device.Uuid}}';">Cancel</button>
+      <button onclick="saveLabels()">Save changes</button>
+    </section>
+    
+    <script>
+      function addNewLabel() {
+        const container = document.getElementById('labelsContainer');
+        const newFieldset = document.createElement('fieldset');
+        newFieldset.className = 'grid';
+        newFieldset.innerHTML = `
+          <input placeholder="Enter key"/>
+          <input placeholder="Enter value"/>
+          <i class="trash" title="Remove label" onclick="removeLabel(this)"></i>
+        `;
+        container.appendChild(newFieldset);
+      }
+
+      function removeLabel(element) {
+        const fieldset = element.parentElement;
+        fieldset.remove();
+      }
+
+      function saveLabels() {
+        const container = document.getElementById('labelsContainer');
+        const fieldsets = container.querySelectorAll('fieldset');
+        const labels = {};
+        
+        fieldsets.forEach(fieldset => {
+          const inputs = fieldset.querySelectorAll('input');
+          if (inputs.length >= 2) {
+            const key = inputs[0].value.trim();
+            const value = inputs[1].value.trim();
+            
+            // Only include non-empty keys
+            if (key) {
+              labels[key] = value;
+            }
+          }
+        });
+
+        fetch('/v1/devices/{{.Device.Uuid}}/labels', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(labels)
+        })
+        .then(async response => {
+          if (response.ok) {
+            location.href = '/devices/{{.Device.Uuid}}';
+          } else {
+            const errorText = await response.text();
+            alert('Error saving labels: ' + errorText);
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Error saving labels: ' + error.message);
+        });
+      }
+
+      // Add click handlers to existing trash icons
+      document.addEventListener('DOMContentLoaded', function() {
+        const trashIcons = document.querySelectorAll('.trash');
+        trashIcons.forEach(icon => {
+          icon.addEventListener('click', function() {
+            removeLabel(this);
+          });
+        });
+      });
+    </script>
+
+{{ template "footer"}}

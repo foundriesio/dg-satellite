@@ -44,6 +44,7 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 	e.GET("/devices", h.devicesList, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/devices/:uuid", h.devicesGet, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/devices/:uuid/apps-states", h.devicesAppsStates, h.requireSession, h.requireScope(users.ScopeDevicesR))
+	e.GET("/devices/:uuid/labels", h.devicesLabelsGet, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/devices/:uuid/update/:update", h.devicesUpdateGet, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/settings", h.settings, h.requireSession)
 	e.GET("/updates", h.updatesList, h.requireSession, h.requireScope(users.ScopeUpdatesR))

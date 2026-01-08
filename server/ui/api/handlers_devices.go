@@ -29,6 +29,8 @@ type LabelsReq struct {
 	Deletes []string
 }
 
+type LabelsPutReq map[string]*string
+
 // @Summary List devices
 // @Param _ query DeviceListOpts false "Sorting options"
 // @Accept  json
@@ -122,8 +124,39 @@ func (h *handlers) deviceLabelsPatch(c echo.Context) error {
 			return EchoError(c, err, http.StatusBadRequest, "Bad JSON body")
 		}
 		if labels, err := parseLabels(labelsReq); err != nil {
-			return EchoError(c, err, http.StatusBadRequest, "Bad Request")
+			return EchoError(c, err, http.StatusBadRequest, err.Error())
 		} else if err = h.storage.PatchDeviceLabels(labels, []string{device.Uuid}); err != nil {
+			if storage.IsDbError(err, storage.ErrDbConstraintUnique) {
+				return EchoError(c, err, http.StatusConflict, "A device with the same 'name' label value already exists")
+			}
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to update device labels")
+		}
+		return c.NoContent(http.StatusOK)
+	})
+}
+
+// @Summary Put device labels
+// @Accept json
+// @Param data body LabelsPutReq true "Labels to set"
+// @Success 200
+// @Router  /devices/:uuid/labels [put]
+func (h *handlers) deviceLabelsPut(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		var labels LabelsPutReq
+		if err := c.Bind(&labels); err != nil {
+			return EchoError(c, err, http.StatusBadRequest, "Bad JSON body")
+		}
+		if err := validateLabels(labels); err != nil {
+			return EchoError(c, err, http.StatusBadRequest, err.Error())
+		}
+
+		for k := range device.Labels {
+			if _, ok := labels[k]; !ok {
+				labels[k] = nil
+			}
+		}
+
+		if err := h.storage.PatchDeviceLabels(labels, []string{device.Uuid}); err != nil {
 			if storage.IsDbError(err, storage.ErrDbConstraintUnique) {
 				return EchoError(c, err, http.StatusConflict, "A device with the same 'name' label value already exists")
 			}
@@ -173,17 +206,24 @@ func parseLabels(req LabelsReq) (map[string]*string, error) {
 		}
 		labels[k] = nil
 	}
+	if err := validateLabels(labels); err != nil {
+		return nil, err
+	}
+	return labels, nil
+}
+
+func validateLabels(labels map[string]*string) error {
 	for k, v := range labels {
 		switch {
 		case len(k) > maxLabelName:
-			return nil, fmt.Errorf("label %s exceeds maximum label name limit %d", k, maxLabelName)
+			return fmt.Errorf("label %s exceeds maximum label name limit %d", k, maxLabelName)
 		case v != nil && len(*v) > maxLabelValue:
-			return nil, fmt.Errorf("label %s exceeds maximum label value limit %d", k, maxLabelValue)
+			return fmt.Errorf("label %s exceeds maximum label value limit %d", k, maxLabelValue)
 		case !validateLabelName(k):
-			return nil, fmt.Errorf("label %s name must match a given regexp: %s", k, validLabelNameRegex)
+			return fmt.Errorf("label %s name must match a given regexp: %s", k, validLabelNameRegex)
 		case v != nil && !validateLabelValue(*v):
-			return nil, fmt.Errorf("label %s value must match a given regexp: %s", k, validLabelValueRegex)
+			return fmt.Errorf("label %s value must match a given regexp: %s", k, validLabelValueRegex)
 		}
 	}
-	return labels, nil
+	return nil
 }

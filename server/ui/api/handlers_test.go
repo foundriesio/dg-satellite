@@ -355,6 +355,43 @@ func TestApiDeviceLabelsPatch(t *testing.T) {
 	tc.PATCH("/devices/test-device-2/labels", 200, data, headers...)
 }
 
+func TestApiDeviceLabelsPut(t *testing.T) {
+	tc := NewTestClient(t)
+	_, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
+	require.Nil(t, err)
+	_, err = tc.gw.DeviceCreate("test-device-2", "pubkey2", false)
+	require.Nil(t, err)
+
+	headers := []string{"content-type", "application/json"}
+	data := `{"foo":"bar", "name":"test"}`
+	tc.PUT("/devices/test-device-1/labels", 403, data, headers...)
+	tc.u.AllowedScopes = users.ScopeDevicesR
+	tc.PUT("/devices/test-device-1/labels", 403, data, headers...)
+	tc.u.AllowedScopes = users.ScopeDevicesRU
+	tc.PUT("/devices/test-device-1/labels", 200, data, headers...)
+
+	var device apiStorage.Device
+	require.Nil(t, json.Unmarshal(tc.GET("/devices/test-device-1", 200), &device))
+	assert.Equal(t, "bar", device.Labels["foo"])
+	assert.Equal(t, "test", device.Labels["name"])
+
+	// Duplicates are not allowed for a "name" label, but allowed for other labels.
+	tc.PUT("/devices/test-device-2/labels", 409, data, headers...)
+	data = `{"foo":"bar"}`
+	tc.PUT("/devices/test-device-2/labels", 200, data, headers...)
+	device = apiStorage.Device{}
+	require.Nil(t, json.Unmarshal(tc.GET("/devices/test-device-2", 200), &device))
+	assert.Equal(t, "bar", device.Labels["foo"])
+	assert.Equal(t, "", device.Labels["name"])
+
+	data = `{"name":"test2"}`
+	tc.PUT("/devices/test-device-2/labels", 200, data, headers...)
+	device = apiStorage.Device{}
+	require.Nil(t, json.Unmarshal(tc.GET("/devices/test-device-2", 200), &device))
+	assert.Equal(t, "", device.Labels["foo"])
+	assert.Equal(t, "test2", device.Labels["name"])
+}
+
 func TestApiAppsStates(t *testing.T) {
 	tc := NewTestClient(t)
 	tc.GET("/devices/test-device-1/apps-states", 403)

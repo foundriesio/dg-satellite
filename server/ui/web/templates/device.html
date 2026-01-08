@@ -1,0 +1,198 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <div class="grid device-details">
+        <div>
+          <dl>
+            <dt>Tag</dt>
+            <dd>{{.Device.Tag}}
+          </dl>
+        </div>
+        <div>
+          <dl>
+            <dt>Production</dt>
+            <dd>{{if .Device.IsProd}}Yes{{else}}No{{end}}</dd>
+          </dl>
+        </div>
+        <div>
+          <dl>
+            <dt>Apps</dt>
+            <dd>{{.Device.Apps}}</dd>
+          </dl>
+        </div>
+        <div>
+          <dl>
+            <dt>Target</dt>
+            <dd>{{.Device.Target}}</dd>
+          </dl>
+        </div>
+      </div>
+        
+      <div class="grid device-details">
+        <div>
+          <dl>
+            <dt>First seen</dt>
+            <dd>{{tsToString .Device.CreatedAt}}</dd>
+          </dl>
+        </div>
+        <div>
+          <dl>
+            <dt>Last seen</dt>
+            <dd>{{tsToString .Device.LastSeen}}</dd>
+          </dl>
+        </div>
+        <div>
+          <dl>
+            <dt>Group name</dt>
+            <dd>{{.Device.GroupName}}</dd>
+          </dl>
+        </div>
+        <div>
+          <dl>
+            <dt>Configured update</dt>
+            <dd><a href="/updates/{{ if .Device.IsProd}}prod{{else}}ci{{end}}/{{.Device.Tag}}/{{.Device.UpdateName}}">{{.Device.UpdateName}}</a></dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="grid device-details">
+        <div>
+          <dl>
+            <dt>OSTree hash</dt>
+            <dd style="font-family: monospace">{{.Device.OstreeHash}}</dd>
+          </dl>
+        </div>
+        <div>
+          <dl>
+            <dt>Labels - <a href='/devices/{{.Device.Uuid}}/labels'>manage</a></dt>
+            <dd>
+              <ul>
+              {{/* A name label (if present) is always the first one */}}
+              {{ if .Device.Labels.name }}<li>name: {{.Device.Labels.name}}</li>{{ end }}
+              {{ range $key, $value := .Device.Labels }}
+                {{if ne $key "name"}}<li>{{$key}}: {{$value}}</li>{{end}}
+              {{ end }}
+              </ul>
+            </dd>
+        </div>
+      </div>
+      
+      <div class="grid device-details">
+        <div>
+          <dl>
+            <dt></dt>
+            <dd><button onclick="location.href='/devices/{{.Device.Uuid}}/apps-states';">Apps States</button></dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+    
+    <section class="content-section">
+      <div class="grid device-details">
+        <div>
+          <dl>
+            <dt>Update history</dt>
+            <dd>
+              <div class="updates-history-container">
+                <table>
+                  <tbody>
+                    {{range .Updates}}
+                    <tr>
+                      <td><a href="/devices/{{$.Device.Uuid}}/update/{{.}}">{{.}}</a></td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                      <td><i>No updates applied</i></td>
+                    </tr>
+                    {{end}}
+                  </tbody>
+                </table>
+              </div>
+            </dd>
+          </dl>
+        </div>
+        <div>
+          <dl>
+            <dt>Network</dt>
+            <dd>
+              {{if .IpInfo}}
+              <table>
+                <thead>
+                  <tr>
+                    <th>Hostname</th>
+                    <th>IP</th>
+                    <th>MAC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{{.IpInfo.Hostname}}</td>
+                    <td>{{.IpInfo.IP}}</td>
+                    <td>{{.IpInfo.Mac}}</td>
+                  </tr>
+                </tbody>
+              </table>
+              {{else}}
+              <pre>{{.Device.NetInfo}}</pre>
+              {{end}}
+            </dd>
+          </dl>
+          <dl>
+            <dt>Public key</dt>
+            <dd><pre>{{.Device.PubKey}}</pre></dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <h3>Hardware info</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>ID</th>
+            <th>Serial</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{{ .HwInfo.product }}</td>
+            <td>{{ .HwInfo.id }}</td>
+            <td>{{ .HwInfo.serial }}</td>
+            <td>{{ .HwInfo.description}}</td>
+          </tr>
+        </tbody>
+      </table>
+      <details>
+        <summary role="button" class="secondary">Details</summary>
+        <pre>{{.Device.HwInfo}}</pre>
+      </details>
+    </section>
+
+    <section class="content-section">
+      <h3>SOTA config</h3>
+      <pre>{{.Device.Aktoml}}</pre>
+    </section>
+
+    <style>
+      .updates-history-container {
+        max-height: calc(6 * 2.5em); /* Approximate height for 6 table rows */
+        overflow-y: auto;
+        border: 1px solid var(--muted-border-color, #e0e0e0);
+        border-radius: 4px;
+      }
+
+      .updates-history-container table {
+        margin: 0;
+        border: none;
+      }
+
+      .updates-history-container tbody tr:last-child td {
+        border-bottom: none;
+      }
+    </style>
+
+{{ template "footer"}}

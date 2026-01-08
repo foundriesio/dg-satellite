@@ -21,6 +21,9 @@
             <td>
               <a href="/users/{{.Username}}/audit-log"><i title="View audit log" class="history"></i></a>
               <i title="Change scopes" class="edit" onclick="showScopesModal('{{.Username}}', '{{.AllowedScopes}}')"></i>
+              {{ if and $.CanDelete (ne .Username $.User.Username) }}
+              <i title="Delete user" class="trash" onclick="deleteUser('{{.Username}}')"></i>
+              {{ end }}
             </td>
             </tr>
             {{ end }}
@@ -69,6 +72,28 @@
         }
 
         scopesModal.show();
+      }
+
+      function deleteUser(username) {
+        if (!confirm('Are you sure you want to delete user "' + username + '"? This action cannot be undone.')) {
+          return;
+        }
+
+        fetch('/users/' + username, {
+          method: 'DELETE',
+        })
+        .then(async response => {
+          if (response.ok) {
+            window.location.reload(); // Refresh to show updated user list
+          } else {
+            const errorText = await response.text();
+            alert('Error deleting user: ' + errorText);
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Error deleting user: ' + error.message);
+        });
       }
 
       function updateScopes() {

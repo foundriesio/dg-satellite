@@ -23,12 +23,33 @@ func (h handlers) usersList(c echo.Context) error {
 		baseCtx
 		Users      []users.User
 		ScopesList []string
+		CanDelete  bool
 	}{
 		baseCtx:    h.baseCtx(c, "Users", "users"),
 		Users:      user,
 		ScopesList: users.ScopesAvailable(),
+		CanDelete:  CtxGetSession(c.Request().Context()).User.AllowedScopes.Has(users.ScopeUsersD),
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "users.html", ctx)
+}
+
+func (h handlers) userDelete(c echo.Context) error {
+	session := CtxGetSession(c.Request().Context())
+	username := c.Param("username")
+	user, err := h.users.Get(username)
+	if err != nil {
+		return h.handleError(c, http.StatusNotFound, err)
+	}
+
+	if session.User.Username == user.Username {
+		err := errors.New("users cannot delete themselves")
+		return EchoError(c, err, http.StatusBadRequest, err.Error())
+	}
+
+	if err := user.Delete(); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+	return nil
 }
 
 func (h handlers) usersAuditLog(c echo.Context) error {

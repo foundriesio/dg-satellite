@@ -48,6 +48,7 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 	e.GET("/devices/:uuid/update/:update", h.devicesUpdateGet, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/settings", h.settings, h.requireSession)
 	e.GET("/updates", h.updatesList, h.requireSession, h.requireScope(users.ScopeUpdatesR))
+	e.GET("/updates/max-expiry-days", h.updatesGetMaxExpiryDays, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/updates/:prod/:tag/:name", h.updatesGet, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/updates/:prod/:tag/:name/tail", h.updatesTail, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/updates/:prod/:tag/:name/rollouts/:rollout", h.updatesRollout, h.requireSession, h.requireScope(users.ScopeUpdatesR))

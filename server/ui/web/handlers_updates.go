@@ -4,7 +4,12 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os/exec"
+	"time"
 
 	"github.com/foundriesio/dg-satellite/server/ui/api"
 	"github.com/labstack/echo/v4"
@@ -24,12 +29,85 @@ func (h handlers) updatesList(c echo.Context) error {
 		baseCtx
 		CI   map[string][]string
 		Prod map[string][]string
+
+		FioctlInstalled bool
 	}{
 		baseCtx: h.baseCtx(c, "Updates", "updates"),
 		CI:      ci,
 		Prod:    prod,
+
+		FioctlInstalled: isFioctlInstalled(),
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "updates.html", ctx)
+}
+
+func getExpiry(url string, apiKey string) (*time.Time, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("OSF-TOKEN", apiKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to fetch factory root.json: status %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var data struct {
+		Signed struct {
+			Expires string `json:"expires"`
+		} `json:"signed"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("failed to decode factory root.json response: %w", err)
+	}
+
+	expiryTime, err := time.Parse(time.RFC3339, data.Signed.Expires)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse root.json expiry: %s: %w", data.Signed.Expires, err)
+	}
+
+	return &expiryTime, nil
+}
+
+func (h handlers) updatesGetMaxExpiryDays(c echo.Context) error {
+	factory := c.QueryParam("factory")
+	apiKey := c.QueryParam("apiKey")
+
+	if factory == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "factory query parameter is missing"})
+	}
+
+	if apiKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "apiKey query parameter is missing"})
+	}
+
+	url := fmt.Sprintf("https://api.foundries.io/ota/repo/%s/api/v1/user_repo/root.json", factory)
+	rootExpiry, err := getExpiry(url, apiKey)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("failed to get root.json expiry: %v", err))
+	}
+
+	url = fmt.Sprintf("https://api.foundries.io/ota/repo/%s/api/v1/user_repo/targets.json", factory)
+	targetsExpiry, err := getExpiry(url, apiKey)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("failed to get targets.json expiry: %v", err))
+	}
+	expiry := *targetsExpiry
+	if rootExpiry.Before(*targetsExpiry) {
+		expiry = *rootExpiry
+	}
+
+	duration := time.Until(expiry)
+	expiresInDays := int(duration.Hours() / 24)
+	return c.String(http.StatusOK, fmt.Sprintf("%d", expiresInDays))
 }
 
 func (h handlers) updatesGet(c echo.Context) error {
@@ -103,4 +181,9 @@ func (h handlers) updatesRolloutTail(c echo.Context) error {
 	}
 
 	return h.templates.ExecuteTemplate(c.Response(), "update_tail.html", ctx)
+}
+
+func isFioctlInstalled() bool {
+	_, err := exec.LookPath("fioctl")
+	return err == nil
 }

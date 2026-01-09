@@ -33,4 +33,89 @@
       </table>
     </section>
 
+    {{ if .FioctlInstalled }}
+    <section class="content-section">
+      <details>
+        <summary role="button">Create new update</summary>
+        <p>Download an offline update from Foundries.io backend to make available to devices. 
+          The maximum expires window is based on your Factory's root metadata expiration that
+          will be looked up when you enter your API key.</p>
+
+        <form>
+          <label for="factory">Factory name:</label>
+          <input type="text" id="factory" name="factoryName" required/>
+
+          <label for="apiKey">API key:</label>
+          <input type="password" id="apiKey" name="apiKey" required/>
+
+          <label for="targetName">Target name:</label>
+          <input type="text" id="targetName" name="targetName" placeholder="intel-corei7-64-lmp-1451" required/>
+
+          <label for="tag">Tag:</label>
+          <input type="text" id="tag" name="tag" placeholder="main/devel/etc" required/>
+
+          <label for="prod">Type of Target:</label>
+          <select id="prod" name="prod">
+            <option value="prod">Production</option>
+            <option value="ci">CI</option>
+          </select>
+
+          <label for="expiresInDays">Expires in days: <span id="expiresInDaysValue">90</span><span id="expiresInDaysMax"></span></span></label>
+          <input type="range" id="expiresInDays" name="expiresInDays" min="1" max="365" value="90" oninput="updateExpiresLabel(this.value)"/>
+
+          <button type="button" onclick="createUpdate()">Create update</button>
+        </form>
+      </details>
+    </section>
+    {{ end }}
+
+    <script>
+      function updateExpiresLabel(value) {
+        document.getElementById('expiresInDaysValue').textContent = value;
+      }
+
+      function checkFactoryExpiry() {
+        const factory = document.getElementById('factory').value.trim();
+        const apiKey = document.getElementById('apiKey').value.trim();
+        if (!factory || !apiKey) {
+          return;
+        }
+
+        fetch(`/updates/max-expiry-days?factory=${encodeURIComponent(factory)}&apiKey=${encodeURIComponent(apiKey)}`, {
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          const daysUntilExpiry = parseInt(data);
+
+          if (daysUntilExpiry > 0) {
+            const expiresSlider = document.getElementById('expiresInDays');
+            expiresSlider.max = daysUntilExpiry;
+
+            if (parseInt(expiresSlider.value) > daysUntilExpiry) {
+              expiresSlider.value = daysUntilExpiry;
+              updateExpiresLabel(daysUntilExpiry);
+            }
+            document.getElementById('expiresInDaysMax').textContent = ` (max: ${daysUntilExpiry} days)`;
+            console.log(`Factory expires in ${daysUntilExpiry} days, slider max updated`);
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching factory expiry:', error);
+          // Reset to default max on error
+          document.getElementById('expiresInDays').max = 365;
+        });
+      }
+
+      // Add event listeners when page loads
+      document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('factory').addEventListener('input', checkFactoryExpiry);
+        document.getElementById('apiKey').addEventListener('input', checkFactoryExpiry);
+      });
+    </script>
+
 {{ template "footer"}}

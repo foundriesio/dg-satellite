@@ -12,7 +12,14 @@
         <p>{{.Name}}</p>
       </fieldset>
 
+      {{ if.Status.InProgress }}
+      <fieldset>
+        <legend><strong>Creation In Progress</strong></legend>
+        <p>{{.Status.InProgress}}</p>
+      </fieldset>
+      {{ else }}
       <button onclick='location.href="/updates/{{$.Prod}}/{{$.Tag}}/{{$.Name}}/tail";'>Follow progress</button>
+      {{ end }}
     </section>
 
     <section class="content-section">
@@ -24,5 +31,16 @@
       </ul>
     </section>
 
+    {{ if gt (len .Status.Logs) 0 }}
+    <section class="content-section">
+      <details {{if .Status.InProgress }}open{{ end }}>
+        <summary role="button">Logs of update creation</summary>
+        {{if .Status.InProgress}}
+        <p><em>Update creation is still in progress. Please refresh the page to see new logs.</em></p>
+        {{ end }}
+        <pre>{{.Status.Logs}}</pre>
+      </details>
+    </section>
+    {{ end }}
 
 {{ template "footer"}}

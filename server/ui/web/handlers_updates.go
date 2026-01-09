@@ -117,18 +117,27 @@ func (h handlers) updatesGet(c echo.Context) error {
 	if err := getJson(c.Request().Context(), url, &rollouts); err != nil {
 		return h.handleUnexpected(c, err)
 	}
+
+	url = fmt.Sprintf("/v1/updates/%s/%s/%s/creationStatus", c.Param("prod"), c.Param("tag"), c.Param("name"))
+	var status api.UpdateCreationStatus
+	if err := getJson(c.Request().Context(), url, &status); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+
 	ctx := struct {
 		baseCtx
 		Tag      string
 		Name     string
 		Prod     string
 		Rollouts []string
+		Status   api.UpdateCreationStatus
 	}{
 		baseCtx:  h.baseCtx(c, "Update Details", "updates"),
 		Tag:      c.Param("tag"),
 		Name:     c.Param("name"),
 		Prod:     c.Param("prod"),
 		Rollouts: rollouts,
+		Status:   status,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "update.html", ctx)
 }

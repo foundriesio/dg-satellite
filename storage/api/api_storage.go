@@ -323,6 +323,20 @@ func (s Storage) ListUpdates(tag string, isProd bool) (map[string][]string, erro
 	return s.getRolloutsFsHandle(isProd).ListUpdates(tag)
 }
 
+func (s Storage) UpdateCreationInProgress(tag, updateName string, isProd bool) (string, bool) {
+	handle := s.fs.Updates.Ci
+	if isProd {
+		handle = s.fs.Updates.Prod
+	}
+	if status, err := handle.Logs.ReadFile(tag, updateName, "fioctl.log"); err == nil {
+		return status, true
+	}
+	if status, err := handle.Logs.ReadFile(tag, updateName, "fioctl.log.done"); err == nil {
+		return status, false
+	}
+	return "", false
+}
+
 func (s Storage) ListRollouts(tag, updateName string, isProd bool) ([]string, error) {
 	return s.getRolloutsFsHandle(isProd).ListFiles(tag, updateName)
 }

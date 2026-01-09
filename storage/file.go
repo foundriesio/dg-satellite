@@ -124,6 +124,14 @@ type updatesFsHandleWrap struct {
 	Logs     UpdatesFsHandle
 }
 
+func (h updatesFsHandleWrap) Create(tag, update string) (string, error) {
+	path := filepath.Join(h.Apps.root, tag, update)
+	if err := os.MkdirAll(path, 0o744); err != nil {
+		return "", fmt.Errorf("unable to create apps storage for tag %s update %s: %w", tag, update, err)
+	}
+	return path, nil
+}
+
 func NewFs(root string) (*FsHandle, error) {
 	fs := &FsHandle{Config: FsConfig(root)}
 	fs.Audit.root = fs.Config.AuditDir()

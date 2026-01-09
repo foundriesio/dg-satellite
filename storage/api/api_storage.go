@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"iter"
 	"log/slog"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -244,6 +247,76 @@ func (s Storage) DeviceGet(uuid string) (*Device, error) {
 	}
 
 	return &d, nil
+}
+
+type UpdatesCreateReq struct {
+	Factory       string `json:"factory"`
+	ApiKey        string `json:"apiKey"`
+	Prod          bool   `json:"prod"`
+	TargetName    string `json:"targetName"`
+	Tag           string `json:"tag"`
+	ExpiresInDays int    `json:"expiresInDays"`
+}
+
+func (s Storage) CreateUpdate(update UpdatesCreateReq) error {
+	handle := s.fs.Updates.Ci
+	if update.Prod {
+		handle = s.fs.Updates.Prod
+	}
+	updateDir, err := handle.Create(update.Tag, update.TargetName)
+	if err != nil {
+		return err
+	}
+
+	clean := func() {
+		if err := os.RemoveAll(updateDir); err != nil {
+			slog.Error("failed to clean up update dir after CreateUpdate failure", "dir", updateDir, "error", err)
+		}
+	}
+
+	logfile := handle.Logs.FilePath(update.Tag, update.TargetName, "fioctl.log")
+	if err := os.MkdirAll(filepath.Dir(logfile), 0o744); err != nil {
+		clean()
+		return fmt.Errorf("failed to create logs dir: %w", err)
+	}
+	fd, err := os.OpenFile(logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		clean()
+		return fmt.Errorf("failed to open fioctl log file: %w", err)
+	}
+
+	args := []string{
+		"--factory", update.Factory,
+		"targets", "offline-update",
+		"--expires-in-days", fmt.Sprintf("%d", update.ExpiresInDays),
+		"--tag", update.Tag,
+		update.TargetName,
+		updateDir,
+	}
+	if update.Prod {
+		args = append(args, "--prod")
+	}
+	fmt.Fprintf(fd, "Starting fioctl offline-update command with args: %s\n", strings.Join(args, " "))
+	args = append(args, "--token="+update.ApiKey)
+
+	cmd := exec.Command("fioctl", args...)
+	cmd.Stderr = fd
+	cmd.Stdout = fd
+	go func() {
+		if err := cmd.Run(); err != nil {
+			slog.Error("fioctl offline-update command failed", "error", err)
+			fmt.Fprintf(fd, "\nERROR: fioctl command failed: %v\n", err)
+			_ = fd.Close()
+		} else {
+			slog.Info("fioctl offline-update command completed successfully")
+			fmt.Fprintf(fd, "\nfioctl command completed successfully - update is ready to deploy\n")
+			_ = fd.Close()
+			if err := os.Rename(logfile, logfile+".done"); err != nil {
+				slog.Error("failed to rename fioctl log file to .done", "error", err)
+			}
+		}
+	}()
+	return nil
 }
 
 func (s Storage) ListUpdates(tag string, isProd bool) (map[string][]string, error) {

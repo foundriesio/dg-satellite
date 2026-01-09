@@ -45,7 +45,7 @@
           <label for="factory">Factory name:</label>
           <input type="text" id="factory" name="factoryName" required/>
 
-          <label for="apiKey">API key:</label>
+          <label for="apiKey">API key (must have ci:read and targets:read-update):</label>
           <input type="password" id="apiKey" name="apiKey" required/>
 
           <label for="targetName">Target name:</label>
@@ -108,6 +108,53 @@
           console.error('Error fetching factory expiry:', error);
           // Reset to default max on error
           document.getElementById('expiresInDays').max = 365;
+        });
+      }
+
+      function createUpdate() {
+        // Get form values
+        const factory = document.getElementById('factory').value.trim();
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const targetName = document.getElementById('targetName').value.trim();
+        const tag = document.getElementById('tag').value.trim();
+        const prod = document.getElementById('prod').value == 'prod';
+        const expiresInDays = document.getElementById('expiresInDays').value;
+
+        // Validate required fields
+        if (!factory || !apiKey || !targetName || !tag) {
+          alert('Please fill in all required fields.');
+          return;
+        }
+
+        // Prepare request data
+        const updateData = {
+          factory: factory,
+          apiKey: apiKey,
+          targetName: targetName,
+          tag: tag,
+          prod: prod,
+          expiresInDays: parseInt(expiresInDays)
+        };
+
+        // Make POST request
+        fetch('/v1/updates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData)
+        })
+        .then(async response => {
+          if (response.ok) {
+            window.location.reload(); // Refresh to show new update
+          } else {
+            const errorText = await response.text();
+            alert('Error creating update: ' + errorText);
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Error creating update: ' + error.message);
         });
       }
 

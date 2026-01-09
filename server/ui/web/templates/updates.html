@@ -45,7 +45,7 @@
           <label for="factory">Factory name:</label>
           <input type="text" id="factory" name="factoryName" required/>
 
-          <label for="apiKey">API key (must have ci:read and targets:read-update):</label>
+          <label for="apiKey">API key (must have ci:read and targets:read-update): <span id="apiKeyStatus"></span></label>
           <input type="password" id="apiKey" name="apiKey" required/>
 
           <label for="targetName">Target name:</label>
@@ -63,13 +63,14 @@
           <label for="expiresInDays">Expires in days: <span id="expiresInDaysValue">90</span><span id="expiresInDaysMax"></span></span></label>
           <input type="range" id="expiresInDays" name="expiresInDays" min="1" max="365" value="90" oninput="updateExpiresLabel(this.value)"/>
 
-          <button type="button" onclick="createUpdate()">Create update</button>
+          <button type="button" id="createUpdateButton" onclick="createUpdate()" disabled>Create update</button>
         </form>
       </details>
     </section>
     {{ end }}
 
     <script>
+      var keyValid = false;
       function updateExpiresLabel(value) {
         document.getElementById('expiresInDaysValue').textContent = value;
       }
@@ -90,16 +91,17 @@
           return response.json();
         })
         .then(data => {
+          keyValid = true;
+          document.getElementById('apiKeyStatus').textContent = '✅';
+          document.getElementById('createUpdateButton').disabled = false;
           const daysUntilExpiry = parseInt(data);
 
           if (daysUntilExpiry > 0) {
             const expiresSlider = document.getElementById('expiresInDays');
             expiresSlider.max = daysUntilExpiry;
 
-            if (parseInt(expiresSlider.value) > daysUntilExpiry) {
-              expiresSlider.value = daysUntilExpiry;
-              updateExpiresLabel(daysUntilExpiry);
-            }
+            expiresSlider.value = daysUntilExpiry;
+            updateExpiresLabel(daysUntilExpiry);
             document.getElementById('expiresInDaysMax').textContent = ` (max: ${daysUntilExpiry} days)`;
             console.log(`Factory expires in ${daysUntilExpiry} days, slider max updated`);
           }
@@ -119,6 +121,11 @@
         const tag = document.getElementById('tag').value.trim();
         const prod = document.getElementById('prod').value == 'prod';
         const expiresInDays = document.getElementById('expiresInDays').value;
+
+        if (!keyValid) {
+          alert('Please enter a valid API key to proceed.');
+          return;
+        }
 
         // Validate required fields
         if (!factory || !apiKey || !targetName || !tag) {

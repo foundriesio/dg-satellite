@@ -11,7 +11,7 @@
         <div id="labelsContainer">
           {{ range $key, $value := .Device.Labels }}
           <fieldset class="grid">
-            <input value="{{$key}}"/>
+            <input list="label-keys" value="{{$key}}"/>
             <input value="{{$value}}"/>
             <i class="trash" title="Remove label"></i>
           </fieldset>
@@ -19,6 +19,12 @@
         </div>
 
         <button type="button" onclick="addNewLabel()">Add new label</button>
+
+	<datalist id="label-keys">
+		{{ range $_, $key := .KnownLabels }}
+		<option value="{{$key}}"/>
+		{{ end }}
+	</datalist>
       </form>
     </section>
     
@@ -33,7 +39,7 @@
         const newFieldset = document.createElement('fieldset');
         newFieldset.className = 'grid';
         newFieldset.innerHTML = `
-          <input placeholder="Enter key"/>
+          <input list="label-keys" placeholder="Type to select or enter key"/>
           <input placeholder="Enter value"/>
           <i class="trash" title="Remove label" onclick="removeLabel(this)"></i>
         `;

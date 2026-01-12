@@ -31,6 +31,31 @@
       </ul>
     </section>
 
+    <section class="content-section">
+      <h2>TUF Metadata</h3>
+      <fieldset>
+        <legend><strong>Root expiration</strong></legend>
+        <p>{{index .Tuf "root.json" "signed" "expires"}}</p>
+      </fieldset>
+      <fieldset>
+        <legend><strong>Snapshot expiration</strong></legend>
+        <p>{{index .Tuf "snapshot.json" "signed" "expires"}}</p>
+      </fieldset>
+      <fieldset>
+        <legend><strong>Timestamp expiration</strong></legend>
+        <p>{{index .Tuf "timestamp.json" "signed" "expires"}}</p>
+      </fieldset>
+      <fieldset>
+        <legend><strong>Targets expiration</strong></legend>
+        <p>{{index .Tuf "targets.json" "signed" "expires"}}</p>
+      </fieldset>
+      <details>
+        <summary role="button">Raw data</summary>
+        <pre>{{ .TufJson }}</pre>
+      </details>
+    </section>
+
+
     {{ if gt (len .Status.Logs) 0 }}
     <section class="content-section">
       <details {{if .Status.InProgress }}open{{ end }}>

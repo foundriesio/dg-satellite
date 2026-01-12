@@ -6,6 +6,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"log/slog"
@@ -335,6 +336,44 @@ func (s Storage) UpdateCreationInProgress(tag, updateName string, isProd bool) (
 		return status, false
 	}
 	return "", false
+}
+
+func (s Storage) GetUpdateTufMetadata(tag, updateName string, isProd bool) (map[string]map[string]any, error) {
+	handle := s.fs.Updates.Ci
+	if isProd {
+		handle = s.fs.Updates.Prod
+	}
+
+	meta := make(map[string]map[string]any)
+	for _, x := range []string{"targets.json", "snapshot.json", "timestamp.json"} {
+		metaStr, err := handle.Tuf.ReadFile(tag, updateName, x)
+		if err != nil {
+			return nil, err
+		}
+		var metaDict map[string]any
+		if err := json.Unmarshal([]byte(metaStr), &metaDict); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal %s: %w", x, err)
+		}
+		meta[x] = metaDict
+	}
+	i := 3
+	for {
+		root := fmt.Sprintf("%d.root.json", i)
+		metaStr, err := handle.Tuf.ReadFile(tag, updateName, root)
+		if err != nil && errors.Is(err, os.ErrNotExist) {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		var metaDict map[string]any
+		if err := json.Unmarshal([]byte(metaStr), &metaDict); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal %s: %w", root, err)
+		}
+		meta["root.json"] = metaDict
+		i += 1
+	}
+
+	return meta, nil
 }
 
 func (s Storage) ListRollouts(tag, updateName string, isProd bool) ([]string, error) {

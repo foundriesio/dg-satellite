@@ -40,6 +40,7 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, a auth.Provider) {
 	// TODO: What data would we want to show for an update?
 	// upd.GET("/:tag/:update", h.updateGet, requireScope(users.ScopeUpdatesR))
 	upd.GET("/:tag/:update/creationStatus", h.updateGetCreateStatus, requireScope(users.ScopeUpdatesR))
+	upd.GET("/:tag/:update/tuf", h.updateGetTuf, requireScope(users.ScopeUpdatesR))
 	upd.GET("/:tag/:update/rollouts", h.rolloutList, requireScope(users.ScopeUpdatesR))
 	upd.GET("/:tag/:update/rollouts/:rollout", h.rolloutGet, requireScope(users.ScopeUpdatesR))
 	upd.PUT("/:tag/:update/rollouts/:rollout", h.rolloutPut, requireScope(users.ScopeUpdatesRU))

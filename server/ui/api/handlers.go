@@ -35,14 +35,14 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, a auth.Provider) {
 	// In updates APIs :prod path element can be either "prod" or "ci".
 	upd := g.Group("/updates/:prod")
 	upd.Use(validateUpdateParams)
-	upd.GET("", h.updateList, requireScope(users.ScopeDevicesR))
-	upd.GET("/:tag", h.updateList, requireScope(users.ScopeDevicesR))
+	upd.GET("", h.updateList, requireScope(users.ScopeUpdatesR))
+	upd.GET("/:tag", h.updateList, requireScope(users.ScopeUpdatesR))
 	// TODO: What data would we want to show for an update?
-	// upd.GET("/:tag/:update", h.updateGet, requireScope(users.ScopeDevicesR))
+	// upd.GET("/:tag/:update", h.updateGet, requireScope(users.ScopeUpdatesR))
 	upd.GET("/:tag/:update/creationStatus", h.updateGetCreateStatus, requireScope(users.ScopeUpdatesR))
-	upd.GET("/:tag/:update/rollouts", h.rolloutList, requireScope(users.ScopeDevicesR))
-	upd.GET("/:tag/:update/rollouts/:rollout", h.rolloutGet, requireScope(users.ScopeDevicesR))
-	upd.PUT("/:tag/:update/rollouts/:rollout", h.rolloutPut, requireScope(users.ScopeDevicesRU))
-	upd.GET("/:tag/:update/rollouts/:rollout/tail", h.rolloutTail, requireScope(users.ScopeDevicesR))
-	upd.GET("/:tag/:update/tail", h.updateTail, requireScope(users.ScopeDevicesR))
+	upd.GET("/:tag/:update/rollouts", h.rolloutList, requireScope(users.ScopeUpdatesR))
+	upd.GET("/:tag/:update/rollouts/:rollout", h.rolloutGet, requireScope(users.ScopeUpdatesR))
+	upd.PUT("/:tag/:update/rollouts/:rollout", h.rolloutPut, requireScope(users.ScopeUpdatesRU))
+	upd.GET("/:tag/:update/rollouts/:rollout/tail", h.rolloutTail, requireScope(users.ScopeUpdatesR))
+	upd.GET("/:tag/:update/tail", h.updateTail, requireScope(users.ScopeUpdatesR))
 }

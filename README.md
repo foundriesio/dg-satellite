@@ -14,6 +14,10 @@ Follow the [Quick Start](./docs/quick-start.md) guide to get a server running in
 ## API access
 Follow the [API](./docs/api.md) to learn how to access and use the REST API.
 
+## Configuring authentication options
+Follow the [configuring authentication](./docs/auth.md) guide for chosing the
+method that meets your requirements.
+
 ## Developing
 The project is a single Golang binary that can be built with:
 ```

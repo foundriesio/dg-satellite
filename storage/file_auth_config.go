@@ -6,9 +6,7 @@ package storage
 import (
 	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 )
 
@@ -45,15 +43,11 @@ func (h AuthFsHandle) GetHmacSecret() ([]byte, error) {
 }
 
 // GetAuthConfig returns the settings for how authorization is configured.
-// If no configuration is in place, AuthConfig.Type == ""
 func (h AuthFsHandle) GetAuthConfig() (*AuthConfig, error) {
 	var cfg AuthConfig
 	handle := baseFsHandle{root: h.root}
 	contents, err := handle.readFile(AuthConfigFile, false)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return &cfg, nil
-		}
 		return nil, err
 	}
 

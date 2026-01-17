@@ -1,0 +1,21 @@
+{
+  "Type": "google",
+  "SessionTimeoutHours": 48,
+  "NewUserDefaultScopes": [
+    "devices:delete",
+    "devices:read",
+    "devices:read-update",
+    "updates:read",
+    "updates:read-update",
+    "users:create",
+    "users:delete",
+    "users:read",
+    "users:read-update"
+  ],
+  "Config": {
+    "ClientID": "Your-Oauth2-ID",
+    "ClientSecret": "Your-Oauth2-Secret",
+    "AllowedDomains": "Your-Oauth2-Domains",
+    "BaseUrl": "Your-Satellite-Site-URL"
+  }
+}

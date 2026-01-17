@@ -5,15 +5,25 @@ package main
 
 import (
 	"github.com/foundriesio/dg-satellite/storage"
+	"github.com/foundriesio/dg-satellite/storage/users"
 )
 
 type AuthInitCmd struct {
+	Test bool `help:"Initialize auth with test config: full access for everyone"`
 }
 
 func (c AuthInitCmd) Run(args CommonArgs) error {
-	fs, err := storage.NewFs(args.DataDir)
-	if err != nil {
+	if fs, err := storage.NewFs(args.DataDir); err != nil {
 		return err
+	} else if err = fs.Auth.InitHmacSecret(); err != nil {
+		return err
+	} else if c.Test {
+		cfg := storage.AuthConfig{
+			Type:                 "noauth",
+			NewUserDefaultScopes: users.ScopesAvailable(),
+		}
+		return fs.Auth.SaveAuthConfig(cfg)
+	} else {
+		return nil
 	}
-	return fs.Auth.InitHmacSecret()
 }

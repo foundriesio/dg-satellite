@@ -10,6 +10,7 @@ import (
 
 	"github.com/foundriesio/dg-satellite/cli/api"
 	"github.com/foundriesio/dg-satellite/cli/config"
+	"github.com/foundriesio/dg-satellite/cli/subcommands/devices"
 	"github.com/spf13/cobra"
 )
 
@@ -47,6 +48,7 @@ Configuration is stored in $HOME/.config/satcli.yaml`,
 
 func init() {
 	rootCmd.PersistentFlags().StringP("context", "c", "", "Specify the context to use from the configuration file")
+	rootCmd.AddCommand(devices.DevicesCmd)
 }
 
 func main() {

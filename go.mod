@@ -4,6 +4,7 @@ go 1.24.4
 
 require (
 	github.com/alexflint/go-arg v1.6.0
+	github.com/cheynewallace/tabby v1.1.1
 	github.com/go-pkgz/expirable-cache/v3 v3.1.0
 	github.com/labstack/echo/v4 v4.14.0
 	github.com/labstack/gommon v0.4.2

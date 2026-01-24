@@ -4,11 +4,14 @@
 package api
 
 import (
+	"fmt"
+
 	models "github.com/foundriesio/dg-satellite/storage/api"
 )
 
 type DeviceListItem = models.DeviceListItem
 type Device = models.Device
+type DeviceUpdateEvent = models.DeviceUpdateEvent
 
 type DeviceApi struct {
 	api *Api
@@ -31,4 +34,14 @@ func (d *DeviceApi) Get(uuid string) (*Device, error) {
 		return nil, err
 	}
 	return &device, nil
+}
+
+func (d *DeviceApi) Updates(uuid string) ([]string, error) {
+	var updates []string
+	return updates, d.api.Get(fmt.Sprintf("/v1/devices/%s/updates", uuid), &updates)
+}
+
+func (d *DeviceApi) UpdateEvents(uuid, updateId string) ([]DeviceUpdateEvent, error) {
+	var events []DeviceUpdateEvent
+	return events, d.api.Get(fmt.Sprintf("/v1/devices/%s/updates/%s", uuid, updateId), &events)
 }

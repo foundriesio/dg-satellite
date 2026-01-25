@@ -62,3 +62,24 @@ func (a Api) Put(resource string, body any) ([]byte, error) {
 
 	return io.ReadAll(resp.Body)
 }
+
+func (a Api) GetStream(resource string) (*http.Response, error) {
+	url := a.URL + resource
+	resp, err := a.Client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != 200 {
+		defer resp.Body.Close()
+		buf, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("API request failed with status %d and unreadable body", resp.StatusCode)
+		}
+		rid := resp.Header.Get("X-Request-ID")
+		return nil, fmt.Errorf("API request (id=%s) failed with status %d: %s", rid, resp.StatusCode, string(buf))
+	}
+
+	// Return the response without closing the body - caller must close it
+	return resp, nil
+}

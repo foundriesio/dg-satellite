@@ -69,6 +69,33 @@ func (c *Config) GetContext(name string) (*Context, error) {
 	return &ctx, nil
 }
 
+// SaveConfig saves the CLI configuration to the default location
+func SaveConfig(cfg *Config) error {
+	configPath, err := getConfigPath()
+	if err != nil {
+		return fmt.Errorf("failed to get config path: %w", err)
+	}
+
+	// Ensure the directory exists
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Marshal the config to YAML
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	// Write the config file
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
 func getConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

@@ -38,3 +38,9 @@ func (u UpdatesApi) GetRollout(tag, updateName, rollout string) (Rollout, error)
 	endpoint := "/v1/updates/" + u.Type + "/" + tag + "/" + updateName + "/rollouts/" + rollout
 	return r, u.api.Get(endpoint, &r)
 }
+
+func (u UpdatesApi) CreateRollout(tag, updateName, rollout string, data Rollout) error {
+	endpoint := "/v1/updates/" + u.Type + "/" + tag + "/" + updateName + "/rollouts/" + rollout
+	_, err := u.api.Put(endpoint, data)
+	return err
+}

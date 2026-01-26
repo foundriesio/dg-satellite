@@ -46,7 +46,7 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 	daemons := daemons.New(ctx, strg, users)
 
 	srv := server.NewServer(ctx, e, serverName, port, nil)
-	apiHandlers.RegisterHandlers(e, strg, provider)
+	apiHandlers.RegisterHandlers(e, strg, users, provider)
 	webHandlers.RegisterHandlers(e, users, provider)
 	return &apiServer{server: srv, daemons: daemons}, nil
 }

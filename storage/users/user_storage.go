@@ -46,6 +46,14 @@ func (u User) GetAuditLog() (string, error) {
 	return u.h.fs.Audit.ReadEvents(u.id)
 }
 
+func (u User) ApproveAuthorization(deviceCode string, tokenDescription string) error {
+	return u.h.stmtOAuth2DeviceAuthAuthorize.run(u.id, deviceCode, tokenDescription)
+}
+
+func (u User) DenyDeviceAuth(deviceCode string) error {
+	return u.h.stmtOAuth2DeviceAuthDeny.run(deviceCode)
+}
+
 type Storage struct {
 	db *storage.DbHandle
 	fs *storage.FsHandle
@@ -69,6 +77,14 @@ type Storage struct {
 	stmtTokenDeleteExpired stmtTokenDeleteExpired
 	stmtTokenList          stmtTokenList
 	stmtTokenLookup        stmtTokenLookup
+
+	// Outh2 device-flow authorization
+	stmtOAuth2DeviceAuthCreate          stmtOAuth2DeviceAuthCreate
+	stmtOAuth2DeviceAuthGetByDeviceCode stmtOAuth2DeviceAuthGetByDeviceCode
+	stmtOAuth2DeviceAuthGetByUserCode   stmtOAuth2DeviceAuthGetByUserCode
+	stmtOAuth2DeviceAuthAuthorize       stmtOAuth2DeviceAuthAuthorize
+	stmtOAuth2DeviceAuthDeny            stmtOAuth2DeviceAuthDeny
+	stmtOAuth2DeviceAuthDeleteExpired   stmtOAuth2DeviceAuthDeleteExpired
 }
 
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
@@ -98,6 +114,12 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 		&handle.stmtTokenDeleteExpired,
 		&handle.stmtTokenList,
 		&handle.stmtTokenLookup,
+		&handle.stmtOAuth2DeviceAuthCreate,
+		&handle.stmtOAuth2DeviceAuthGetByDeviceCode,
+		&handle.stmtOAuth2DeviceAuthGetByUserCode,
+		&handle.stmtOAuth2DeviceAuthAuthorize,
+		&handle.stmtOAuth2DeviceAuthDeny,
+		&handle.stmtOAuth2DeviceAuthDeleteExpired,
 	); err != nil {
 		return nil, err
 	}
@@ -115,6 +137,11 @@ func (s Storage) RunGc() {
 	slog.Info("Running user session GC")
 	if err := s.stmtSessionDeleteExpired.run(now); err != nil {
 		slog.Error("Unable to run user session GC", "error", err)
+	}
+
+	slog.Info("Running OAuth2 device-flow GC")
+	if err := s.stmtOAuth2DeviceAuthDeleteExpired.run(now); err != nil {
+		slog.Error("Unable to run OAuth2 device-flow GC", "error", err)
 	}
 }
 

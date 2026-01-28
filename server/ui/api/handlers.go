@@ -5,6 +5,8 @@ package api
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"golang.org/x/time/rate"
 
 	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/server"
@@ -27,8 +29,10 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, userStorage *users
 
 	// OAuth2 endpoints (no authentication required)
 	oauth2 := oauth2Handlers{users: userStorage}
-	e.POST("/oauth2/device/code", oauth2.oauth2DeviceCode)
-	e.POST("/oauth2/device/token", oauth2.oauth2DeviceToken)
+	oauth2Group := e.Group("/oauth2")
+	oauth2Group.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(rate.Limit(2))))
+	oauth2Group.POST("/device/code", oauth2.oauth2DeviceCode)
+	oauth2Group.POST("/device/token", oauth2.oauth2DeviceToken)
 
 	g := e.Group("/v1")
 	g.Use(authUser(a))

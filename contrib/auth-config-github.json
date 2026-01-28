@@ -1,5 +1,5 @@
 {
-  "Type": "google",
+  "Type": "github",
   "SessionTimeoutHours": 48,
   "NewUserDefaultScopes": [
     "devices:delete",
@@ -15,7 +15,7 @@
   "Config": {
     "ClientID": "Your-Oauth2-ID",
     "ClientSecret": "Your-Oauth2-Secret",
-    "AllowedDomains": ["Your-Oauth2-Domains"],
+    "AllowedOrgs": ["Your", "GitHub", "Orgs"],
     "BaseUrl": "Your-Satellite-Site-URL"
   }
 }

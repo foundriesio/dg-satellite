@@ -36,6 +36,12 @@ type DeviceStatus struct {
 func (e DeviceUpdateEvent) ParseStatus() *DeviceStatus {
 	var status string
 	switch e.EventType.Id {
+	case "MetadataUpdateCompleted":
+		if e.Event.Success != nil && !*e.Event.Success {
+			status = "Metadata update failed"
+		} else {
+			status = "Metadata update completed"
+		}
 	case "EcuDownloadStarted":
 		status = "Download started"
 	case "EcuDownloadCompleted":

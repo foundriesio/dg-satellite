@@ -19,8 +19,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type authConfigLocal struct {
+	MinPasswordLength int
+}
+
 type localProvider struct {
 	commonProvider
+	authConfig     *authConfigLocal
 	newUserScopes  users.Scopes
 	sessionTimeout time.Duration
 }
@@ -34,6 +39,9 @@ func (p localProvider) Name() string {
 }
 
 func (p *localProvider) Configure(e *echo.Echo, userStorage *users.Storage, cfg *storage.AuthConfig) error {
+	if err := json.Unmarshal(cfg.Config, &p.authConfig); err != nil {
+		return fmt.Errorf("unable to unmarshal local config: %w", err)
+	}
 	var err error
 	p.users = userStorage
 	p.renderer = p
@@ -138,6 +146,10 @@ func (p localProvider) setPassword(u *users.User, password string) (int, error) 
 	var localData localProviderUserData
 	if err := json.Unmarshal(u.AuthProviderData, &localData); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("unable to unmarshal auth provider data: %w", err)
+	}
+
+	if p.authConfig.MinPasswordLength > 0 && len(password) < p.authConfig.MinPasswordLength {
+		return http.StatusBadRequest, fmt.Errorf("new password must be at least %d characters", p.authConfig.MinPasswordLength)
 	}
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

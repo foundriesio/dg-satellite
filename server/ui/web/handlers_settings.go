@@ -21,10 +21,12 @@ func (h handlers) settings(c echo.Context) error {
 		baseCtx
 		Tokens     []users.Token
 		ScopesList []string
+		LocalAuth  bool
 	}{
 		baseCtx:    h.baseCtx(c, "Settings", "settings"),
 		Tokens:     tokens,
 		ScopesList: session.User.AllowedScopes.ToSlice(),
+		LocalAuth:  h.provider.Name() == "local",
 	}
 	return c.Render(http.StatusOK, "settings.html", ctx)
 }

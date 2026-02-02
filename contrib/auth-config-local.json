@@ -1,0 +1,15 @@
+{
+  "Type": "local",
+  "SessionTimeoutHours": 48,
+  "NewUserDefaultScopes": [
+    "devices:delete",
+    "devices:read",
+    "devices:read-update",
+    "updates:read",
+    "updates:read-update",
+    "users:create",
+    "users:delete",
+    "users:read",
+    "users:read-update"
+  ]
+}

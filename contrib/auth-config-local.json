@@ -1,6 +1,9 @@
 {
   "Type": "local",
   "SessionTimeoutHours": 48,
+  "Config": {
+    "MinPasswordLength": 0
+  },
   "NewUserDefaultScopes": [
     "devices:delete",
     "devices:read",

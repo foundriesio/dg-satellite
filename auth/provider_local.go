@@ -4,6 +4,8 @@
 package auth
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -24,6 +26,10 @@ type localProvider struct {
 	sessionTimeout time.Duration
 }
 
+type localProviderUserData struct {
+	PasswordTimestamp int64
+}
+
 func (p localProvider) Name() string {
 	return "local"
 }
@@ -39,6 +45,7 @@ func (p *localProvider) Configure(e *echo.Echo, userStorage *users.Storage, cfg 
 	}
 
 	e.POST("/auth/login", p.handleLogin)
+	e.POST("/users/:username/password", p.handlePasswordChange)
 	return nil
 }
 
@@ -94,6 +101,66 @@ func (p localProvider) renderLoginPage(c echo.Context, reason string) error {
 		Reason: reason,
 	}
 	return templates.Templates.ExecuteTemplate(c.Response(), localLoginTemplate, context)
+}
+
+func (p *localProvider) handlePasswordChange(c echo.Context) error {
+	session, err := p.GetSession(c)
+	if err != nil {
+		return server.EchoError(c, err, http.StatusInternalServerError, err.Error())
+	} else if session == nil {
+		err := errors.New("authentication required")
+		return server.EchoError(c, err, http.StatusUnauthorized, "authentication required")
+	}
+	u := session.User
+
+	if u.Username != c.Param("username") {
+		err := errors.New("users can only change their own password")
+		return server.EchoError(c, err, http.StatusForbidden, err.Error())
+	}
+
+	curPassword := c.FormValue("currentPassword")
+	newPassword := c.FormValue("newPassword")
+	if curPassword == "" || newPassword == "" {
+		return server.EchoError(c, errors.New("missing form values"), http.StatusBadRequest, "Missing form values")
+	}
+	if curPassword == newPassword {
+		return server.EchoError(c, errors.New("new password must be different"), http.StatusBadRequest, "New password must be different from current password")
+	}
+
+	if ok, err := PasswordVerify(curPassword, u.Password); err != nil {
+		return server.EchoError(c, err, http.StatusInternalServerError, "Internal error verifying password")
+	} else if !ok {
+		return server.EchoError(c, errors.New("current password is incorrect"), http.StatusBadRequest, "Current password is incorrect")
+	}
+
+	if rc, err := p.setPassword(u, newPassword); err != nil {
+		return server.EchoError(c, err, rc, err.Error())
+	}
+	return c.String(http.StatusOK, "")
+}
+
+func (p localProvider) setPassword(u *users.User, password string) (int, error) {
+	var localData localProviderUserData
+	if err := json.Unmarshal(u.AuthProviderData, &localData); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("unable to unmarshal auth provider data: %w", err)
+	}
+
+	hashed, err := PasswordHash(password)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("unable to hash password: %w", err)
+	}
+	u.Password = hashed
+
+	localData.PasswordTimestamp = time.Now().Unix()
+	u.AuthProviderData, err = json.Marshal(localData)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("unable to marshal auth provider data: %w", err)
+	}
+
+	if err := u.Update("Password changed"); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("unable to update user: %w", err)
+	}
+	return 0, nil
 }
 
 func init() {

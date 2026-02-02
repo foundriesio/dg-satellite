@@ -138,6 +138,8 @@ func (p oauth2BaseProvider) renderLoginPage(c echo.Context, reason string) error
 		LoginTip string
 		Name     string
 		Reason   string
+		User     *users.User
+		NavItems []string
 	}{
 		Title:    "Login",
 		LoginTip: p.loginTip,

@@ -20,6 +20,7 @@
         <div style="display: flex; align-items: center; gap: 1rem;">
         <a href="#" style="color: white; text-decoration: none;">Docs</a>
 
+        {{ if .User }}
         <details class="dropdown">
           <summary><i class="user"></i>{{.User.Username}}</summary>
           <ul>
@@ -27,9 +28,12 @@
             <li><a href="/auth/logout">Logout</a></li>
           </ul>
         </details>
+        {{ end }}
+        </div>
       </div>
     </nav>
 
+    {{ if .NavItems }}
     <nav id="subnav">
       <div class="container">
         {{ range .NavItems }}
@@ -37,6 +41,7 @@
         {{ end }}
       </div>
     </nav>
+    {{ end }}
 
     <main class="container">
     

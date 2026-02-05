@@ -4,6 +4,7 @@
 package users
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
@@ -62,9 +63,21 @@ func TestNewStorage(t *testing.T) {
 	require.Len(t, ul, 1)
 	require.Equal(t, u.Username, ul[0].Username)
 
+	type authData struct {
+		ID string
+	}
 	u.Username = "seconduser"
+	u.AuthProviderData, err = json.Marshal(authData{ID: "auth-123"})
+	require.Nil(t, err)
 	err = users.Create(&u)
 	require.Nil(t, err)
+
+	u2, err = users.Get("seconduser")
+	require.Nil(t, err)
+	require.NotNil(t, u2)
+	data := authData{}
+	require.Nil(t, json.Unmarshal(u2.AuthProviderData, &data))
+	require.Equal(t, "auth-123", data.ID)
 
 	ul, err = users.List()
 	require.Nil(t, err)

@@ -106,7 +106,9 @@ func createTables(db *sql.DB) error {
 			email          TEXT,
 			created_at     INT DEFAULT 0,
 			deleted        BOOL DEFAULT 0,
-			allowed_scopes TEXT DEFAULT ""
+			allowed_scopes TEXT DEFAULT "",
+
+			auth_provider_data JSONB NOT NULL DEFAULT '{}'
 		);
 
 		CREATE TABLE tokens (

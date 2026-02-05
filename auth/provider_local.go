@@ -22,6 +22,7 @@ const localLoginTemplate = "local-login.html"
 
 type authConfigLocal struct {
 	MinPasswordLength int
+	PasswordHistory   int
 }
 
 type localProvider struct {
@@ -33,6 +34,7 @@ type localProvider struct {
 
 type localProviderUserData struct {
 	PasswordTimestamp int64
+	PasswordHistory   []string
 }
 
 func (p localProvider) Name() string {
@@ -161,6 +163,24 @@ func (p localProvider) setPassword(u *users.User, password string) (int, error) 
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("unable to hash password: %w", err)
 	}
+
+	if p.authConfig.PasswordHistory > 0 {
+		for _, oldHash := range localData.PasswordHistory {
+			if ok, err := PasswordVerify(password, oldHash); err != nil {
+				return http.StatusInternalServerError, fmt.Errorf("unable to verify password history: %w", err)
+			} else if ok {
+				return http.StatusBadRequest, fmt.Errorf("new password cannot be the same as any of the last %d passwords", p.authConfig.PasswordHistory)
+			}
+		}
+
+		localData.PasswordHistory = append(localData.PasswordHistory, u.Password)
+		// Keep only the most recent N-1 passwords in history, since the current password should count as well.
+		toRemove := len(localData.PasswordHistory) - (p.authConfig.PasswordHistory - 1)
+		if toRemove > 0 {
+			localData.PasswordHistory = localData.PasswordHistory[toRemove:]
+		}
+	}
+
 	u.Password = hashed
 
 	localData.PasswordTimestamp = time.Now().Unix()

@@ -73,6 +73,32 @@ func (c *Config) GetContext(name string) (*Context, error) {
 	return &ctx, nil
 }
 
+func SaveConfig(configPath string, cfg *Config) error {
+	if configPath == "" {
+		var err error
+		configPath, err = getConfigPath()
+		if err != nil {
+			return fmt.Errorf("failed to get config path: %w", err)
+		}
+	}
+
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
 func getConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

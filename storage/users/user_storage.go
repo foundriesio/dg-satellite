@@ -24,6 +24,8 @@ type User struct {
 	Deleted   bool
 
 	AllowedScopes Scopes
+
+	AuthProviderData []byte
 }
 
 func (u User) Delete() error {
@@ -168,8 +170,8 @@ type stmtUserCreate storage.DbStmt
 
 func (s *stmtUserCreate) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("userCreate", `
-		INSERT INTO users (username, password, email, created_at, deleted, allowed_scopes)
-		VALUES (?, ?, ?, ?, ?, ?)`,
+		INSERT INTO users (username, password, email, created_at, deleted, allowed_scopes, auth_provider_data)
+		VALUES (?, ?, ?, ?, ?, ?, jsonb(?))`,
 	)
 	return
 }
@@ -178,6 +180,9 @@ func (s *stmtUserCreate) run(u *User) error {
 	if u.CreatedAt == 0 {
 		u.CreatedAt = time.Now().Unix()
 	}
+	if u.AuthProviderData == nil {
+		u.AuthProviderData = []byte("{}")
+	}
 	result, err := s.Stmt.Exec(
 		u.Username,
 		u.Password,
@@ -185,6 +190,7 @@ func (s *stmtUserCreate) run(u *User) error {
 		u.CreatedAt,
 		u.Deleted,
 		u.AllowedScopes.String(),
+		u.AuthProviderData,
 	)
 	if err != nil {
 		return err
@@ -200,7 +206,7 @@ type stmtUserGetById storage.DbStmt
 
 func (s *stmtUserGetById) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("userGetId", `
-		SELECT id, username, password, email, created_at, allowed_scopes
+		SELECT id, username, password, email, created_at, allowed_scopes, json_extract(auth_provider_data, '$')
 		FROM users
 		WHERE id = ? and deleted = false`,
 	)
@@ -217,6 +223,7 @@ func (s *stmtUserGetById) run(id int64) (*User, error) {
 		&u.Email,
 		&u.CreatedAt,
 		&scopeStr,
+		&u.AuthProviderData,
 	)
 	if err == nil {
 		u.AllowedScopes, err = ScopesFromString(scopeStr)
@@ -231,7 +238,7 @@ type stmtUserGetByName storage.DbStmt
 
 func (s *stmtUserGetByName) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("userGet", `
-		SELECT id, username, password, email, created_at, allowed_scopes
+		SELECT id, username, password, email, created_at, allowed_scopes, json_extract(auth_provider_data, '$')
 		FROM users
 		WHERE username = ? AND deleted = false`,
 	)
@@ -248,6 +255,7 @@ func (s *stmtUserGetByName) run(username string) (*User, error) {
 		&u.Email,
 		&u.CreatedAt,
 		&scopesStr,
+		&u.AuthProviderData,
 	)
 	if err == nil {
 		u.AllowedScopes, err = ScopesFromString(scopesStr)
@@ -310,13 +318,16 @@ type stmtUserUpdate storage.DbStmt
 func (s *stmtUserUpdate) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("userUpdate", `
 		UPDATE users
-		SET username = ?, password = ?, email = ?, allowed_scopes = ?, deleted = ?
+		SET username = ?, password = ?, email = ?, allowed_scopes = ?, deleted = ?, auth_provider_data = jsonb(?)
 		WHERE id = ?`,
 	)
 	return
 }
 
 func (s *stmtUserUpdate) run(u User) error {
-	_, err := s.Stmt.Exec(u.Username, u.Password, u.Email, u.AllowedScopes.String(), u.Deleted, u.id)
+	if u.AuthProviderData == nil {
+		u.AuthProviderData = []byte("{}")
+	}
+	_, err := s.Stmt.Exec(u.Username, u.Password, u.Email, u.AllowedScopes.String(), u.Deleted, u.AuthProviderData, u.id)
 	return err
 }

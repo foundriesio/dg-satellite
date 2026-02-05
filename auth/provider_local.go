@@ -21,6 +21,7 @@ import (
 
 type authConfigLocal struct {
 	MinPasswordLength int
+	PasswordHistory   int
 }
 
 type localProvider struct {
@@ -32,6 +33,7 @@ type localProvider struct {
 
 type localProviderUserData struct {
 	PasswordTimestamp int64
+	PasswordHistory   []string
 }
 
 func (p localProvider) Name() string {
@@ -147,6 +149,21 @@ func (p localProvider) setPassword(u *users.User, password string) (int, error) 
 
 	if p.authConfig.MinPasswordLength > 0 && len(password) < p.authConfig.MinPasswordLength {
 		return http.StatusBadRequest, fmt.Errorf("new password must be at least %d characters", p.authConfig.MinPasswordLength)
+	}
+
+	for _, oldHash := range localData.PasswordHistory {
+		if err := bcrypt.CompareHashAndPassword([]byte(oldHash), []byte(password)); err == nil {
+			return http.StatusBadRequest, fmt.Errorf("new password was used recently. Your last %d passwords cannot be reused", p.authConfig.PasswordHistory)
+		}
+	}
+
+	if p.authConfig.PasswordHistory > 0 {
+		localData.PasswordHistory = append(localData.PasswordHistory, u.Password)
+		// Keep only the most recent N-1 passwords in history, since the current password should count as well.
+		toRemove := len(localData.PasswordHistory) - (p.authConfig.PasswordHistory - 1)
+		if toRemove > 0 {
+			localData.PasswordHistory = localData.PasswordHistory[toRemove:]
+		}
 	}
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

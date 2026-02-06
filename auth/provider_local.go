@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -19,10 +20,12 @@ import (
 )
 
 const localLoginTemplate = "local-login.html"
+const localPasswordChangeTemplate = "local-password-change.html"
 
 type authConfigLocal struct {
 	MinPasswordLength int
 	PasswordHistory   int
+	PasswordAgeDays   int
 }
 
 type localProvider struct {
@@ -111,6 +114,49 @@ func (p localProvider) renderLoginPage(c echo.Context, reason string) error {
 		Reason: reason,
 	}
 	return templates.Templates.ExecuteTemplate(c.Response(), localLoginTemplate, context)
+}
+
+func (p localProvider) GetSession(c echo.Context) (*Session, error) {
+	// A user can login and have a valid session. However, if the password has
+	// expired due to password ageing, we want to force them to change their
+	// password before allowing them to access any other pages.
+	// To accomplish this, we check the password age in GetSession, and if
+	// the password has expired, we force a password-change page. The only
+	// page/handler we allow with an expired password is the password-change handler
+	session, err := p.commonProvider.GetSession(c)
+	if err != nil || session == nil {
+		return session, err
+	}
+
+	passwordPage := "/users/" + session.User.Username + "/password"
+	if p.authConfig.PasswordAgeDays > 0 && c.Request().URL.Path != passwordPage {
+		var localData localProviderUserData
+		if err := json.Unmarshal(session.User.AuthProviderData, &localData); err == nil {
+			passwordAge := time.Now().Unix() - localData.PasswordTimestamp
+			maxAge := int64(p.authConfig.PasswordAgeDays * 24 * 60 * 60)
+			if localData.PasswordTimestamp == 0 || passwordAge > maxAge {
+				return nil, p.handlePasswordPage(c, session)
+			}
+		} else {
+			slog.Warn("unable to unmarshal auth provider data", "user", session.User.Username, "error", err)
+		}
+	}
+
+	return session, nil
+}
+
+func (p *localProvider) handlePasswordPage(c echo.Context, session *Session) error {
+	context := struct {
+		Title    string
+		Message  string
+		User     *users.User
+		NavItems []string
+	}{
+		Title:   "Change Password",
+		Message: "Your password has expired. Please choose a new password.",
+		User:    session.User,
+	}
+	return templates.Templates.ExecuteTemplate(c.Response(), localPasswordChangeTemplate, context)
 }
 
 func (p *localProvider) handlePasswordChange(c echo.Context) error {

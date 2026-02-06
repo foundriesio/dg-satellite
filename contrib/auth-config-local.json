@@ -3,6 +3,7 @@
   "SessionTimeoutHours": 48,
   "Config": {
     "MinPasswordLength": 0,
+    "PasswordAgeDays": 0,
     "PasswordHistory": 0
   },
   "NewUserDefaultScopes": [

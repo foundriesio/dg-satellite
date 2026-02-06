@@ -74,6 +74,8 @@ managed users.
 Copy `contrib/auth-config-local.json` to `<configdir>/auth/auth-config.json`
 and set these optional values:
 
+ * `Config.MaxLoginAttempts` - Set this to lock a user account after failed login attampts. For example, `5` would lockout a user account after 5 failed login attempts. The default is 0, not enforced. This setting is used in conjunction with `Config.LockoutDurationMinutes`.
+ * `Config.LockoutDurationMinutes` - Set this to block a user account after failed login attempts. For example, `30` would prevent a user from loging in for 30 minutes after `Config.MaxLoginAttempts` was violated. The default is 0, not enforced.
  * `Config.MinPasswordLength` - Set this to enforce a minimum password length. For example, `8` would require passwords be at least 8 characters. The default is 0, not enforced.
  * `Config.PasswordAgeDays` - Set this to require users to change their password every `PasswordAgeDays`. For example, `180` would require a user to change their password every 180 days. The default is 0, not enforced.
  * `Config.PasswordHistory` - Set this to prevent users from repeating old passwords. For example, `5` means they must use 5 different passwords before repeating one. The default is 0, not enforced.

@@ -5,6 +5,8 @@
     "MinPasswordLength": 0,
     "PasswordAgeDays": 0,
     "PasswordHistory": 0,
+    "MaxLoginAttempts": 0,
+    "LockoutDurationMinutes": 0,
     "PasswordComplexityRules": {
       "RequireUppercase": false,
       "RequireLowercase": false,

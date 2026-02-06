@@ -33,6 +33,8 @@ type authConfigLocal struct {
 	MinPasswordLength       int
 	PasswordHistory         int
 	PasswordAgeDays         int
+	MaxLoginAttempts        int
+	LockoutDurationMinutes  int
 	PasswordComplexityRules PasswordComplexityRules
 }
 
@@ -44,8 +46,10 @@ type localProvider struct {
 }
 
 type localProviderUserData struct {
-	PasswordTimestamp int64
-	PasswordHistory   []string
+	PasswordTimestamp   int64
+	PasswordHistory     []string
+	FailedLoginAttempts int
+	LockedUntil         int64
 }
 
 func (p localProvider) Name() string {
@@ -81,10 +85,56 @@ func (p *localProvider) handleLogin(c echo.Context) error {
 		return p.renderLoginPage(c, "Invalid username or password")
 	}
 
+	var localData localProviderUserData
+	if err := json.Unmarshal(user.AuthProviderData, &localData); err != nil {
+		slog.Warn("Unable to unmarshal auth provider data", "error", err)
+	}
+
+	// Check if account is locked
+	fmt.Println("A1")
+	if p.authConfig.MaxLoginAttempts > 0 && localData.LockedUntil > 0 {
+		fmt.Println("A2")
+		if time.Now().Unix() < localData.LockedUntil {
+			lockoutRemaining := time.Until(time.Unix(localData.LockedUntil, 0))
+			return p.renderLoginPage(c, fmt.Sprintf("Account locked due to too many failed login attempts. Try again in %v", lockoutRemaining.Round(time.Minute)))
+		}
+		// Lockout period has expired, reset the counter
+		localData.LockedUntil = 0
+		localData.FailedLoginAttempts = 0
+	}
+
 	if ok, err := PasswordVerify(password, user.Password); err != nil {
 		return server.EchoError(c, err, http.StatusInternalServerError, "Internal error verifying password")
 	} else if !ok {
+		if p.authConfig.MaxLoginAttempts > 0 {
+			// Increment failed login attempts
+			localData.FailedLoginAttempts++
+			if localData.FailedLoginAttempts >= p.authConfig.MaxLoginAttempts {
+				// Lock the account
+				lockoutDuration := time.Duration(p.authConfig.LockoutDurationMinutes) * time.Minute
+				localData.LockedUntil = time.Now().Add(lockoutDuration).Unix()
+				user.AuthProviderData, _ = json.Marshal(localData)
+				if updateErr := user.Update(fmt.Sprintf("Account locked due to %d failed login attempts", localData.FailedLoginAttempts)); updateErr != nil {
+					slog.Warn("Failed to update user lockout status", "error", updateErr)
+				}
+				return p.renderLoginPage(c, fmt.Sprintf("Account locked due to too many failed login attempts. Try again in %v", lockoutDuration.Round(time.Minute)))
+			}
+			user.AuthProviderData, _ = json.Marshal(localData)
+			if updateErr := user.Update("Failed login attempt"); updateErr != nil {
+				slog.Warn("Failed to update failed login attempts", "error", updateErr)
+			}
+		}
 		return p.renderLoginPage(c, "Invalid username or password")
+	}
+
+	if p.authConfig.MaxLoginAttempts > 0 && localData.FailedLoginAttempts > 0 {
+		// Successful login - reset failed attempts
+		localData.FailedLoginAttempts = 0
+		localData.LockedUntil = 0
+		user.AuthProviderData, _ = json.Marshal(localData)
+		if updateErr := user.Update("Successful login - reset failed attempts"); updateErr != nil {
+			slog.Warn("Failed to reset failed login attempts", "error", updateErr)
+		}
 	}
 
 	expires := time.Now().Add(p.sessionTimeout)

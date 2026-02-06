@@ -4,7 +4,13 @@
   "Config": {
     "MinPasswordLength": 0,
     "PasswordAgeDays": 0,
-    "PasswordHistory": 0
+    "PasswordHistory": 0,
+    "PasswordComplexityRules": {
+      "RequireUppercase": false,
+      "RequireLowercase": false,
+      "RequireDigit": false,
+      "RequireSpecialChar": ""
+    }
   },
   "NewUserDefaultScopes": [
     "devices:delete",

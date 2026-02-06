@@ -22,10 +22,18 @@ import (
 const localLoginTemplate = "local-login.html"
 const localPasswordChangeTemplate = "local-password-change.html"
 
+type PasswordComplexityRules struct {
+	RequireUppercase   bool
+	RequireLowercase   bool
+	RequireDigit       bool
+	RequireSpecialChar string
+}
+
 type authConfigLocal struct {
-	MinPasswordLength int
-	PasswordHistory   int
-	PasswordAgeDays   int
+	MinPasswordLength       int
+	PasswordHistory         int
+	PasswordAgeDays         int
+	PasswordComplexityRules PasswordComplexityRules
 }
 
 type localProvider struct {
@@ -205,6 +213,10 @@ func (p localProvider) setPassword(u *users.User, password string) (int, error) 
 		return http.StatusBadRequest, fmt.Errorf("new password must be at least %d characters", p.authConfig.MinPasswordLength)
 	}
 
+	if err := p.validatePasswordComplexity(password); err != nil {
+		return http.StatusBadRequest, err
+	}
+
 	hashed, err := PasswordHash(password)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("unable to hash password: %w", err)
@@ -239,6 +251,56 @@ func (p localProvider) setPassword(u *users.User, password string) (int, error) 
 		return http.StatusInternalServerError, fmt.Errorf("unable to update user: %w", err)
 	}
 	return 0, nil
+}
+
+func (p localProvider) validatePasswordComplexity(password string) error {
+	var errors []string
+	hasUpper := false
+	hasLower := false
+	hasDigit := false
+	hasSpecial := false
+
+	for _, c := range password {
+		if !hasUpper && c >= 'A' && c <= 'Z' {
+			hasUpper = true
+		}
+		if !hasLower && c >= 'a' && c <= 'z' {
+			hasLower = true
+		}
+		if !hasDigit && c >= '0' && c <= '9' {
+			hasDigit = true
+		}
+		if !hasSpecial && strings.ContainsRune(p.authConfig.PasswordComplexityRules.RequireSpecialChar, c) {
+			hasSpecial = true
+		}
+
+		// Early exit if all required checks are satisfied
+		if (!p.authConfig.PasswordComplexityRules.RequireUppercase || hasUpper) &&
+			(!p.authConfig.PasswordComplexityRules.RequireLowercase || hasLower) &&
+			(!p.authConfig.PasswordComplexityRules.RequireDigit || hasDigit) &&
+			(len(p.authConfig.PasswordComplexityRules.RequireSpecialChar) == 0 || hasSpecial) {
+			break
+		}
+	}
+
+	if p.authConfig.PasswordComplexityRules.RequireUppercase && !hasUpper {
+		errors = append(errors, "at least one uppercase letter")
+	}
+	if p.authConfig.PasswordComplexityRules.RequireLowercase && !hasLower {
+		errors = append(errors, "at least one lowercase letter")
+	}
+	if p.authConfig.PasswordComplexityRules.RequireDigit && !hasDigit {
+		errors = append(errors, "at least one digit")
+	}
+	if len(p.authConfig.PasswordComplexityRules.RequireSpecialChar) > 0 && !hasSpecial {
+		errors = append(errors, fmt.Sprintf("at least one of the following special characters: %s", p.authConfig.PasswordComplexityRules.RequireSpecialChar))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("password must contain %s", strings.Join(errors, ", "))
+	}
+
+	return nil
 }
 
 func init() {

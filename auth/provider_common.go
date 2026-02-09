@@ -69,7 +69,7 @@ func (p *commonProvider) GetSession(c echo.Context) (*Session, error) {
 	} else if len(cookie.Value) == 0 {
 		return nil, p.renderer.renderLoginPage(c, "")
 	}
-	if cookie.Expires.After(time.Now()) {
+	if cookie.Expires.Before(time.Now()) {
 		return nil, p.renderer.renderLoginPage(c, "Cookie expired")
 	}
 	sessionID := cookie.Value

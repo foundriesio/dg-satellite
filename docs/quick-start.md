@@ -8,7 +8,7 @@ device-facing APIs.
 ## Building
 First build the service with:
 ```
- go build -o dg-sat github.com/foundriesio/dg-satellite/cmd
+ go build -o dg-sat github.com/foundriesio/dg-satellite/cmd/server
 ```
 
 ## Configure Mutual TLS

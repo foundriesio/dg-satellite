@@ -30,7 +30,7 @@ deploying the satellite server for production use.
 ## Developing
 The project is a single Golang binary that can be built with:
 ```
- go build github.com/foundriesio/dg-satellite/cmd/server
+ go build -o dg-sat github.com/foundriesio/dg-satellite/cmd/server
 ```
 
 A "devshell" is also included that can be used for local development:

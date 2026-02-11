@@ -13,16 +13,16 @@ project source code mounted.
 This compose project will launch a satellite server that devices can
 communicate with. In order to use this you must first:
 ```
- $ go run github.com/foundriesio/dg-satellite/cmd create-csr \
+ $ go run github.com/foundriesio/dg-satellite/cmd/server create-csr \
      --datadir .compose-server-data \
      --dnsname <HOSTNAME> --factory <FACTORY>
- $ go run github.com/foundriesio/dg-satellite/cmd \
+ $ go run github.com/foundriesio/dg-satellite/cmd/server \
     --datadir .compose-server-data sign-csr \
     --cakey <PATH TO FACTORY PKI>/factory_ca.key \
     --cacert <PATH TO FACTORY PKI>/factory_ca.pem
  $ fioctl keys ca show --just-device-cas > .compose-server-data/certs/cas.pem
  
- $ go run github.com/foundriesio/dg-satellite/cmd \
+ $ go run github.com/foundriesio/dg-satellite/cmd/server \
     --datadir .compose-server-data auth-init
 ```
 
@@ -36,7 +36,7 @@ have fake-devices connect to it.
 Example:
 ```
  $ ./contrib/gen-certs /tmp/server
- $  go run github.com/foundriesio/dg-satellite/cmd serve --datadir /tmp/server
+ $  go run github.com/foundriesio/dg-satellite/cmd/server serve --datadir /tmp/server
 
  # From another terminal:
  ./contrib/fake-device.py -d /tmp/server/fake-devices/device-1 /device

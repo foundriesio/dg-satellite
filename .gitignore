@@ -2,3 +2,5 @@
 *.swo
 .extra-certs
 .compose-server-data
+dg-sat
+satcli

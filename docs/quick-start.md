@@ -21,7 +21,7 @@ root key:
 ```
 
 ### Sign the request
-Copy `data/certs/tls.csr` to the computer with your factory PKI. This
+Copy `datadir/certs/tls.csr` to the computer with your factory PKI. This
 file does not contain sensitive information, so it's safe to share as
 needed. From the factory PKI directory run:
 ```

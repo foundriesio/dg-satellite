@@ -7,10 +7,11 @@ settings page in the UI and create a token.
 
 The token must be provided using the `Authorization: Bearer <token>` header.
 For example, you could list devices using cURL with:
+
 ```
  $ curl -H "Authorization: Bearer <your token>" http://localhost:8000/devices
 ```
 
-## API documentation
+## API Documentation
 
 TODO: How to see swagger docs

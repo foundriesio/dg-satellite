@@ -1,16 +1,14 @@
-{{ template "header"}}
+{{ template "header" .}}
     <section class="content-section">
-    <h2>{{.Title}}</h2>
-    <p>Please login with your SSO provider. {{if .LoginTip}}{{.LoginTip}}{{end}}</p>
+      <h2>{{.Title}}</h2>
+      <p>Please login with your SSO provider. {{if .LoginTip}}{{.LoginTip}}{{end}}</p>
 
-      <section>
-        <a href="/auth/login">{{.Name}}</a>
-      </section>
+      <a href="/auth/login">{{.Name}}</a>
       {{ if .Reason }}
       <section>
         <i><small>Reason: {{.Reason}}</small></i>
       </section>
       {{ end }}
-    </main>
+    </section>
 
 {{ template "footer"}}

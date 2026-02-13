@@ -21,7 +21,7 @@ root key:
 ```
 
 ### Sign the request
-Copy `data/certs/tls.csr` to the computer with your factory PKI. This
+Copy `data/certs/tls.csr` to the computer with your [factory PKI](https://docs.foundries.io/96/reference-manual/security/device-gateway.html#setting-up-your-pki). This
 file does not contain sensitive information, so it's safe to share as
 needed. From the factory PKI directory run:
 ```

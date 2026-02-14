@@ -21,6 +21,7 @@ const (
 	AuditDir   = "audit"
 	AuthDir    = "auth"
 	CertsDir   = "certs"
+	ConfigsDir = "configs"
 	DbFile     = "db.sqlite"
 	DevicesDir = "devices"
 	UpdatesDir = "updates"
@@ -35,6 +36,12 @@ const (
 
 	AuthConfigFile = "auth-config.json"
 	HmacFile       = "hmac.secret"
+
+	// Per config class files/dirs
+	ConfigsFactoryDir  = "factory"
+	ConfigsGroupDir    = "group"
+	ConfigsDeviceDir   = "device"
+	ConfigsJournalFile = ".journal"
 
 	// Per device files/dirs
 	AktomlFile   = "aktoml"
@@ -98,6 +105,10 @@ func (c FsConfig) DevicesDir() string {
 	return filepath.Join(string(c), DevicesDir)
 }
 
+func (c FsConfig) ConfigsDir() string {
+	return filepath.Join(string(c), ConfigsDir)
+}
+
 func (c FsConfig) UpdatesDir() string {
 	return filepath.Join(string(c), UpdatesDir)
 }
@@ -116,6 +127,7 @@ type FsHandle struct {
 	Audit   AuditLogsFsHandle
 	Auth    AuthFsHandle
 	Certs   CertsFsHandle
+	Configs ConfigsFsHandle
 	Devices DevicesFsHandle
 	Updates struct {
 		Ci   updatesFsHandleWrap
@@ -136,6 +148,7 @@ func NewFs(root string) (*FsHandle, error) {
 	fs.Audit.root = fs.Config.AuditDir()
 	fs.Auth.root = fs.Config.AuthDir()
 	fs.Certs.root = fs.Config.CertsDir()
+	fs.Configs.root = fs.Config.ConfigsDir()
 	fs.Devices.root = fs.Config.DevicesDir()
 
 	for _, h := range []struct {
@@ -161,6 +174,7 @@ func NewFs(root string) (*FsHandle, error) {
 		fs.Audit.baseFsHandle,
 		fs.Auth.baseFsHandle,
 		fs.Certs.baseFsHandle,
+		fs.Configs.baseFsHandle,
 		fs.Devices.baseFsHandle,
 		// All updates categories have the same base dir, so only one of Ci/prod is needed.
 		fs.Updates.Ci.Tuf.baseFsHandle,
@@ -261,11 +275,19 @@ func (s baseFsHandle) appendFile(name, content string, mode os.FileMode) error {
 	return err
 }
 
+func (s baseFsHandle) deleteFile(name string, ignoreNotExist bool) error {
+	err := os.Remove(filepath.Join(s.root, name))
+	if err != nil && ignoreNotExist && errors.Is(err, os.ErrNotExist) {
+		err = nil
+	}
+	return err
+}
+
 func (s baseFsHandle) rolloverFiles(prefix string, max int) error {
 	names, err := s.matchFiles(prefix, true)
 	if err == nil {
 		for i := 0; i < len(names)-max; i++ {
-			if err = os.Remove(filepath.Join(s.root, names[i])); err != nil {
+			if err = s.deleteFile(names[i], false); err != nil {
 				break
 			}
 		}

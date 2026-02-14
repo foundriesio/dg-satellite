@@ -31,7 +31,7 @@ func (h AuthFsHandle) InitHmacSecret() error {
 	if _, err := rand.Read(secret); err != nil {
 		return fmt.Errorf("generating HMAC secret: %w", err)
 	}
-	if err := h.writeFile(HmacFile, string(secret), 0o640); err != nil {
+	if err := h.writeFile(HmacFile, string(secret), secureFileAccess); err != nil {
 		return fmt.Errorf("storing HMAC secret: %w", err)
 	}
 	return nil
@@ -65,7 +65,7 @@ func (h AuthFsHandle) SaveAuthConfig(cfg AuthConfig) error {
 	if err != nil {
 		return fmt.Errorf("unable to marshall auth config: %w", err)
 	}
-	if err := h.writeFile(AuthConfigFile, string(data), 0o640); err != nil {
+	if err := h.writeFile(AuthConfigFile, string(data), defaultFileAccess); err != nil {
 		return fmt.Errorf("storing auth config: %w", err)
 	}
 	return nil

@@ -62,6 +62,13 @@ const (
 	LogRolloutsFile = "rollouts.log"
 )
 
+const (
+	// File & Dir access
+	defaultDirAccess  os.FileMode = 0o750
+	defaultFileAccess os.FileMode = 0o640
+	secureFileAccess  os.FileMode = 0o600
+)
+
 type (
 	FsConfig string
 	DoneChan = <-chan struct{} // Dictated by Context.Done
@@ -150,19 +157,16 @@ func NewFs(root string) (*FsHandle, error) {
 		h.handle.Logs.category = UpdatesLogsDir
 	}
 
-	for _, h := range []struct {
-		handle baseFsHandle
-		mode   os.FileMode
-	}{
-		{fs.Audit.baseFsHandle, 0o744},
-		{fs.Auth.baseFsHandle, 0o744},
-		{fs.Certs.baseFsHandle, 0o744},
-		{fs.Devices.baseFsHandle, 0o740},
+	for _, h := range []baseFsHandle{
+		fs.Audit.baseFsHandle,
+		fs.Auth.baseFsHandle,
+		fs.Certs.baseFsHandle,
+		fs.Devices.baseFsHandle,
 		// All updates categories have the same base dir, so only one of Ci/prod is needed.
-		{fs.Updates.Ci.Tuf.baseFsHandle, 0o744},
-		{fs.Updates.Prod.Tuf.baseFsHandle, 0o744},
+		fs.Updates.Ci.Tuf.baseFsHandle,
+		fs.Updates.Prod.Tuf.baseFsHandle,
 	} {
-		if err := h.handle.mkdirs(h.mode, true); err != nil {
+		if err := h.mkdirs(defaultDirAccess, true); err != nil {
 			return nil, fmt.Errorf("unable to initialize file storage: %w", err)
 		}
 	}
@@ -173,7 +177,7 @@ type baseFsHandle struct {
 	root string
 }
 
-func (s baseFsHandle) mkdirs(mode os.FileMode, ignoreExists bool) error {
+func (s baseFsHandle) mkdirs(mode os.FileMode, ignoreExists bool) error { //nolint:unparam
 	if ignoreExists {
 		return os.MkdirAll(s.root, mode)
 	} else {
@@ -242,7 +246,7 @@ func (s baseFsHandle) writeFile(name, content string, mode os.FileMode) error {
 	}
 }
 
-func (s baseFsHandle) appendFile(name, content string, mode os.FileMode) error {
+func (s baseFsHandle) appendFile(name, content string, mode os.FileMode) error { //nolint:unparam
 	// O_APPEND + O_SYNC on Linux warrants that concurrent file appends up to 1MB are serialized.
 	fd, err := os.OpenFile(filepath.Join(s.root, name),
 		os.O_CREATE|os.O_APPEND|syscall.O_SYNC|os.O_WRONLY, mode)

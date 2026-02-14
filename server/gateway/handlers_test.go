@@ -445,7 +445,7 @@ func TestOstree(t *testing.T) {
 	writeFile := func(h baseStorage.UpdatesFsHandle, tag, update, path, content string) error {
 		if parts := strings.Split(path, "/"); len(parts) > 1 {
 			require.Equal(t, 2, len(parts), content) // Only level 1 depth in tests
-			if err := os.MkdirAll(h.FilePath(tag, update, parts[0]), 0o775); err != nil {
+			if err := os.MkdirAll(h.FilePath(tag, update, parts[0]), 0o750); err != nil {
 				return err
 			}
 		}

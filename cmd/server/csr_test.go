@@ -78,6 +78,6 @@ func createSelfSignedRoot(t *testing.T, fs *storage.FsHandle) (string, string) {
 		},
 	)
 	caFile := fs.Certs.FilePath("ca.pem")
-	require.Nil(t, os.WriteFile(caFile, caPem, 0o740))
+	require.Nil(t, os.WriteFile(caFile, caPem, 0o640))
 	return caKeyFile, caFile
 }

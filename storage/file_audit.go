@@ -15,7 +15,7 @@ type AuditLogsFsHandle struct {
 
 func (h AuditLogsFsHandle) AppendEvent(userid int64, event string) {
 	msg := fmt.Sprintf("%s: %s\n", time.Now().Format(time.RFC3339), event)
-	if err := h.appendFile(fmt.Sprintf("users-%d", userid), msg, 0o740); err != nil {
+	if err := h.appendFile(fmt.Sprintf("users-%d", userid), msg, defaultFileAccess); err != nil {
 		slog.Error("Failed to append audit log", "userID", userid, "error", err)
 	}
 }

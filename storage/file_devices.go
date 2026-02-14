@@ -24,7 +24,7 @@ func (s DevicesFsHandle) ReadFile(uuid, name string) (string, error) {
 func (s DevicesFsHandle) WriteFile(uuid, name, content string) error {
 	if h, err := s.deviceLocalHandle(uuid, true); err != nil {
 		return err
-	} else if err = h.writeFile(name, content, 0o744); err != nil {
+	} else if err = h.writeFile(name, content, defaultFileAccess); err != nil {
 		return fmt.Errorf("error writing file %s for device %s: %w", name, uuid, err)
 	}
 	return nil
@@ -33,7 +33,7 @@ func (s DevicesFsHandle) WriteFile(uuid, name, content string) error {
 func (s DevicesFsHandle) AppendFile(uuid, name, content string) error {
 	if h, err := s.deviceLocalHandle(uuid, true); err != nil {
 		return err
-	} else if err = h.appendFile(name, content, 0o744); err != nil {
+	} else if err = h.appendFile(name, content, defaultFileAccess); err != nil {
 		return fmt.Errorf("error writing file %s for device %s: %w", name, uuid, err)
 	}
 	return nil
@@ -60,7 +60,7 @@ func (s DevicesFsHandle) RolloverFiles(uuid, prefix string, max int) error {
 func (s DevicesFsHandle) deviceLocalHandle(uuid string, forUpdate bool) (h baseFsHandle, err error) {
 	h.root = filepath.Join(s.root, uuid)
 	if forUpdate {
-		if err = h.mkdirs(0o744, true); err != nil {
+		if err = h.mkdirs(defaultDirAccess, true); err != nil {
 			err = fmt.Errorf("unable to create file storage for device %s: %w", uuid, err)
 		}
 	}

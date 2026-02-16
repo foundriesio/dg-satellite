@@ -228,7 +228,7 @@ func TestConfig(t *testing.T) {
 	}
 
 	// No config
-	cfg := getConfig(200)
+	cfg := getConfig(204)
 	require.Equal(t, 0, len(cfg))
 
 	checkConfig := func(name, content string, onChanged ...string) {

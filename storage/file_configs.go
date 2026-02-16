@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // Outer directory structure:
@@ -24,9 +27,9 @@ type ConfigsFsHandle struct {
 	baseFsHandle
 }
 
-func (s ConfigsFsHandle) ReadFactoryConfig() (content string, err error) {
+func (s ConfigsFsHandle) ReadFactoryConfig() (content string, timestamp int64, err error) {
 	h, _ := s.factoryLocalHandle(false)
-	content, err = h.readConfig()
+	content, timestamp, err = h.readConfig()
 	if err != nil {
 		err = fmt.Errorf("unexpected error reading factory config: %w", err)
 	}
@@ -60,9 +63,9 @@ func (s ConfigsFsHandle) PurgeFactoryConfigHistory(keepLatest int) error {
 	return nil
 }
 
-func (s ConfigsFsHandle) ReadGroupConfig(name string) (content string, err error) {
+func (s ConfigsFsHandle) ReadGroupConfig(name string) (content string, timestamp int64, err error) {
 	h, _ := s.groupLocalHandle(name, false)
-	content, err = h.readConfig()
+	content, timestamp, err = h.readConfig()
 	if err != nil {
 		err = fmt.Errorf("unexpected error reading group config for %s: %w", name, err)
 	}
@@ -96,9 +99,9 @@ func (s ConfigsFsHandle) PurgeGroupConfigHistory(name string, keepLatest int) er
 	return nil
 }
 
-func (s ConfigsFsHandle) ReadDeviceConfig(uuid string) (content string, err error) {
+func (s ConfigsFsHandle) ReadDeviceConfig(uuid string) (content string, timestamp int64, err error) {
 	h, _ := s.deviceLocalHandle(uuid, false)
-	content, err = h.readConfig()
+	content, timestamp, err = h.readConfig()
 	if err != nil {
 		err = fmt.Errorf("unexpected error reading device config for %s: %w", uuid, err)
 	}
@@ -166,15 +169,22 @@ type configsFsHandle struct {
 	baseFsHandle
 }
 
-func (s configsFsHandle) readConfig() (string, error) {
-	// The last file name inside a journal is the latest config file version
-	if contents, err := s.readHistory(1); err != nil {
-		return "", err
-	} else if len(contents) == 0 {
-		return "", nil
-	} else {
-		return contents[0], nil
+type configJournalItem struct {
+	name      string
+	timestamp int64
+}
+
+func (s configsFsHandle) readConfig() (content string, timestamp int64, err error) {
+	var journal []configJournalItem
+	if journal, err = s.readJournal(); err == nil && len(journal) > 0 {
+		latest := journal[len(journal)-1]
+		if content, err = s.readFile(latest.name, false); err != nil {
+			err = fmt.Errorf("failed to read config file %s: %w", latest.name, err)
+		} else {
+			timestamp = latest.timestamp
+		}
 	}
+	return
 }
 
 func (s configsFsHandle) writeConfig(content string) error {
@@ -185,7 +195,8 @@ func (s configsFsHandle) writeConfig(content string) error {
 	if err := s.writeFile(name, content, defaultFileAccess); err != nil {
 		return fmt.Errorf("failed to save config file %s: %w", name, err)
 	}
-	if err := s.appendFile(ConfigsJournalFile, name+"\n", defaultFileAccess); err != nil {
+	line := fmt.Sprintf("%s:%x\n", name, time.Now().Unix())
+	if err := s.appendFile(ConfigsJournalFile, line, defaultFileAccess); err != nil {
 		_ = s.deleteFile(name, true) // Silence cleanup errors - nothing we can do here.
 		return fmt.Errorf("failed to write journal for config file %s: %w", name, err)
 	}
@@ -193,7 +204,7 @@ func (s configsFsHandle) writeConfig(content string) error {
 }
 
 func (s configsFsHandle) readHistory(latest int) ([]string, error) {
-	names, err := s.readJournal()
+	names, err := s.readJournalNames()
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +214,7 @@ func (s configsFsHandle) readHistory(latest int) ([]string, error) {
 	if len(names) > latest {
 		names = names[len(names)-latest:]
 	}
+	slices.Reverse(names) // Return the latest config as the first item.
 	configs := make([]string, 0, len(names))
 	for _, name := range names {
 		if content, err := s.readFile(name, false); err != nil {
@@ -225,7 +237,7 @@ func (s configsFsHandle) purgeHistory(keepLatest int) (err error) {
 	if len(haveNames) <= keepLatest {
 		return
 	}
-	if keepNames, err = s.readJournal(); err != nil {
+	if keepNames, err = s.readJournalNames(); err != nil {
 		return
 	}
 	if len(keepNames) > keepLatest {
@@ -241,13 +253,33 @@ func (s configsFsHandle) purgeHistory(keepLatest int) (err error) {
 	return
 }
 
-func (s configsFsHandle) readJournal() ([]string, error) {
-	var names []string
-	for name, err := range s.readFileLines(ConfigsJournalFile, true, nil) {
+func (s configsFsHandle) readJournal() ([]configJournalItem, error) {
+	var items []configJournalItem
+	for line, err := range s.readFileLines(ConfigsJournalFile, true, nil) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to read journal file: %w", err)
 		}
-		names = append(names, name)
+		parts := strings.Split(line, ":")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("failed to parse journal item %s: wrong format", line)
+		}
+		ts, err := strconv.ParseInt(parts[1], 16, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse journal item %s: wrong format", line)
+		}
+		items = append(items, configJournalItem{parts[0], ts})
 	}
-	return names, nil
+	return items, nil
+}
+
+func (s configsFsHandle) readJournalNames() ([]string, error) {
+	if items, err := s.readJournal(); err != nil {
+		return nil, err
+	} else {
+		names := make([]string, len(items))
+		for idx, item := range items {
+			names[idx] = item.name
+		}
+		return names, nil
+	}
 }

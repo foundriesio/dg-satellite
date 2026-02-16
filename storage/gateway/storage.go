@@ -165,18 +165,23 @@ func (d Device) GetTufMeta(tag, file string) (string, error) {
 	}
 }
 
-func (d Device) GetConfigs() (configs [3]string, err error) {
-	// Returns 3 configs (in order): factory, group, device.
-	if configs[0], err = d.storage.fs.Configs.ReadFactoryConfig(); err != nil {
+func (d Device) GetConfigs() (configs [3]string, timestamp int64, err error) {
+	// Returns 3 configs (in order): factory, group, device; and their latest modification timestamp.
+	var ts int64
+	if configs[0], timestamp, err = d.storage.fs.Configs.ReadFactoryConfig(); err != nil {
 		return
 	}
 	if len(d.GroupName) > 0 {
-		if configs[1], err = d.storage.fs.Configs.ReadGroupConfig(d.GroupName); err != nil {
+		if configs[1], ts, err = d.storage.fs.Configs.ReadGroupConfig(d.GroupName); err != nil {
 			return
+		} else if ts > timestamp {
+			timestamp = ts
 		}
 	}
-	if configs[2], err = d.storage.fs.Configs.ReadDeviceConfig(d.Uuid); err != nil {
+	if configs[2], ts, err = d.storage.fs.Configs.ReadDeviceConfig(d.Uuid); err != nil {
 		return
+	} else if ts > timestamp {
+		timestamp = ts
 	}
 	return
 }

@@ -112,25 +112,34 @@ func TestStorage(t *testing.T) {
 	require.Nil(t, fs.Configs.WriteGroupConfig("grp", "group config"))
 	require.Nil(t, fs.Configs.WriteDeviceConfig(d2.Uuid, "device config"))
 
+	time.Sleep(10 * time.Millisecond)
+	now := time.Now().Truncate(time.Second).Add(time.Second).Unix()
+
 	d3 := Device{Uuid: "fake", storage: *s}
-	cfgs, err := d3.GetConfigs()
+	cfgs, ts, err := d3.GetConfigs()
 	require.Nil(t, err)
 	require.Equal(t, "factory config", cfgs[0])
 	require.Equal(t, "", cfgs[1])
 	require.Equal(t, "", cfgs[2])
+	require.Less(t, ts, now)
+	require.Greater(t, ts, now-2)
 
-	cfgs, err = d2.GetConfigs()
+	cfgs, ts, err = d2.GetConfigs()
 	require.Nil(t, err)
 	require.Equal(t, "factory config", cfgs[0])
 	require.Equal(t, "", cfgs[1])
 	require.Equal(t, "device config", cfgs[2])
+	require.Less(t, ts, now)
+	require.Greater(t, ts, now-2)
 
 	d2.GroupName = "grp"
-	cfgs, err = d2.GetConfigs()
+	cfgs, ts, err = d2.GetConfigs()
 	require.Nil(t, err)
 	require.Equal(t, "factory config", cfgs[0])
 	require.Equal(t, "group config", cfgs[1])
 	require.Equal(t, "device config", cfgs[2])
+	require.Less(t, ts, now)
+	require.Greater(t, ts, now-2)
 }
 
 func Test_ProcessEvents(t *testing.T) {

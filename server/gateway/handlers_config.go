@@ -6,6 +6,7 @@ package gateway
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -23,10 +24,25 @@ type ConfigFile struct {
 func (h handlers) configGet(c echo.Context) error {
 	req := c.Request()
 	ctx := req.Context()
+	log := CtxGetLog(ctx)
 	d := CtxGetDevice(ctx)
-	configs, err := d.GetConfigs()
+	configs, timestamp, err := d.GetConfigs()
 	if err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "failed to fetch config")
+	} else if timestamp == 0 {
+		return c.NoContent(http.StatusNoContent)
+	}
+
+	// All times below use one second precision to account for devices which don't support subsecond timestamps.
+	// A client is expected to use the Date header value in its subsequent If-Modified-Since header values.
+	cts := time.Unix(timestamp, 0)
+	ifModifiedSince := req.Header.Get("If-Modified-Since")
+	if len(ifModifiedSince) > 0 {
+		if dts, err := time.Parse(time.RFC1123, ifModifiedSince); err != nil {
+			log.Warn("Unable to parse If-Modified-Since", "error", err, "if-modified-since", ifModifiedSince)
+		} else if !cts.After(dts) { // Latest update made at or before if-modified-since
+			return c.String(http.StatusNotModified, "")
+		}
 	}
 
 	files := make(map[string]ConfigFile)
@@ -41,5 +57,6 @@ func (h handlers) configGet(c echo.Context) error {
 			files[k] = v
 		}
 	}
+	c.Response().Header().Set("Date", cts.Format(time.RFC1123))
 	return c.JSON(http.StatusOK, files)
 }

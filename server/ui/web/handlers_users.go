@@ -24,11 +24,13 @@ func (h handlers) usersList(c echo.Context) error {
 		Users      []users.User
 		ScopesList []string
 		CanDelete  bool
+		CanUpdate  bool
 	}{
 		baseCtx:    h.baseCtx(c, "Users", "users"),
 		Users:      user,
 		ScopesList: users.ScopesAvailable(),
 		CanDelete:  CtxGetSession(c.Request().Context()).User.AllowedScopes.Has(users.ScopeUsersD),
+		CanUpdate:  CtxGetSession(c.Request().Context()).User.AllowedScopes.Has(users.ScopeUsersRU),
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "users.html", ctx)
 }

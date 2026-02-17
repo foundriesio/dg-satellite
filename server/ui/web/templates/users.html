@@ -20,7 +20,9 @@
             <td>{{.AllowedScopes}}</td>
             <td>
               <a href="/users/{{.Username}}/audit-log"><i title="View audit log" class="history"></i></a>
+              {{ if and $.CanUpdate }}
               <i title="Change scopes" class="edit" onclick="showScopesModal('{{.Username}}', '{{.AllowedScopes}}')"></i>
+              {{ end }}
               {{ if and $.CanDelete (ne .Username $.User.Username) }}
               <i title="Delete user" class="trash" onclick="deleteUser('{{.Username}}')"></i>
               {{ end }}

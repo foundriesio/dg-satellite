@@ -26,6 +26,9 @@
     <section class="content-section">
       <h3>Actions</h3>
       <button onclick="location.href='/users/{{.User.Username}}/audit-log';">View audit log</button>
+      {{ if .LocalAuth }}
+      <button onclick="passwordModal.show(); document.getElementById('currentPassword').focus();" >Change Password</button>
+      {{ end }}
     </section>
 
     <section class="content-section">
@@ -122,6 +125,30 @@
         </article>
       </dialog>
 
+      {{ if .LocalAuth }}
+      <dialog id="passwordModal">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" onclick="passwordModal.close()"></button>
+            <h3>Change Password</h3>
+          </header>
+          <form method="dialog">
+            <label for="currentPassword">Current Password:</label>
+            <input type="password" id="currentPassword" name="currentPassword" required>
+            <label for="newPassword">New Password:</label>
+            <input type="password" id="newPassword" name="newPassword" required>
+            <label for="confirmPassword">Confirm New Password:</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" required>
+            <span id="passwordError" style="color: red; display: none;">Passwords do not match</span>
+          </form>
+          <footer>
+            <button role="button" onclick="passwordModal.close()">Cancel</button>
+            <button autofocus="" role="button" onclick="changePassword()">Change Password</button>
+          </footer>
+        </article>
+      </dialog>
+      {{ end }}
+
     </section>
 
     <style>
@@ -129,6 +156,10 @@
         cursor: pointer;
       }
     </style>
+
+    {{ if .LocalAuth }}
+    {{ template "password_change_script" . }}
+    {{ end }}
 
     <script>
       let currentTokenId = null;
@@ -273,6 +304,23 @@
         const today = new Date();
         expiresInput.min = today.toISOString().split('T')[0];
       });
+
+      {{ if .LocalAuth }}
+      setupPasswordMatchValidation('newPassword', 'confirmPassword', 'passwordError');
+
+      function changePassword() {
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        submitPasswordChange(currentPassword, newPassword, confirmPassword, function() {
+          document.getElementById('currentPassword').value = '';
+          document.getElementById('newPassword').value = '';
+          document.getElementById('confirmPassword').value = '';
+          document.getElementById('passwordModal').close();
+        });
+      }
+      {{ end }}
     </script>
 
 

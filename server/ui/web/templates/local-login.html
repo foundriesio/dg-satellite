@@ -1,0 +1,27 @@
+{{/* Used by the auth package's localProvider implementation */}}
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <form method="post" action="/auth/login">
+        <fieldset>
+          <legend><strong>Username</strong></legend>
+          <input type="text" name="username" required />
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Password</strong></legend>
+          <input type="password" name="password" required />
+        </fieldset>
+
+        <button type="submit">Login</button>
+      </form>
+
+      {{ if .Reason }}
+      <section>
+        <i><small>Reason: {{.Reason}}</small></i>
+      </section>
+      {{ end }}
+    </section>
+
+{{ template "footer"}}

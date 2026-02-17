@@ -1,0 +1,26 @@
+{
+  "Type": "local",
+  "SessionTimeoutHours": 48,
+  "Config": {
+    "MinPasswordLength": 0,
+    "PasswordAgeDays": 0,
+    "PasswordHistory": 0,
+    "PasswordComplexityRules": {
+      "RequireUppercase": false,
+      "RequireLowercase": false,
+      "RequireDigit": false,
+      "RequireSpecialChar": ""
+    }
+  },
+  "NewUserDefaultScopes": [
+    "devices:delete",
+    "devices:read",
+    "devices:read-update",
+    "updates:read",
+    "updates:read-update",
+    "users:create",
+    "users:delete",
+    "users:read",
+    "users:read-update"
+  ]
+}

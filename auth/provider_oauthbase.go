@@ -26,6 +26,7 @@ type authConfigOauth2 struct {
 }
 
 type oauth2BaseProvider struct {
+	commonProvider
 	name        string
 	displayName string
 
@@ -33,7 +34,6 @@ type oauth2BaseProvider struct {
 
 	newUserScopes  users.Scopes
 	oauthConfig    *oauth2.Config
-	users          *users.Storage
 	loginTip       string
 	sessionTimeout time.Duration
 }
@@ -58,72 +58,12 @@ func (p *oauth2BaseProvider) configure(e *echo.Echo, usersStorage *users.Storage
 		return fmt.Errorf("unable to parse new user default scopes: %w", err)
 	}
 	p.users = usersStorage
+	p.renderer = p
 	p.sessionTimeout = time.Duration(cfg.SessionTimeoutHours) * time.Hour
 
 	e.GET(AuthLoginPath, p.handleLogin)
 	e.GET(AuthCallbackPath, p.handleOauthCallback)
 	return nil
-}
-
-func (p *oauth2BaseProvider) DropSession(c echo.Context, session *Session) {
-	cookie, err := c.Cookie(AuthCookieName)
-	if err != nil {
-		slog.Warn("unable to read auth cookie", "error", err)
-		return
-	}
-	if err := session.User.DeleteSession(cookie.Value); err != nil {
-		slog.Warn("unable to delete session from storage", "cookie", cookie.Value, "error", err)
-	}
-}
-
-func (p oauth2BaseProvider) GetUser(c echo.Context) (*users.User, error) {
-	authHeader := c.Request().Header.Get("Authorization")
-	if len(authHeader) > 0 {
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			return nil, fmt.Errorf("invalid authorization header")
-		}
-		user, err := p.users.GetByToken(parts[1])
-		if err != nil {
-			slog.Warn("unable to get user by token", "error", err)
-			return nil, c.String(http.StatusInternalServerError, "Could not get user by token")
-		} else if user == nil {
-			return nil, c.String(http.StatusUnauthorized, "Invalid token")
-		}
-		return user, nil
-	}
-
-	session, err := p.GetSession(c)
-	if err != nil || session == nil {
-		return nil, err
-	}
-	return session.User, nil
-}
-
-func (p oauth2BaseProvider) GetSession(c echo.Context) (*Session, error) {
-	cookie, err := c.Cookie(AuthCookieName)
-	if err != nil {
-		return nil, p.renderLoginPage(c, err.Error())
-	} else if len(cookie.Value) == 0 {
-		return nil, p.renderLoginPage(c, "")
-	}
-	if cookie.Expires.After(time.Now()) {
-		return nil, p.renderLoginPage(c, "Cookie expired")
-	}
-	sessionID := cookie.Value
-	user, err := p.users.GetBySession(sessionID)
-	if user != nil {
-		session := &Session{
-			BaseUrl: c.Scheme() + "://" + c.Request().Host,
-			User:    user,
-			Client:  newHttpClientWithSessionCookie(cookie),
-		}
-		return session, nil
-	}
-	if err != nil {
-		return nil, p.renderLoginPage(c, err.Error())
-	}
-	return nil, p.renderLoginPage(c, "")
 }
 
 func (p oauth2BaseProvider) renderLoginPage(c echo.Context, reason string) error {
@@ -138,6 +78,8 @@ func (p oauth2BaseProvider) renderLoginPage(c echo.Context, reason string) error
 		LoginTip string
 		Name     string
 		Reason   string
+		User     *users.User
+		NavItems []string
 	}{
 		Title:    "Login",
 		LoginTip: p.loginTip,

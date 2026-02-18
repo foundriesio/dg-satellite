@@ -14,10 +14,18 @@ type AuthFsHandle struct {
 	baseFsHandle
 }
 
+type RateLimitConfig struct {
+	AttemptsPerSecond        int
+	AttemptsBlockDurationSec int
+	BadAuthLimit             int
+	BadAuthBlockDurationSec  int
+}
+
 type AuthConfig struct {
 	Type                 string
 	SessionTimeoutHours  int // Default is 48 hours
 	NewUserDefaultScopes []string
+	RateLimits           RateLimitConfig
 	Config               json.RawMessage
 }
 

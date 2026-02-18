@@ -2,6 +2,7 @@
   "Type": "local",
   "SessionTimeoutHours": 48,
   "Config": {
+    "AttemptsPerSecond": 2,
     "MinPasswordLength": 0,
     "PasswordAgeDays": 0,
     "PasswordHistory": 0,

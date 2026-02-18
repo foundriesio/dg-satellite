@@ -34,6 +34,7 @@ type authConfigLocal struct {
 	PasswordHistory         int
 	PasswordAgeDays         int
 	PasswordComplexityRules PasswordComplexityRules
+	AttemptsPerSecond       int
 }
 
 type localProvider struct {
@@ -65,9 +66,11 @@ func (p *localProvider) Configure(e *echo.Echo, userStorage *users.Storage, cfg 
 		return fmt.Errorf("unable to parse new user default scopes: %w", err)
 	}
 
-	e.POST("/auth/login", p.handleLogin)
-	e.POST("/users/:username/password", p.handlePasswordChange)
-	e.POST("/users/:username/reset-password", p.handlePasswordReset)
+	rateLimiter := p.authConfig.NewRateLimiter()
+
+	e.POST("/auth/login", p.handleLogin, rateLimiter)
+	e.POST("/users/:username/password", p.handlePasswordChange, rateLimiter)
+	e.POST("/users/:username/reset-password", p.handlePasswordReset, rateLimiter)
 	return nil
 }
 

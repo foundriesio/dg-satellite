@@ -34,6 +34,7 @@ type authConfigLocal struct {
 	PasswordHistory         int
 	PasswordAgeDays         int
 	PasswordComplexityRules PasswordComplexityRules
+	AttemptsPerSecond       int
 }
 
 type localProvider struct {
@@ -41,6 +42,7 @@ type localProvider struct {
 	authConfig     *authConfigLocal
 	newUserScopes  users.Scopes
 	sessionTimeout time.Duration
+	rateLimiter    *localAuthRateLimiter
 }
 
 type localProviderUserData struct {
@@ -65,9 +67,12 @@ func (p *localProvider) Configure(e *echo.Echo, userStorage *users.Storage, cfg 
 		return fmt.Errorf("unable to parse new user default scopes: %w", err)
 	}
 
-	e.POST("/auth/login", p.handleLogin)
-	e.POST("/users/:username/password", p.handlePasswordChange)
-	e.POST("/users/:username/reset-password", p.handlePasswordReset)
+	rl, rlMiddleware := p.authConfig.NewRateLimiter()
+	p.rateLimiter = rl
+
+	e.POST("/auth/login", p.handleLogin, rlMiddleware)
+	e.POST("/users/:username/password", p.handlePasswordChange, rlMiddleware)
+	e.POST("/users/:username/reset-password", p.handlePasswordReset, rlMiddleware)
 	return nil
 }
 
@@ -79,12 +84,14 @@ func (p *localProvider) handleLogin(c echo.Context) error {
 	if err != nil {
 		return server.EchoError(c, err, http.StatusInternalServerError, "Unable to look up user")
 	} else if user == nil {
+		p.rateLimiter.FlagBadOperation(c)
 		return p.renderLoginPage(c, "Invalid username or password")
 	}
 
 	if ok, err := PasswordVerify(password, user.Password); err != nil {
 		return server.EchoError(c, err, http.StatusInternalServerError, "Internal error verifying password")
 	} else if !ok {
+		p.rateLimiter.FlagBadOperation(c)
 		return p.renderLoginPage(c, "Invalid username or password")
 	}
 

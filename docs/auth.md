@@ -74,6 +74,7 @@ managed users.
 Copy `contrib/auth-config-local.json` to `<configdir>/auth/auth-config.json`
 and set these optional values:
 
+ * `Config.AttemptsPerSecond` - Set this to globally rate-limit how many authentication operations (login, password change/reset) are allowed per IP per scond. The default is 2. Responses will be slowed down to introduce a 2 second delay when the rate-limit is exceeded.
  * `Config.MinPasswordLength` - Set this to enforce a minimum password length. For example, `8` would require passwords be at least 8 characters. The default is 0, not enforced.
  * `Config.PasswordAgeDays` - Set this to require users to change their password every `PasswordAgeDays`. For example, `180` would require a user to change their password every 180 days. The default is 0, not enforced.
  * `Config.PasswordHistory` - Set this to prevent users from repeating old passwords. For example, `5` means they must use 5 different passwords before repeating one. The default is 0, not enforced.

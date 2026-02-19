@@ -9,8 +9,11 @@ import (
 
 	"github.com/alexflint/go-arg"
 
+	"github.com/foundriesio/dg-satellite/cmd"
 	"github.com/foundriesio/dg-satellite/context"
 )
+
+type VersionCmd struct{}
 
 type CommonArgs struct {
 	DataDir string `arg:"required" help:"Directory to store data"`
@@ -20,6 +23,7 @@ type CommonArgs struct {
 	SignCsr  *CsrSignCmd  `arg:"subcommand:sign-csr" help:"Create the TLS certificate from the signing request"`
 	Serve    *ServeCmd    `arg:"subcommand:serve" help:"Run the REST API and device-gateway services"`
 	UserAdd  *UserAddCmd  `arg:"subcommand:user-add" help:"Add a new user if local authentication is enabled"`
+	Version  *VersionCmd  `arg:"subcommand:version" help:"Print the version of the program"`
 
 	ctx context.Context
 }
@@ -48,6 +52,8 @@ func main() {
 		err = args.AuthInit.Run(args)
 	case args.UserAdd != nil:
 		err = args.UserAdd.Run(args)
+	case args.Version != nil:
+		fmt.Println(cmd.Version)
 	default:
 		p.Fail("missing required subcommand")
 	}

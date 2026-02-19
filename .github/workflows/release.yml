@@ -1,0 +1,76 @@
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: Create release
+
+jobs:
+  build-arm64-server:
+    name: Build the arm64 server binary
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+      - name: Set up golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Build arm64 server
+        run: |
+          make dg-sat
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: dg-sat-linux-arm64
+          path: bin/dg-sat
+
+  build:
+    name: Build and publish
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+      - name: Set up golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Build amd64 server
+        run: |
+          make dg-sat
+          mv bin/dg-sat bin/dg-sat-linux-amd64
+
+      - name: Build CLI binaries
+        run: |
+          make build-cli
+
+      - name: Download arm64 server
+        uses: actions/download-artifact@v5
+        with:
+          name: dg-sat-linux-arm64
+          path: bin/
+
+      - name: Hack
+        run: |
+          # Download artifact stores the file without "linux-arm64"
+          mv bin/dg-sat bin/dg-sat-linux-arm64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.version }}
+          files: |
+            bin/*

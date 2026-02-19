@@ -1,0 +1,87 @@
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: Create release
+
+jobs:
+  build-server:
+    name: Build server (${{ matrix.arch }})
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+      - name: Set up golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Build binary
+        run: |
+          make dg-sat
+          mv bin/dg-sat bin/dg-sat-linux-${{ matrix.arch }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: dg-sat-linux-${{ matrix.arch }}
+          path: bin/dg-sat-linux-${{ matrix.arch }}
+
+  build-cli:
+    name: Build CLI
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+      - name: Set up golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Build binaries
+        run: |
+          make build-cli
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: cli-binaries
+          path: bin/satcli-*
+
+  publish-release:
+    name: Publish release
+    needs: [build-server, build-cli]
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: bin/
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.version }}
+          files: |
+            bin/*

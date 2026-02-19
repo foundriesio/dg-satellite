@@ -12,6 +12,7 @@ import (
 	"github.com/foundriesio/dg-satellite/cli/subcommands/devices"
 	"github.com/foundriesio/dg-satellite/cli/subcommands/login"
 	"github.com/foundriesio/dg-satellite/cli/subcommands/updates"
+	version "github.com/foundriesio/dg-satellite/cmd"
 	"github.com/spf13/cobra"
 )
 
@@ -23,8 +24,8 @@ and other resources on a Satellite server.
 
 Configuration is stored in $HOME/.config/satcli.yaml`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Skip config logic for login command
-		if cmd.Name() == "login" {
+		// Skip config logic for login and version commands
+		if cmd.Name() == "login" || cmd.Name() == "version" {
 			return nil
 		}
 
@@ -63,6 +64,13 @@ func init() {
 	rootCmd.AddCommand(login.LoginCmd)
 	rootCmd.AddCommand(devices.DevicesCmd)
 	rootCmd.AddCommand(updates.UpdatesCmd)
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print the version of satcli",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(version.Version)
+		},
+	})
 }
 
 func main() {

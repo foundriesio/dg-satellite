@@ -56,3 +56,8 @@ func (u UpdatesApi) TailRollout(tag, updateName, rollout string) (io.ReadCloser,
 	endpoint := "/v1/updates/" + u.Type + "/" + tag + "/" + updateName + "/rollouts/" + rollout
 	return u.api.GetStream(endpoint)
 }
+
+func (u UpdatesApi) CreateUpdate(tag, updateName string, body io.Reader) error {
+	endpoint := "/v1/updates/" + u.Type + "/" + tag + "/" + updateName
+	return u.api.Post(endpoint, body, "application/gzip")
+}

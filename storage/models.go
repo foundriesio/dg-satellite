@@ -31,6 +31,7 @@ type DeviceStatus struct {
 	CorrelationId string `json:"correlationId"`
 	TargetName    string `json:"target-name"`
 	Status        string `json:"status"`
+	DeviceTime    string `json:"deviceTime"`
 }
 
 func (e DeviceUpdateEvent) ParseStatus() *DeviceStatus {
@@ -66,6 +67,7 @@ func (e DeviceUpdateEvent) ParseStatus() *DeviceStatus {
 			CorrelationId: e.Event.CorrelationId,
 			TargetName:    e.Event.TargetName,
 			Status:        status,
+			DeviceTime:    e.DeviceTime,
 		}
 	} else {
 		return nil

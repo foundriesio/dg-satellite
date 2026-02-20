@@ -5,6 +5,7 @@
 
     <section class="content-section">
       <h3>Logs</h3>
+      <p>Output format: [Device time] [Device UUID]: [Status]</p>
       <pre id="tail-logs"></pre>
     </section>
 
@@ -31,7 +32,7 @@
         eventSource.addEventListener("log", (event) => {
           try {
             const data = JSON.parse(event.data);
-            tailLogs.textContent += data.uuid + ': ' + data.status + '\n';
+            tailLogs.textContent += data.deviceTime + ' ' + data.uuid + ': ' + data.status + '\n';
           } catch (e) {
             // Fallback to raw data if not valid JSON
             tailLogs.textContent += event.data + '\n';

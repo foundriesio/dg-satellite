@@ -811,12 +811,12 @@ data: No rollout logs for this update yet.
 	// A previous error line should not appear in the new response.
 	expectedStream1 := `event: log
 id: 1
-data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
+data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started","deviceTime":"2023-12-12T12:00:00"}
 
 `
 	expectedStream2 := `event: log
 id: 2
-data: {"uuid":"test-device-2","correlationId":"uuid-2","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
+data: {"uuid":"test-device-2","correlationId":"uuid-2","target-name":"intel-corei7-64-lmp-23","status":"Download started","deviceTime":"2023-12-12T12:00:00"}
 
 `
 	expectedStream1 += expectedStream2
@@ -831,7 +831,7 @@ data: {"uuid":"test-device-2","correlationId":"uuid-2","target-name":"intel-core
 	time.Sleep(10 * time.Millisecond)
 	expectedStreamX := `event: log
 id: 3
-data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started"}
+data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started","deviceTime":"2023-12-12T12:00:00"}
 
 `
 	expectedStream1 += expectedStreamX

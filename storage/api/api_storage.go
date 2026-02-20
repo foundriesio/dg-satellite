@@ -4,11 +4,16 @@
 package api
 
 import (
+	"archive/tar"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -57,6 +62,8 @@ var (
 
 	IsDbError             = storage.IsDbError
 	ErrDbConstraintUnique = storage.ErrDbConstraintUnique
+
+	ErrInvalidUpdate = errors.New("invalid update archive")
 )
 
 // DeviceListOpts lets you set the order devices will be returned
@@ -545,5 +552,94 @@ func (s *stmtDeviceSetUpdate) run(tag, updateName string, isProd bool, uuids, gr
 			return err
 		}
 	}
+	return nil
+}
+
+// CreateUpdate extracts a tar stream into the update storage directory for the
+// given tag and update name. The caller is responsible for decompressing the
+// stream (e.g. gzip) before passing it in.
+func (s Storage) CreateUpdate(tag, updateName string, isProd bool, body io.Reader) error {
+	baseDir := s.fs.Config.UpdatesCiDir()
+	if isProd {
+		baseDir = s.fs.Config.UpdatesProdDir()
+	}
+	destDir := filepath.Join(baseDir, tag, updateName)
+	if err := extractTar(body, destDir); err != nil {
+		err2 := os.RemoveAll(destDir)
+		if err2 != nil {
+			return errors.Join(err, err2)
+		}
+		return err
+	}
+	return nil
+}
+
+func extractTar(r io.Reader, destDir string) error {
+	tr := tar.NewReader(r)
+
+	var sawTuf, sawOstree, sawApps bool
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read tar entry: %w", err)
+		}
+
+		name := filepath.Clean(header.Name)
+		target := filepath.Join(destDir, name)
+
+		// Security: prevent directory traversal
+		if rel, err := filepath.Rel(destDir, target); err != nil || strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("tar entry would escape destination directory: %s", header.Name)
+		}
+
+		// Track top-level directories for validation
+		topDir := strings.SplitN(name, string(filepath.Separator), 2)[0]
+		switch topDir {
+		case storage.UpdatesTufDir:
+			sawTuf = true
+		case storage.UpdatesOstreeDir:
+			sawOstree = true
+		case storage.UpdatesAppsDir:
+			sawApps = true
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", header.Name, err)
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return fmt.Errorf("failed to create parent directory for %s: %w", header.Name, err)
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
+			if err != nil {
+				return fmt.Errorf("failed to create file %s: %w", header.Name, err)
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				if err := f.Close(); err != nil {
+					return fmt.Errorf("failed to close file %s after copy error: %w", header.Name, err)
+				}
+				return fmt.Errorf("failed to write file %s: %w", header.Name, err)
+			}
+			if err := f.Close(); err != nil {
+				return fmt.Errorf("failed to close file %s: %w", header.Name, err)
+			}
+		default:
+			return fmt.Errorf("unsupported tar entry type for %s: %c", header.Name, header.Typeflag)
+		}
+	}
+
+	if !sawTuf {
+		return fmt.Errorf("%w: missing required %q directory", ErrInvalidUpdate, storage.UpdatesTufDir)
+	}
+	if !sawOstree && !sawApps {
+		return fmt.Errorf("%w: must contain %q and/or %q directory", ErrInvalidUpdate, storage.UpdatesOstreeDir, storage.UpdatesAppsDir)
+	}
+
 	return nil
 }

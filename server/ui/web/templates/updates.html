@@ -33,4 +33,223 @@
       </table>
     </section>
 
+    <section class="content-section">
+      <details>
+        <summary><h2 style="display:inline;">Upload Update</h2></summary>
+        <p>Offline updates can be created with <code>fioctl targets offline-update</code>.
+            This command creates a directory with the offline update content.
+            This directory includes subdirectories for "tuf", "ostree_repo", and "apps".
+        </p>
+
+        <form id="upload-form" onsubmit="return false;">
+          <label for="upload-type">Type</label>
+          <select id="upload-type" required>
+            <option value="ci">CI</option>
+            <option value="prod">Production</option>
+          </select>
+
+          <label for="upload-tag">Tag</label>
+          <input type="text" id="upload-tag" placeholder="e.g. main" required />
+
+          <label for="upload-name">Update name</label>
+          <input type="text" id="upload-name" placeholder="e.g. v1.0" required />
+
+          <label for="upload-dir">Update directory</label>
+          <input type="file" id="upload-dir" webkitdirectory multiple required />
+
+          <div id="upload-progress" style="display:none;">
+            <progress id="upload-bar" value="0" max="100"></progress>
+            <small id="upload-status"></small>
+          </div>
+
+          <div id="upload-result" style="display:none;"></div>
+
+          <button type="button" id="upload-btn" onclick="uploadUpdate()">Upload</button>
+        </form>
+      </details>
+    </section>
+
+    <script>
+    // Build a tar archive as a composite Blob.
+    // File objects are Blobs referencing disk - the browser reads them on demand
+    // during upload, so only tar headers and padding live in RAM.
+    function buildTarBlob(files) {
+      const parts = [];
+      const fileEntries = [];
+
+      // Collect files and directories
+      const dirs = new Set();
+      for (const file of files) {
+        const name = file.webkitRelativePath
+          ? file.webkitRelativePath.split('/').slice(1).join('/')
+          : file.name;
+        if (!name) continue;
+
+        fileEntries.push({ name: name, file: file });
+
+        const pathParts = name.split('/');
+        for (let i = 1; i < pathParts.length; i++) {
+          dirs.add(pathParts.slice(0, i).join('/') + '/');
+        }
+      }
+
+      // Write directory headers
+      for (const dir of [...dirs].sort()) {
+        parts.push(makeTarHeader(dir, 0, true));
+      }
+
+      // Write file entries: header + File blob (no copy!) + padding
+      for (const entry of fileEntries) {
+        parts.push(makeTarHeader(entry.name, entry.file.size, false));
+        parts.push(entry.file);
+        const remainder = entry.file.size % 512;
+        if (remainder > 0) {
+          parts.push(new Uint8Array(512 - remainder));
+        }
+      }
+
+      // End of archive: two 512-byte zero blocks
+      parts.push(new Uint8Array(1024));
+
+      return new Blob(parts, { type: 'application/x-tar' });
+    }
+
+    function makeTarHeader(name, size, isDir) {
+      const header = new Uint8Array(512);
+      const encoder = new TextEncoder();
+
+      // name (0, 100)
+      const nameBytes = encoder.encode(name.length > 100 ? name.slice(-100) : name);
+      header.set(nameBytes, 0);
+
+      // mode (100, 8)
+      const mode = isDir ? '0000755' : '0000644';
+      header.set(encoder.encode(mode + '\0'), 100);
+
+      // uid (108, 8) and gid (116, 8)
+      header.set(encoder.encode('0000000\0'), 108);
+      header.set(encoder.encode('0000000\0'), 116);
+
+      // size (124, 12)
+      const sizeStr = size.toString(8).padStart(11, '0') + '\0';
+      header.set(encoder.encode(sizeStr), 124);
+
+      // mtime (136, 12)
+      const mtime = Math.floor(Date.now() / 1000).toString(8).padStart(11, '0') + '\0';
+      header.set(encoder.encode(mtime), 136);
+
+      // typeflag (156, 1)
+      header[156] = isDir ? 53 : 48; // '5' for dir, '0' for file
+
+      // magic (257, 6) and version (263, 2)
+      header.set(encoder.encode('ustar\0'), 257);
+      header.set(encoder.encode('00'), 263);
+
+      // checksum (148, 8): fill with spaces first, compute, then write
+      header.set(encoder.encode('        '), 148);
+      let chksum = 0;
+      for (let i = 0; i < 512; i++) chksum += header[i];
+      const chksumStr = chksum.toString(8).padStart(6, '0') + '\0 ';
+      header.set(encoder.encode(chksumStr), 148);
+
+      return header;
+    }
+
+    function formatBytes(b) {
+      if (b >= 1 << 30) return (b / (1 << 30)).toFixed(2) + ' GB';
+      if (b >= 1 << 20) return (b / (1 << 20)).toFixed(2) + ' MB';
+      if (b >= 1 << 10) return (b / (1 << 10)).toFixed(2) + ' KB';
+      return b + ' B';
+    }
+
+    async function uploadUpdate() {
+      const typeEl = document.getElementById('upload-type');
+      const tagEl = document.getElementById('upload-tag');
+      const nameEl = document.getElementById('upload-name');
+      const dirEl = document.getElementById('upload-dir');
+      const btn = document.getElementById('upload-btn');
+      const progressDiv = document.getElementById('upload-progress');
+      const progressBar = document.getElementById('upload-bar');
+      const statusEl = document.getElementById('upload-status');
+      const resultDiv = document.getElementById('upload-result');
+
+      const updateType = typeEl.value;
+      const tag = tagEl.value.trim();
+      const updateName = nameEl.value.trim();
+
+      if (!tag || !updateName) {
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      const files = dirEl.files;
+      if (!files || files.length === 0) {
+        alert('Please select a directory.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+      progressDiv.style.display = 'block';
+      resultDiv.style.display = 'none';
+      progressBar.value = 0;
+      statusEl.textContent = 'Building tar...';
+
+      try {
+        const tarBlob = buildTarBlob(files);
+        statusEl.textContent = 'Uploading: 0 B / ' + formatBytes(tarBlob.size);
+
+        const url = '/v1/updates/' + encodeURIComponent(updateType) + '/' +
+                    encodeURIComponent(tag) + '/' + encodeURIComponent(updateName);
+
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', url);
+          xhr.setRequestHeader('Content-Type', 'application/x-tar');
+
+          xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              progressBar.value = pct;
+              statusEl.textContent = 'Uploading: ' + formatBytes(e.loaded) + ' / ' + formatBytes(e.total) + ' (' + pct + '%)';
+            }
+          };
+
+          xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error('Upload failed (HTTP ' + xhr.status + '): ' + xhr.responseText));
+            }
+          };
+
+          xhr.onerror = function() {
+            reject(new Error('Network error during upload'));
+          };
+
+          xhr.send(tarBlob);
+        });
+
+        progressBar.value = 100;
+        statusEl.textContent = 'Upload complete: ' + formatBytes(tarBlob.size);
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<p style="color:green;"><strong>Update ' + updateType + '/' + tag + '/' + updateName + ' created successfully.</strong></p>';
+
+        // Clear the form
+        document.getElementById('upload-form').reset();
+        progressDiv.style.display = 'none';
+
+        // Reload the page after a short delay to show the new update in the list
+        setTimeout(() => location.reload(), 1500);
+
+      } catch (err) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<p style="color:red;"><strong>Error:</strong> ' + err.message + '</p>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Upload';
+      }
+    }
+    </script>
+
 {{ template "footer"}}

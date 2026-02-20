@@ -6,14 +6,19 @@ package updates
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sync/atomic"
+	"time"
 
 	"github.com/foundriesio/dg-satellite/cli/api"
 	"github.com/spf13/cobra"
 )
+
+const AnsiClearLine = "\033[2K\r"
 
 var createCmd = &cobra.Command{
 	Use:   "create <ci|prod> <tag> <update-name> <directory>",
@@ -43,14 +48,64 @@ var createCmd = &cobra.Command{
 		pr, pw := io.Pipe()
 		errCh := make(chan error, 1)
 
+		// Track compressed bytes produced by the tar+gz writer
+		var compressedBytes atomic.Int64
+		// Track uploaded bytes consumed by the HTTP client
+		var uploadedBytes atomic.Int64
+		// Signal when tar creation is done so total size is known
+		var totalSize atomic.Int64
+
 		go func() {
-			errCh <- createTarGz(pw, dir)
+			cw := &countingWriter{pw: pw, count: &compressedBytes}
+			err := createTarGz(cw, dir)
+			if err == nil {
+				totalSize.Store(compressedBytes.Load())
+			}
+			errCh <- err
 		}()
 
-		uploadErr := a.Updates(prodType).CreateUpdate(tag, updateName, pr)
+		// Progress reporter
+		stopProgress := make(chan struct{})
+		progressDone := make(chan struct{})
+		go func() {
+			defer close(progressDone)
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					uploaded := uploadedBytes.Load()
+					compressed := compressedBytes.Load()
+					total := totalSize.Load()
+					rate := formatBytes(uploaded * 2) // ~per second at 500ms tick
+					if total > 0 {
+						pct := float64(uploaded) / float64(total) * 100
+						fmt.Fprintf(os.Stderr, AnsiClearLine+"Uploading: %s / %s (%.1f%%) [%s/s]",
+							formatBytes(uploaded), formatBytes(total), pct, rate)
+					} else {
+						fmt.Fprintf(os.Stderr, AnsiClearLine+"Compressing: %s compressed, %s uploaded [%s/s]",
+							formatBytes(compressed), formatBytes(uploaded), rate)
+					}
+				case <-stopProgress:
+					return
+				}
+			}
+		}()
 
-		// Wait for the tar writer goroutine to finish
+		uploadReader := &countingReader{r: pr, count: &uploadedBytes}
+		uploadErr := a.Updates(prodType).CreateUpdate(tag, updateName, uploadReader)
+
 		tarErr := <-errCh
+
+		close(stopProgress)
+		<-progressDone
+		total := totalSize.Load()
+		if total > 0 {
+			fmt.Fprintf(os.Stderr, AnsiClearLine+"Uploaded: %s / %s (100%%)\n", formatBytes(total), formatBytes(total))
+		} else {
+			fmt.Fprintf(os.Stderr, AnsiClearLine+"Uploaded: %s\n", formatBytes(uploadedBytes.Load()))
+		}
+
 		if uploadErr != nil {
 			return fmt.Errorf("upload failed: %w", uploadErr)
 		}
@@ -67,8 +122,49 @@ func init() {
 	UpdatesCmd.AddCommand(createCmd)
 }
 
-func createTarGz(pw *io.PipeWriter, dir string) error {
-	gw := gzip.NewWriter(pw)
+// countingWriter wraps an io.PipeWriter and counts bytes written through it.
+type countingWriter struct {
+	pw    *io.PipeWriter
+	count *atomic.Int64
+}
+
+func (w *countingWriter) Write(p []byte) (int, error) {
+	n, err := w.pw.Write(p)
+	w.count.Add(int64(n))
+	return n, err
+}
+
+func (w *countingWriter) CloseWithError(err error) error {
+	return w.pw.CloseWithError(err)
+}
+
+// countingReader wraps an io.Reader and counts bytes read through it.
+type countingReader struct {
+	r     io.Reader
+	count *atomic.Int64
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	r.count.Add(int64(n))
+	return n, err
+}
+
+func formatBytes(b int64) string {
+	switch {
+	case b >= 1<<30:
+		return fmt.Sprintf("%.2f GB", float64(b)/(1<<30))
+	case b >= 1<<20:
+		return fmt.Sprintf("%.2f MB", float64(b)/(1<<20))
+	case b >= 1<<10:
+		return fmt.Sprintf("%.2f KB", float64(b)/(1<<10))
+	default:
+		return fmt.Sprintf("%d B", b)
+	}
+}
+
+func createTarGz(cw *countingWriter, dir string) error {
+	gw := gzip.NewWriter(cw)
 	tw := tar.NewWriter(gw)
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -115,6 +211,8 @@ func createTarGz(pw *io.PipeWriter, dir string) error {
 		err = closeErr
 	}
 	// CloseWithError signals the pipe reader; use nil on success so the reader gets EOF
-	pw.CloseWithError(err)
+	if err2 := cw.CloseWithError(err); err2 != nil && err == nil {
+		return errors.Join(err, err2)
+	}
 	return err
 }

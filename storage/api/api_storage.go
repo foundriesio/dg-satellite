@@ -172,6 +172,9 @@ func (d Device) Config() (storage.FioconfigFiles, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(content) == 0 {
+		return storage.FioconfigFiles{}, nil
+	}
 	var files storage.FioconfigFiles
 	if err := json.Unmarshal([]byte(content), &files); err != nil {
 		return nil, fmt.Errorf("unexpected error unmarshalling fioconfig json: %w", err)

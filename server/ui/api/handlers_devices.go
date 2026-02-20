@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/labstack/echo/v4"
 
 	storage "github.com/foundriesio/dg-satellite/storage/api"
@@ -200,6 +201,38 @@ func (h *handlers) deviceLabelsPut(c echo.Context) error {
 }
 
 const AkliteConfigName = "z-50-fioctl.toml"
+
+// @Summary Get the configured compose apps for a device
+// @Produce json
+// @Success 200 {array} string
+// @Router  /devices/:uuid/config/apps [get]
+func (h *handlers) deviceConfigAppsGet(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		config, err := device.Config()
+		if err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to read device config")
+		}
+
+		apps := []string{}
+		if item, ok := config[AkliteConfigName]; ok {
+			var parsed struct {
+				Pacman struct {
+					ComposeApps string `toml:"compose_apps"`
+				} `toml:"pacman"`
+			}
+			if _, err := toml.Decode(item.Value, &parsed); err != nil {
+				return EchoError(c, err, http.StatusInternalServerError, "Failed to parse device config")
+			}
+			for app := range strings.SplitSeq(parsed.Pacman.ComposeApps, ",") {
+				app = strings.TrimSpace(app)
+				if app != "" {
+					apps = append(apps, app)
+				}
+			}
+		}
+		return c.JSON(http.StatusOK, apps)
+	})
+}
 
 // @Summary Set the compose apps for a device
 // @Accept json

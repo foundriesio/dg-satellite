@@ -192,6 +192,14 @@ func (s baseFsHandle) readFile(name string, ignoreNotExist bool) (string, error)
 	}
 }
 
+func (s baseFsHandle) fileModTime(name string) (time.Time, error) {
+	info, err := os.Stat(filepath.Join(s.root, name))
+	if err != nil {
+		return time.Time{}, err
+	}
+	return info.ModTime(), nil
+}
+
 func (s baseFsHandle) readFileLines(name string, ignoreNotExist bool, infinityStop DoneChan) iter.Seq2[string, error] {
 	// memory efficient way to read lines from a potentially large file
 	return func(yield func(string, error) bool) {

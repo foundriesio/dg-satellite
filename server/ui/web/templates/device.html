@@ -82,8 +82,41 @@
             <dd><button onclick="location.href='/devices/{{.Device.Uuid}}/apps-states';">Apps States</button></dd>
           </dl>
         </div>
+        <div>
+          <dl>
+            <dt></dt>
+            <dd><button onclick="openConfigureAppsDialog()">Configure apps</button></dd>
+          </dl>
+        </div>
       </div>
     </section>
+
+    <dialog id="configureAppsModal">
+      <article>
+        <header>
+          <button aria-label="Close" rel="prev" onclick="configureAppsModal.close()"></button>
+          <h3>Configure apps</h3>
+        </header>
+        <div style="display:flex; gap:1rem; align-items:start;">
+          <div style="flex:1;">
+            <label for="appsAvailable">Apps available</label>
+            <select id="appsAvailable" multiple size="8" style="width:100%;"></select>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:0.5rem; justify-content:center; padding-top:1.8rem;">
+            <button type="button" onclick="moveApps('appsAvailable','appsConfigured')" style="padding:0.3rem 0.8rem;">→</button>
+            <button type="button" onclick="moveApps('appsConfigured','appsAvailable')" style="padding:0.3rem 0.8rem;">←</button>
+          </div>
+          <div style="flex:1;">
+            <label for="appsConfigured">Configured apps</label>
+            <select id="appsConfigured" multiple size="8" style="width:100%;"></select>
+          </div>
+        </div>
+        <footer>
+          <button role="button" onclick="configureAppsModal.close()">Cancel</button>
+          <button autofocus role="button" onclick="submitConfiguredApps()">Submit</button>
+        </footer>
+      </article>
+    </dialog>
     
     <section class="content-section">
       <div class="grid device-details">
@@ -191,5 +224,74 @@
         border-bottom: none;
       }
     </style>
+
+    <script>
+      const deviceUuid = '{{.Device.Uuid}}';
+      const configureAppsModal = document.getElementById('configureAppsModal');
+
+      async function openConfigureAppsDialog() {
+        const availableSelect = document.getElementById('appsAvailable');
+        const configuredSelect = document.getElementById('appsConfigured');
+        availableSelect.innerHTML = '';
+        configuredSelect.innerHTML = '';
+
+        try {
+          const [availResp, confResp] = await Promise.all([
+            fetch('/v1/devices/' + deviceUuid + '/config/apps-available'),
+            fetch('/v1/devices/' + deviceUuid + '/config/apps'),
+          ]);
+          if (!availResp.ok || !confResp.ok) {
+            alert('Failed to load app configuration');
+            return;
+          }
+          const allApps = await availResp.json();
+          const configuredApps = await confResp.json();
+          const configuredSet = new Set(configuredApps);
+
+          allApps.forEach(app => {
+            if (!configuredSet.has(app)) {
+              availableSelect.appendChild(new Option(app, app));
+            }
+          });
+          configuredApps.forEach(app => {
+            configuredSelect.appendChild(new Option(app, app));
+          });
+        } catch (e) {
+          alert('Error loading apps: ' + e.message);
+          return;
+        }
+        configureAppsModal.showModal();
+      }
+
+      function moveApps(fromId, toId) {
+        const from = document.getElementById(fromId);
+        const to = document.getElementById(toId);
+        Array.from(from.selectedOptions).forEach(opt => {
+          to.appendChild(opt);
+        });
+      }
+
+      async function submitConfiguredApps() {
+        const configuredSelect = document.getElementById('appsConfigured');
+        const apps = Array.from(configuredSelect.options).map(o => o.value);
+
+        try {
+          const resp = await fetch('/v1/devices/' + deviceUuid + '/config/apps', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(apps),
+          });
+          if (!resp.ok) {
+            const text = await resp.text();
+            alert('Failed to save: ' + text);
+            return;
+          }
+          configureAppsModal.close();
+          location.reload();
+        } catch (e) {
+          alert('Error saving apps: ' + e.message);
+        }
+      }
+    </script>
 
 {{ template "footer"}}

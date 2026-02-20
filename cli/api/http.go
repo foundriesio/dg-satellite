@@ -76,30 +76,41 @@ func (a Api) Delete(resource string, opts ...HttpOption) error {
 	return nil
 }
 
-func (a Api) Put(resource string, body any, opts ...HttpOption) ([]byte, error) {
-	var (
-		options httpOptions
-		reader  io.Reader
-		ok      bool
-	)
+func (a Api) Post(resource string, body any, opts ...HttpOption) ([]byte, error) {
+	var options httpOptions
 	options.apply(opts)
 	url := a.URL + resource
 
-	if reader, ok = body.(io.Reader); ok {
-		if _, ok = options.header["Content-Type"]; !ok {
-			options.header.Set("Content-Type", "application/octet-stream")
-		}
-	} else {
-		jsonData, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request body: %w", err)
-		}
-		reader = bytes.NewBuffer(jsonData)
-		if _, ok = options.header["Content-Type"]; !ok {
-			options.header.Set("Content-Type", "application/json")
-		}
+	reader, err := a.handleRequestBody(body, &options)
+	if err != nil {
+		return nil, err
 	}
+	req, err := http.NewRequest("POST", url, reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header = options.header
 
+	resp, err := a.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer a.closeHttpBody(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, a.handleHttpError(resp)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+func (a Api) Put(resource string, body any, opts ...HttpOption) ([]byte, error) {
+	var options httpOptions
+	options.apply(opts)
+	url := a.URL + resource
+
+	reader, err := a.handleRequestBody(body, &options)
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequest("PUT", url, reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -116,6 +127,25 @@ func (a Api) Put(resource string, body any, opts ...HttpOption) ([]byte, error) 
 	}
 
 	return io.ReadAll(resp.Body)
+}
+
+func (a Api) handleRequestBody(body any, options *httpOptions) (io.Reader, error) {
+	if reader, ok := body.(io.Reader); ok {
+		if _, ok = options.header["Content-Type"]; !ok {
+			options.header.Set("Content-Type", "application/octet-stream")
+		}
+		return reader, nil
+	} else {
+		jsonData, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		reader := bytes.NewBuffer(jsonData) // no need to close
+		if _, ok = options.header["Content-Type"]; !ok {
+			options.header.Set("Content-Type", "application/json")
+		}
+		return reader, nil
+	}
 }
 
 func (a Api) handleHttpError(resp *http.Response) error {

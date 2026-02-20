@@ -265,6 +265,37 @@ func (h *handlers) deviceConfigAppsPut(c echo.Context) error {
 	})
 }
 
+// @Summary Get apps available for a device
+// @Produce json
+// @Success 200 {array} string
+// @Router  /devices/:uuid/config/apps-available [get]
+func (h *handlers) deviceConfigAppsAvailableGet(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		if len(device.Tag) == 0 || len(device.UpdateName) == 0 {
+			return EchoError(c, fmt.Errorf("device is missing tag or update name"), http.StatusInternalServerError, "Failed to get device update TUF metadata")
+		}
+
+		metas, err := h.storage.GetUpdateTufMetadata(device.Tag, device.UpdateName, device.IsProd)
+		if err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to get device update TUF metadata")
+		}
+		signed := metas["targets.json"]["signed"].(map[string]any)
+		targets := signed["targets"].(map[string]any)
+		if tgt, ok := targets[device.Target]; ok {
+			custom := tgt.(map[string]any)["custom"].(map[string]any)
+			if apps, ok := custom["docker_compose_apps"]; ok {
+				appsList := []string{}
+				for app := range apps.(map[string]any) {
+					appsList = append(appsList, app)
+				}
+				return c.JSON(http.StatusOK, appsList)
+			}
+			return c.JSON(http.StatusOK, []string{})
+		}
+		return EchoError(c, fmt.Errorf("device target not found in TUF metadata"), http.StatusInternalServerError, "Failed to get device update TUF metadata")
+	})
+}
+
 func (h *handlers) handleDevice(c echo.Context, next func(*Device) error) error {
 	uuid := c.Param("uuid")
 	if device, err := h.storage.DeviceGet(uuid); err != nil {

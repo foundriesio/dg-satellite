@@ -250,11 +250,11 @@
 
           allApps.forEach(app => {
             if (!configuredSet.has(app)) {
-              availableSelect.appendChild(new Option(app, app));
+              availableSelect.appendChild(makeOption(app, 'appsAvailable', 'appsConfigured'));
             }
           });
           configuredApps.forEach(app => {
-            configuredSelect.appendChild(new Option(app, app));
+            configuredSelect.appendChild(makeOption(app, 'appsConfigured', 'appsAvailable'));
           });
         } catch (e) {
           alert('Error loading apps: ' + e.message);
@@ -263,11 +263,23 @@
         configureAppsModal.showModal();
       }
 
+      function makeOption(app, fromId, toId) {
+        const opt = new Option(app, app);
+        opt.addEventListener('dblclick', () => {
+          const to = document.getElementById(toId);
+          to.appendChild(makeOption(app, toId, fromId));
+          opt.remove();
+        });
+        return opt;
+      }
+
       function moveApps(fromId, toId) {
         const from = document.getElementById(fromId);
-        const to = document.getElementById(toId);
         Array.from(from.selectedOptions).forEach(opt => {
-          to.appendChild(opt);
+          const to = document.getElementById(toId);
+          const newOpt = makeOption(opt.value, toId, fromId);
+          to.appendChild(newOpt);
+          opt.remove();
         });
       }
 

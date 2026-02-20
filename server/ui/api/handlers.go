@@ -30,6 +30,7 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, a auth.Provider) {
 	g.GET("/devices/:uuid/updates/:id", h.deviceUpdatesGet, requireScope(users.ScopeDevicesR))
 	g.PATCH("/devices/:uuid/labels", h.deviceLabelsPatch, requireScope(users.ScopeDevicesRU))
 	g.PUT("/devices/:uuid/labels", h.deviceLabelsPut, requireScope(users.ScopeDevicesRU))
+	g.PUT("/devices/:uuid/config/apps", h.deviceConfigAppsPut, requireScope(users.ScopeDevicesRU))
 	g.GET("/known-labels/devices", h.deviceKnownLabelsGet, requireScope(users.ScopeDevicesR))
 	g.GET("/known-labels/device-groups", h.deviceKnownGroupsGet, requireScope(users.ScopeDevicesR))
 	// In updates APIs :prod path element can be either "prod" or "ci".

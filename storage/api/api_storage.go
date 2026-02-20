@@ -24,6 +24,8 @@ type (
 	AppsStates        = storage.AppsStates
 	DeviceStatus      = storage.DeviceStatus
 	DeviceUpdateEvent = storage.DeviceUpdateEvent
+	FioconfigFiles    = storage.FioconfigFiles
+	FioconfigItem     = storage.FioconfigItem
 )
 
 const (

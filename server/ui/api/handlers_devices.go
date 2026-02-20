@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -193,6 +194,39 @@ func (h *handlers) deviceLabelsPut(c echo.Context) error {
 				return EchoError(c, err, http.StatusConflict, "A device with the same 'name' label value already exists")
 			}
 			return EchoError(c, err, http.StatusInternalServerError, "Failed to update device labels")
+		}
+		return c.NoContent(http.StatusOK)
+	})
+}
+
+const AkliteConfigName = "z-50-fioctl.toml"
+
+// @Summary Set the compose apps for a device
+// @Accept json
+// @Param data body []string true "List of compose app names"
+// @Success 200
+// @Router  /devices/:uuid/config/apps [put]
+func (h *handlers) deviceConfigAppsPut(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		var apps []string
+		if err := c.Bind(&apps); err != nil {
+			return EchoError(c, err, http.StatusBadRequest, "Bad JSON body")
+		}
+
+		config, err := device.Config()
+		if err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to read device config")
+		}
+
+		val := "[pacman]\ncompose_apps = \"" + strings.Join(apps, ",") + "\"\n"
+		config[AkliteConfigName] = storage.FioconfigItem{
+			Unencrypted: true,
+			Value:       val,
+			OnChanged:   []string{"/usr/share/fioconfig/handlers/aktualizr-toml-update"},
+		}
+
+		if err := device.SetConfig(config); err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to save device config")
 		}
 		return c.NoContent(http.StatusOK)
 	})

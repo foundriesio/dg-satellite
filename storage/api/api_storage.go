@@ -165,6 +165,26 @@ func (d Device) AppsStates() ([]AppsStates, error) {
 	return states, nil
 }
 
+func (d Device) Config() (storage.FioconfigFiles, error) {
+	content, err := d.storage.fs.Devices.ReadFile(d.Uuid, storage.FioconfigFile)
+	if err != nil {
+		return nil, err
+	}
+	var files storage.FioconfigFiles
+	if err := json.Unmarshal([]byte(content), &files); err != nil {
+		return nil, fmt.Errorf("unexpected error unmarshalling fioconfig json: %w", err)
+	}
+	return files, nil
+}
+
+func (d Device) SetConfig(files storage.FioconfigFiles) error {
+	data, err := json.Marshal(files)
+	if err != nil {
+		return fmt.Errorf("unexpected error marshalling fioconfig json: %w", err)
+	}
+	return d.storage.fs.Devices.WriteFile(d.Uuid, storage.FioconfigFile, string(data))
+}
+
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	handle := Storage{db: db, fs: fs}
 

@@ -37,11 +37,12 @@ const (
 	HmacFile       = "hmac.secret"
 
 	// Per device files/dirs
-	AktomlFile   = "aktoml"
-	HwInfoFile   = "hardware-info"
-	NetInfoFile  = "network-info"
-	EventsPrefix = "events"
-	StatesPrefix = "apps-states"
+	AktomlFile    = "aktoml"
+	HwInfoFile    = "hardware-info"
+	NetInfoFile   = "network-info"
+	FioconfigFile = "fioconfig"
+	EventsPrefix  = "events"
+	StatesPrefix  = "apps-states"
 
 	// Per update files/dirs
 	// Update roots

@@ -91,3 +91,11 @@ type AppsStates struct {
 		} `json:"services"`
 	} `json:"apps"`
 }
+
+type FioconfigItem struct {
+	Unencrypted bool
+	Value       string
+	OnChanged   []string
+}
+
+type FioconfigFiles map[string]FioconfigItem

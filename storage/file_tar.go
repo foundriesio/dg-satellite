@@ -21,12 +21,24 @@ type tarUnpackConfig struct {
 	fileAccess  os.FileMode
 	tmpFile     string
 	tmpDir      string
-
-	onTmpRenameErr  func(error) (bool, error)
-	onTmpCleanupErr func(error)
+	events      tarUnpackEvents
 }
 
-type TarUnpackOption func(tarUnpackConfig) tarUnpackConfig
+type tarUnpackEvents struct {
+	// Notifications that can be used to interrupt or amend unpacking process
+	onUnpackStarted  func() error
+	onTarHeaderSeen  func(*TarHeader) (skip bool, err error)
+	onUnpackComplete func() error
+	// Error handlers for two specific errors of interest
+	onTmpRenameError  func(error) (isDestCorrupted bool, err error)
+	onTmpCleanupError func(error)
+}
+
+type (
+	TarUnpackOption func(tarUnpackConfig) tarUnpackConfig
+
+	TarHeader = tar.Header
+)
 
 func TarUnpackDirAccess(mode os.FileMode) TarUnpackOption {
 	return func(cfg tarUnpackConfig) tarUnpackConfig {
@@ -81,18 +93,9 @@ func TarUnpackUseTmpFile(val string) TarUnpackOption {
 	}
 }
 
-// Error handler for a failure of renaming temporary directory to destination. Used optionally with TarUnpackUseTmpDir.
-func TarUnpackOnTmpRenameErr(val func(error) (isCorrupted bool, err error)) TarUnpackOption {
+func TarUnpackOnEvents(val tarUnpackEvents) TarUnpackOption {
 	return func(cfg tarUnpackConfig) tarUnpackConfig {
-		cfg.onTmpRenameErr = val
-		return cfg
-	}
-}
-
-// Error handler for temporary directory cleanup failure. Used optionally with TarUnpackUseTmpDir.
-func TarUnpackOnTmpCleanupErr(val func(error)) TarUnpackOption {
-	return func(cfg tarUnpackConfig) tarUnpackConfig {
-		cfg.onTmpCleanupErr = val
+		cfg.events = val
 		return cfg
 	}
 }
@@ -180,8 +183,8 @@ func (s tarFsHandle) _handleTmpDir(destDirPath string, cfg tarUnpackConfig, unpa
 	var isDestCorrupted bool
 	defer func() {
 		if !isDestCorrupted {
-			if err := os.RemoveAll(txDirPath); err != nil && cfg.onTmpCleanupErr != nil {
-				cfg.onTmpCleanupErr(err)
+			if err := os.RemoveAll(txDirPath); err != nil && cfg.events.onTmpCleanupError != nil {
+				cfg.events.onTmpCleanupError(err)
 			}
 		}
 	}()
@@ -207,8 +210,8 @@ func (s tarFsHandle) _handleTmpDir(destDirPath string, cfg tarUnpackConfig, unpa
 		// If the second phase fails, source directory is moved to backup, while unpacked directory is not yet moved.
 		// Although the destination directory does not exist in this case - this is a potential data corruption.
 		// Let the caller decide what to do in this case. By default do nothing.
-		if cfg.onTmpRenameErr != nil {
-			isDestCorrupted, err = cfg.onTmpRenameErr(err)
+		if cfg.events.onTmpRenameError != nil {
+			isDestCorrupted, err = cfg.events.onTmpRenameError(err)
 		} else {
 			err = fmt.Errorf("failed to rename unpacked directory: %w", err)
 		}
@@ -247,6 +250,11 @@ func (s tarFsHandle) _handleTmpFile(srcReader io.Reader, cfg tarUnpackConfig) (i
 }
 
 func (s tarFsHandle) _unpackTar(srcReader io.Reader, destDirPath string, cfg tarUnpackConfig) error {
+	if cfg.events.onUnpackStarted != nil {
+		if err := cfg.events.onUnpackStarted(); err != nil {
+			return err
+		}
+	}
 	// Unpack config upload tarball; if it fails - halt.
 	tarReader := tar.NewReader(srcReader)
 	for {
@@ -256,6 +264,13 @@ func (s tarFsHandle) _unpackTar(srcReader io.Reader, destDirPath string, cfg tar
 				break // Success
 			}
 			return fmt.Errorf("failed to unpack tarball header: %w", err)
+		}
+		if cfg.events.onTarHeaderSeen != nil {
+			if skip, err := cfg.events.onTarHeaderSeen(hdr); err != nil {
+				return err
+			} else if skip {
+				continue
+			}
 		}
 		switch hdr.Typeflag {
 		case tar.TypeReg:
@@ -287,6 +302,11 @@ func (s tarFsHandle) _unpackTar(srcReader io.Reader, destDirPath string, cfg tar
 			return fmt.Errorf("failed to unpack file '%s': %w", hdr.Name, err)
 		} else if _, err = io.Copy(file, tarReader); err != nil {
 			return fmt.Errorf("failed to unpack file '%s': %w", hdr.Name, err)
+		}
+	}
+	if cfg.events.onUnpackComplete != nil {
+		if err := cfg.events.onUnpackComplete(); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -147,14 +147,16 @@ func (s ConfigsFsHandle) SaveUpload(payload io.Reader, onCleanupFailure func(err
 		TarUnpackReplaceDest(true),
 		TarUnpackUseTmpFile("configs.tar"),
 		TarUnpackUseTmpDir(txDir),
-		TarUnpackOnTmpRenameErr(func(err error) (bool, error) {
-			return true, ErrConfigUploadBroken{
-				err:         fmt.Errorf("failed to make uploaded config active: %s", err),
-				ConfigsPath: s.root, // not h.root
-				UploadPath:  filepath.Join(h.root, txDir),
-			}
+		TarUnpackOnEvents(tarUnpackEvents{
+			onTmpCleanupError: onCleanupFailure,
+			onTmpRenameError: func(err error) (bool, error) {
+				return true, ErrConfigUploadBroken{
+					err:         fmt.Errorf("failed to make uploaded config active: %s", err),
+					ConfigsPath: s.root, // not h.root
+					UploadPath:  filepath.Join(h.root, txDir),
+				}
+			},
 		}),
-		TarUnpackOnTmpCleanupErr(onCleanupFailure),
 	)
 }
 

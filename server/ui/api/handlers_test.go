@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -110,8 +111,23 @@ func (c testClient) GET(resource string, status int, headers ...string) []byte {
 	return rec.Body.Bytes()
 }
 
+func (c testClient) DELETE(resource string, status int, headers ...string) []byte {
+	req := httptest.NewRequest(http.MethodDelete, "/v1"+resource, nil)
+	c.marshalHeaders(headers, req)
+	rec := c.Do(req)
+	require.Equal(c.t, status, rec.Code)
+	return rec.Body.Bytes()
+}
 func (c testClient) PATCH(resource string, status int, data any, headers ...string) []byte {
 	req := httptest.NewRequest(http.MethodPatch, "/v1"+resource, c.marshalBody(data))
+	c.marshalHeaders(headers, req)
+	rec := c.Do(req)
+	require.Equal(c.t, status, rec.Code)
+	return rec.Body.Bytes()
+}
+
+func (c testClient) POST(resource string, status int, body io.Reader, headers ...string) []byte {
+	req := httptest.NewRequest(http.MethodPost, "/v1"+resource, body)
 	c.marshalHeaders(headers, req)
 	rec := c.Do(req)
 	require.Equal(c.t, status, rec.Code)
@@ -121,13 +137,6 @@ func (c testClient) PATCH(resource string, status int, data any, headers ...stri
 func (c testClient) PUT(resource string, status int, data any, headers ...string) []byte {
 	req := httptest.NewRequest(http.MethodPut, "/v1"+resource, c.marshalBody(data))
 	c.marshalHeaders(headers, req)
-	rec := c.Do(req)
-	require.Equal(c.t, status, rec.Code)
-	return rec.Body.Bytes()
-}
-
-func (c testClient) DELETE(resource string, status int) []byte {
-	req := httptest.NewRequest(http.MethodDelete, "/v1"+resource, nil)
 	rec := c.Do(req)
 	require.Equal(c.t, status, rec.Code)
 	return rec.Body.Bytes()
@@ -952,6 +961,103 @@ func TestApiUploadConfigs(t *testing.T) {
 		r := gzipBuffer(t, tarBuffer(t, validTarFiles))
 		tc.PUT("/configs", 200, r, "Content-Type", "application/gzip")
 	})
+}
+
+func TestApiUpdateCreate(t *testing.T) {
+	tc := NewTestClient(t)
+
+	validTar := tarBuffer(t, map[string]string{
+		"tuf/root.json":              `{"signed":{}}`,
+		"tuf/targets.json":           `{"signed":{}}`,
+		"ostree_repo/config":         "[core]\nrepo_version=1\n",
+		"ostree_repo/refs/heads/foo": "abc123",
+	})
+
+	// Should require auth scope
+	tc.POST("/updates/ci/main/v1.0", 403, bytes.NewReader(validTar.Bytes()),
+		"Content-Type", "application/x-tar")
+
+	tc.u.AllowedScopes = users.ScopeUpdatesRU
+
+	// Valid tar with tuf + ostree_repo
+	tc.POST("/updates/ci/main/v1.0", 201, bytes.NewReader(validTar.Bytes()),
+		"Content-Type", "application/x-tar")
+
+	// Verify files were extracted to the right place
+	updatesDir := tc.fs.Config.UpdatesCiDir()
+	root, err := os.ReadFile(filepath.Join(updatesDir, "main", "v1.0", "tuf", "root.json"))
+	require.NoError(t, err)
+	assert.Equal(t, `{"signed":{}}`, string(root))
+	config, err := os.ReadFile(filepath.Join(updatesDir, "main", "v1.0", "ostree_repo", "config"))
+	require.NoError(t, err)
+	assert.Equal(t, "[core]\nrepo_version=1\n", string(config))
+
+	// Valid tar with tuf + apps (no ostree_repo)
+	appsTar := tarBuffer(t, map[string]string{
+		"tuf/root.json":    `{"signed":{}}`,
+		"tuf/targets.json": `{"signed":{}}`,
+		"apps/myapp.json":  `{"name":"myapp"}`,
+	})
+	tc.POST("/updates/prod/main/v2.0", 201, bytes.NewReader(appsTar.Bytes()),
+		"Content-Type", "application/x-tar")
+	prodDir := tc.fs.Config.UpdatesProdDir()
+	appData, err := os.ReadFile(filepath.Join(prodDir, "main", "v2.0", "apps", "myapp.json"))
+	require.NoError(t, err)
+	assert.Equal(t, `{"name":"myapp"}`, string(appData))
+
+	// Valid tar with tuf + ostree_repo + apps (both present)
+	bothTar := tarBuffer(t, map[string]string{
+		"tuf/root.json":      `{"signed":{}}`,
+		"ostree_repo/config": "[core]\n",
+		"apps/myapp.json":    `{}`,
+	})
+	tc.POST("/updates/ci/main/v3.0", 201, bytes.NewReader(bothTar.Bytes()),
+		"Content-Type", "application/x-tar")
+
+	// Missing tuf directory
+	noTufTar := tarBuffer(t, map[string]string{
+		"ostree_repo/config": "[core]\n",
+	})
+	data := tc.POST("/updates/ci/main/v-bad1", 400, bytes.NewReader(noTufTar.Bytes()),
+		"Content-Type", "application/x-tar")
+	assert.Contains(t, string(data), "invalid update archive")
+
+	// Missing ostree_repo and apps
+	noContentTar := tarBuffer(t, map[string]string{
+		"tuf/root.json": `{"signed":{}}`,
+	})
+	data = tc.POST("/updates/ci/main/v-bad2", 400, bytes.NewReader(noContentTar.Bytes()),
+		"Content-Type", "application/x-tar")
+	assert.Contains(t, string(data), "invalid update archive")
+
+	// Gzip-compressed tar via Content-Type
+	gzTar := gzipBuffer(t, tarBuffer(t, map[string]string{
+		"tuf/root.json":      `{"signed":{}}`,
+		"ostree_repo/config": "[core]\n",
+	}))
+	tc.POST("/updates/ci/main/v4.0", 201, bytes.NewReader(gzTar.Bytes()),
+		"Content-Type", "application/gzip")
+	_, err = os.ReadFile(filepath.Join(updatesDir, "main", "v4.0", "tuf", "root.json"))
+	require.NoError(t, err)
+
+	// Gzip-compressed tar via Content-Encoding header
+	gzTar2 := gzipBuffer(t, tarBuffer(t, map[string]string{
+		"tuf/root.json":      `{"signed":{}}`,
+		"ostree_repo/config": "[core]\n",
+	}))
+	tc.POST("/updates/ci/main/v5.0", 201, bytes.NewReader(gzTar2.Bytes()),
+		"Content-Type", "application/x-tar",
+		"Content-Encoding", "gzip")
+	_, err = os.ReadFile(filepath.Join(updatesDir, "main", "v5.0", "tuf", "root.json"))
+	require.NoError(t, err)
+
+	// Invalid gzip stream
+	tc.POST("/updates/ci/main/v-bad3", 500, strings.NewReader("not-gzip-data"),
+		"Content-Type", "application/gzip")
+
+	// Invalid update path params
+	tc.POST("/updates/ci/../../etc/v1.0", 404, bytes.NewReader(validTar.Bytes()),
+		"Content-Type", "application/x-tar")
 }
 
 var tarBuffer = storageTesting.CreateTarBuffer

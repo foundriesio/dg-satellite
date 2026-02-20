@@ -61,6 +61,7 @@ var (
 
 	IsDbError             = storage.IsDbError
 	ErrDbConstraintUnique = storage.ErrDbConstraintUnique
+	ErrInvalidUpdate      = storage.ErrInvalidUpdate
 )
 
 // DeviceListOpts lets you set the order devices will be returned
@@ -393,6 +394,18 @@ func (s Storage) UploadConfigs(payload io.Reader) (err error) {
 		// This is not critical - log and let the "real" error/success return below.
 		slog.Error("Failed to clean upload directory", "error", cleanupErr)
 	})
+}
+
+func (s Storage) CreateUpdate(tag, updateName string, isProd bool, payload io.Reader) error {
+	cleanup := func(cleanupErr error) {
+		// This is not critical - log and let the "real" error/success return below.
+		slog.Error("Failed to clean upload directory", "error", cleanupErr)
+	}
+	if isProd {
+		return s.fs.Updates.Prod.SaveUpload(tag, updateName, payload, cleanup)
+	} else {
+		return s.fs.Updates.Ci.SaveUpload(tag, updateName, payload, cleanup)
+	}
 }
 
 func (s Storage) getRolloutsFsHandle(isProd bool) storage.RolloutsFsHandle {

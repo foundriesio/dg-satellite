@@ -44,8 +44,8 @@ var orderByDeviceMap = map[OrderBy]string{
 	OrderByDeviceLastSeenAsc: "last_seen ASC",
 	OrderByDeviceLastSeenDsc: "last_seen DESC",
 	// Devices with name always come before devices without name
-	OrderByDeviceNameAsc:  "name ASC NULLS LAST, uuid ASC",
-	OrderByDeviceNameDesc: "name DESC NULLS LAST, uuid DESC",
+	OrderByDeviceNameAsc:  "name = '', name ASC NULLS LAST, uuid ASC",
+	OrderByDeviceNameDesc: "name = '', name DESC NULLS LAST, uuid DESC",
 	OrderByDeviceUuidAsc:  "uuid ASC",
 	OrderByDeviceUuidDesc: "uuid DESC",
 }

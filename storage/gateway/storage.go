@@ -73,6 +73,8 @@ type Device struct {
 	TargetName string `json:"target_name"`
 	Tag        string `json:"tag"`
 	UpdateName string `json:"update_name"`
+
+	groupNameModifiedAt int64
 }
 
 func (d *Device) CheckIn(targetName, tag, ostreeHash string, apps string) error {
@@ -168,8 +170,11 @@ func (d Device) GetTufMeta(tag, file string) (string, error) {
 func (d Device) GetConfigs() (configs [3]string, timestamp int64, err error) {
 	// Returns 3 configs (in order): factory, group, device; and their latest modification timestamp.
 	var ts int64
-	if configs[0], timestamp, err = d.storage.fs.Configs.ReadFactoryConfig(); err != nil {
+	timestamp = d.groupNameModifiedAt
+	if configs[0], ts, err = d.storage.fs.Configs.ReadFactoryConfig(); err != nil {
 		return
+	} else if ts > timestamp {
+		timestamp = ts
 	}
 	if len(d.GroupName) > 0 {
 		if configs[1], ts, err = d.storage.fs.Configs.ReadGroupConfig(d.GroupName); err != nil {
@@ -269,7 +274,9 @@ type stmtDeviceGet storage.DbStmt
 
 func (s *stmtDeviceGet) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("DeviceGet", `
-		SELECT deleted, pubkey, group_name, update_name, last_seen, is_prod, tag, target_name, ostree_hash, apps
+		SELECT
+			deleted, pubkey, group_name, update_name, last_seen, is_prod, tag, target_name,
+			ostree_hash, apps, group_name_modified_at
 		FROM devices
 		WHERE uuid = ?`,
 	)
@@ -278,5 +285,6 @@ func (s *stmtDeviceGet) Init(db storage.DbHandle) (err error) {
 
 func (s *stmtDeviceGet) run(uuid string, d *Device) error {
 	return s.Stmt.QueryRow(uuid).Scan(
-		&d.Deleted, &d.PubKey, &d.GroupName, &d.UpdateName, &d.LastSeen, &d.IsProd, &d.Tag, &d.TargetName, &d.OstreeHash, &d.Apps)
+		&d.Deleted, &d.PubKey, &d.GroupName, &d.UpdateName, &d.LastSeen, &d.IsProd, &d.Tag, &d.TargetName,
+		&d.OstreeHash, &d.Apps, &d.groupNameModifiedAt)
 }

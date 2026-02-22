@@ -323,10 +323,18 @@ func TestConfig(t *testing.T) {
 	checkTimestamp(false)
 	tick(true)
 
-	setGroupStmt, err := tc.db.Prepare("TestUpdateGroup", "UPDATE devices SET labels=jsonb_set(labels,'$.group',?) WHERE uuid=?")
+	// SQLite sets group_name_modified_at inside a trigger. Override it to our desired value.
+	// A rudimentary test is to verify that the group_name_modified_at inside a table was set to some non-zero value.
+	setGroupStmt, err := tc.db.Prepare("TestUpdateGroup",
+		`UPDATE devices SET labels=jsonb_set(labels,'$.group',?) WHERE uuid=?`)
+	require.Nil(t, err)
+	setGroupModifiedStmt, err := tc.db.Prepare("TestUpdateGroupModified",
+		"UPDATE devices SET group_name_modified_at=? WHERE uuid=? AND group_name_modified_at != 0")
 	require.Nil(t, err)
 	setGroup := func(group string) {
 		_, err := setGroupStmt.Exec(group, tc.uuid)
+		require.Nil(t, err)
+		_, err = setGroupModifiedStmt.Exec(now.Unix(), tc.uuid)
 		require.Nil(t, err)
 	}
 
@@ -338,9 +346,8 @@ func TestConfig(t *testing.T) {
 	checkConfig("bar", "bar device")
 	checkConfig("baz", "baz device")
 	checkConfig("toe", "first toe")
-	// TODO: group change tracking is added in the next commit
-	checkTimestamp(false)
-	tick(false)
+	checkTimestamp(true)
+	tick(true)
 
 	// Set second group - adds one config, overrides one factory config, both are overridden by device config
 	setGroup("second")
@@ -349,9 +356,8 @@ func TestConfig(t *testing.T) {
 	checkConfig("foo", "foo content")
 	checkConfig("bar", "bar device")
 	checkConfig("baz", "baz device")
-	// TODO: group change tracking is added in the next commit
-	checkTimestamp(false)
-	tick(false)
+	checkTimestamp(true)
+	tick(true)
 
 	// Changed device config - remove one factory/group override, keep another group override, add one more config
 	require.Nil(t, tc.fs.Configs.WriteDeviceConfig(tc.uuid,
@@ -397,8 +403,7 @@ func TestConfig(t *testing.T) {
 	checkConfig("bar", "bar content", "/bin/bar")
 	checkConfig("baz", "baz device")
 	checkConfig("ooh", "ooh device")
-	// TODO: group change tracking is added in the next commit
-	checkTimestamp(false)
+	checkTimestamp(true)
 }
 
 func TestInfo(t *testing.T) {

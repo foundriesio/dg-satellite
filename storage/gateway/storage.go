@@ -65,6 +65,7 @@ type Device struct {
 	Uuid       string `json:"uuid"`
 	Apps       string `json:"docker_apps"`
 	Deleted    bool   `json:"-"`
+	GroupName  string `json:"group_name"`
 	IsProd     bool   `json:"is_prod"`
 	LastSeen   int64  `json:"last_seen"`
 	OstreeHash string `json:"ostree_hash"`
@@ -164,6 +165,22 @@ func (d Device) GetTufMeta(tag, file string) (string, error) {
 	}
 }
 
+func (d Device) GetConfigs() (configs [3]string, err error) {
+	// Returns 3 configs (in order): factory, group, device.
+	if configs[0], err = d.storage.fs.Configs.ReadFactoryConfig(); err != nil {
+		return
+	}
+	if len(d.GroupName) > 0 {
+		if configs[1], err = d.storage.fs.Configs.ReadFactoryConfig(); err != nil {
+			return
+		}
+	}
+	if configs[2], err = d.storage.fs.Configs.ReadFactoryConfig(); err != nil {
+		return
+	}
+	return
+}
+
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	handle := Storage{
 		db:        db,
@@ -247,7 +264,7 @@ type stmtDeviceGet storage.DbStmt
 
 func (s *stmtDeviceGet) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("DeviceGet", `
-		SELECT deleted, pubkey, update_name, last_seen, is_prod, tag, target_name, ostree_hash, apps
+		SELECT deleted, pubkey, group_name, update_name, last_seen, is_prod, tag, target_name, ostree_hash, apps
 		FROM devices
 		WHERE uuid = ?`,
 	)
@@ -256,5 +273,5 @@ func (s *stmtDeviceGet) Init(db storage.DbHandle) (err error) {
 
 func (s *stmtDeviceGet) run(uuid string, d *Device) error {
 	return s.Stmt.QueryRow(uuid).Scan(
-		&d.Deleted, &d.PubKey, &d.UpdateName, &d.LastSeen, &d.IsProd, &d.Tag, &d.TargetName, &d.OstreeHash, &d.Apps)
+		&d.Deleted, &d.PubKey, &d.GroupName, &d.UpdateName, &d.LastSeen, &d.IsProd, &d.Tag, &d.TargetName, &d.OstreeHash, &d.Apps)
 }

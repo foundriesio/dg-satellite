@@ -109,6 +109,15 @@ func createTables(db *sql.DB) error {
 			SELECT json_each.key FROM json_each(NEW.labels);
 		END;
 
+		CREATE TRIGGER devices_after_update_group_name AFTER UPDATE ON devices
+		FOR EACH ROW
+		WHEN OLD.labels ->> '$.group' != NEW.labels ->> '$.group'
+		BEGIN
+			UPDATE devices
+			SET group_name_modified_at = unixepoch('now')
+			WHERE uuid == NEW.uuid;
+		END;
+
 		CREATE TABLE users (
 			id             INTEGER PRIMARY KEY AUTOINCREMENT,
 			username       TEXT NOT NULL UNIQUE,

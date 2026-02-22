@@ -84,8 +84,14 @@ func createTables(db *sql.DB) error {
 			ostree_hash VARCHAR(80) DEFAULT "",
 			apps VARCHAR(2048) DEFAULT "",
 
-			name VARCHAR(80) GENERATED ALWAYS AS (labels ->> '$.name') VIRTUAL,
-			group_name VARCHAR(80) GENERATED ALWAYS AS (labels ->> '$.group') VIRTUAL
+			group_name_modified_at INT DEFAULT 0,
+
+			name VARCHAR(80) GENERATED ALWAYS AS (
+				COALESCE(labels ->> '$.name', '')
+			) VIRTUAL,
+			group_name VARCHAR(80) GENERATED ALWAYS AS (
+				COALESCE(labels ->> '$.group', '')
+			) VIRTUAL
 		) WITHOUT ROWID;
 
 		CREATE UNIQUE INDEX idx_device_name ON devices(name);
@@ -96,6 +102,8 @@ func createTables(db *sql.DB) error {
 		) WITHOUT ROWID;
 
 		CREATE TRIGGER devices_after_update_labels AFTER UPDATE ON devices
+		FOR EACH ROW
+		WHEN OLD.labels != NEW.labels
 		BEGIN
 			INSERT OR IGNORE INTO device_labels(label)
 			SELECT json_each.key FROM json_each(NEW.labels);

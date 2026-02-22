@@ -3,6 +3,7 @@ module github.com/foundriesio/dg-satellite
 go 1.24.4
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/alexflint/go-arg v1.6.0
 	github.com/go-pkgz/expirable-cache/v3 v3.1.0
 	github.com/labstack/echo/v4 v4.14.0

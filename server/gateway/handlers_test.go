@@ -406,6 +406,45 @@ func TestConfig(t *testing.T) {
 	checkTimestamp(true)
 }
 
+func TestConfigSota(t *testing.T) {
+	tc := NewTestClient(t)
+	_ = tc.GET("/device", 200) // auto-register before setting group
+
+	setGroupStmt, err := tc.db.Prepare("TestUpdateGroup",
+		`UPDATE devices SET labels=jsonb_set(labels,'$.group',?) WHERE uuid=?`)
+	require.Nil(t, err)
+	_, err = setGroupStmt.Exec("group", tc.uuid)
+	require.Nil(t, err)
+
+	marshalSota := func(cfg string) string {
+		jsonCfg, e := json.Marshal(cfg)
+		require.Nil(t, e)
+		return fmt.Sprintf(`{"%s":{"Value":%s}}`, sotaOverride, string(jsonCfg))
+	}
+
+	cfg := marshalSota("[pacman]\ntags='factory'\napps='factory'\n[madman]\nfoo='bar'\n")
+	require.Nil(t, tc.fs.Configs.WriteFactoryConfig(cfg))
+	cfg = marshalSota("[pacman]\ntags='group'\n[madman]\nbar='baz'\n")
+	require.Nil(t, tc.fs.Configs.WriteGroupConfig("group", cfg))
+	cfg = marshalSota("[pacman]\napps='device'\n[badman]\nfoo='bar'\n")
+	require.Nil(t, tc.fs.Configs.WriteDeviceConfig(tc.uuid, cfg))
+
+	// TOML library uses double-quotes for values, sorts everything alphabetically, and puts spaces around equality.
+	mergedCfg := marshalSota(`[badman]
+foo = "bar"
+
+[madman]
+bar = "baz"
+foo = "bar"
+
+[pacman]
+apps = "device"
+tags = "group"
+`)
+	serverCfg := strings.Trim(string(tc.GET("/config", 200)), "\n")
+	require.Equal(t, mergedCfg, serverCfg)
+}
+
 func TestInfo(t *testing.T) {
 	akInfo := "[config]\nkey=value"
 	hwInfo := `{"key":"value"}`

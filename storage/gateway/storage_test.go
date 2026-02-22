@@ -107,6 +107,30 @@ func TestStorage(t *testing.T) {
 	content, err := fs.Devices.ReadFile(d2.Uuid, storage.AktomlFile)
 	require.Nil(t, err)
 	require.Equal(t, "test content", content)
+
+	require.Nil(t, fs.Configs.WriteFactoryConfig("factory config"))
+	require.Nil(t, fs.Configs.WriteGroupConfig("grp", "group config"))
+	require.Nil(t, fs.Configs.WriteDeviceConfig(d2.Uuid, "device config"))
+
+	d3 := Device{Uuid: "fake", storage: *s}
+	cfgs, err := d3.GetConfigs()
+	require.Nil(t, err)
+	require.Equal(t, "factory config", cfgs[0])
+	require.Equal(t, "", cfgs[1])
+	require.Equal(t, "", cfgs[2])
+
+	cfgs, err = d2.GetConfigs()
+	require.Nil(t, err)
+	require.Equal(t, "factory config", cfgs[0])
+	require.Equal(t, "", cfgs[1])
+	require.Equal(t, "device config", cfgs[2])
+
+	d2.GroupName = "grp"
+	cfgs, err = d2.GetConfigs()
+	require.Nil(t, err)
+	require.Equal(t, "factory config", cfgs[0])
+	require.Equal(t, "group config", cfgs[1])
+	require.Equal(t, "device config", cfgs[2])
 }
 
 func Test_ProcessEvents(t *testing.T) {

@@ -217,6 +217,122 @@ func TestCheckIn(t *testing.T) {
 	assert.Equal(t, target, d.TargetName)
 }
 
+func TestConfig(t *testing.T) {
+	tc := NewTestClient(t)
+	getConfig := func(status int) (cfg map[string]ConfigFile) {
+		bytes := tc.GET("/config", status)
+		if status == 200 {
+			require.Nil(t, json.Unmarshal(bytes, &cfg))
+		}
+		return
+	}
+
+	// No config
+	cfg := getConfig(200)
+	require.Equal(t, 0, len(cfg))
+
+	checkConfig := func(name, content string, onChanged ...string) {
+		v, ok := cfg[name]
+		require.True(t, ok)
+		require.Equal(t, content, v.Value)
+		require.Equal(t, len(onChanged), len(v.OnChanged))
+		for idx, item := range onChanged {
+			require.Equal(t, item, v.OnChanged[idx])
+		}
+	}
+
+	// Added factory configs
+	require.Nil(t, tc.fs.Configs.WriteFactoryConfig(
+		`{"foo":{"Value":"foo content"},"bar":{"Value":"bar content","OnChanged":["/bin/bar"]}}`))
+	cfg = getConfig(200)
+	require.Equal(t, 2, len(cfg))
+	checkConfig("foo", "foo content")
+	checkConfig("bar", "bar content", "/bin/bar")
+
+	// Added device configs - override one factory config, adds one more
+	require.Nil(t, tc.fs.Configs.WriteDeviceConfig(tc.uuid,
+		`{"bar":{"Value":"bar device"},"baz":{"Value":"baz device"}}`))
+	cfg = getConfig(200)
+	require.Equal(t, 3, len(cfg))
+	checkConfig("foo", "foo content")
+	checkConfig("bar", "bar device")
+	checkConfig("baz", "baz device")
+
+	// Added group configs, group not set
+	require.Nil(t, tc.fs.Configs.WriteGroupConfig("first",
+		`{"baz":{"Value":"first baz"},"toe":{"Value":"first toe"}}`))
+	require.Nil(t, tc.fs.Configs.WriteGroupConfig("second",
+		`{"bar":{"Value":"second bar"},"baz":{"Value":"second baz"}}`))
+	cfg = getConfig(200)
+	require.Equal(t, 3, len(cfg))
+	checkConfig("foo", "foo content")
+	checkConfig("bar", "bar device")
+	checkConfig("baz", "baz device")
+
+	setGroupStmt, err := tc.db.Prepare("TestUpdateGroup", "UPDATE devices SET labels=jsonb_set(labels,'$.group',?) WHERE uuid=?")
+	require.Nil(t, err)
+	setGroup := func(group string) {
+		_, err := setGroupStmt.Exec(group, tc.uuid)
+		require.Nil(t, err)
+	}
+
+	// Set first group - adds two configs, one is overridden by device config
+	setGroup("first")
+	cfg = getConfig(200)
+	require.Equal(t, 4, len(cfg))
+	checkConfig("foo", "foo content")
+	checkConfig("bar", "bar device")
+	checkConfig("baz", "baz device")
+	checkConfig("toe", "first toe")
+
+	// Set second group - adds one config, overrides one factory config, both are overridden by device config
+	setGroup("second")
+	cfg = getConfig(200)
+	require.Equal(t, 3, len(cfg))
+	checkConfig("foo", "foo content")
+	checkConfig("bar", "bar device")
+	checkConfig("baz", "baz device")
+
+	// Changed device config - remove one factory/group override, keep another group override, add one more config
+	require.Nil(t, tc.fs.Configs.WriteDeviceConfig(tc.uuid,
+		`{"ooh":{"Value":"ooh device"},"baz":{"Value":"baz device"}}`))
+	cfg = getConfig(200)
+	require.Equal(t, 4, len(cfg))
+	checkConfig("foo", "foo content")
+	checkConfig("bar", "second bar")
+	checkConfig("baz", "baz device")
+	checkConfig("ooh", "ooh device")
+
+	// Changed group config - remove factory override, add one more config
+	require.Nil(t, tc.fs.Configs.WriteGroupConfig("second",
+		`{"tip":{"Value":"second tip","OnChanged":["/big/tip"]},"baz":{"Value":"second baz"}}`))
+	cfg = getConfig(200)
+	require.Equal(t, 5, len(cfg))
+	checkConfig("foo", "foo content")
+	checkConfig("bar", "bar content", "/bin/bar")
+	checkConfig("baz", "baz device")
+	checkConfig("ooh", "ooh device")
+	checkConfig("tip", "second tip", "/big/tip")
+
+	// Changed factory config - remove one config
+	require.Nil(t, tc.fs.Configs.WriteFactoryConfig(
+		`{"bar":{"Value":"bar content","OnChanged":["/bin/bar"]}}`))
+	cfg = getConfig(200)
+	require.Equal(t, 4, len(cfg))
+	checkConfig("bar", "bar content", "/bin/bar")
+	checkConfig("baz", "baz device")
+	checkConfig("ooh", "ooh device")
+	checkConfig("tip", "second tip", "/big/tip")
+
+	// Set third group, no group config
+	setGroup("third")
+	cfg = getConfig(200)
+	require.Equal(t, 3, len(cfg))
+	checkConfig("bar", "bar content", "/bin/bar")
+	checkConfig("baz", "baz device")
+	checkConfig("ooh", "ooh device")
+}
+
 func TestInfo(t *testing.T) {
 	akInfo := "[config]\nkey=value"
 	hwInfo := `{"key":"value"}`

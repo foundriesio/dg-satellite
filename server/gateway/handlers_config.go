@@ -4,12 +4,16 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/labstack/echo/v4"
 )
+
+const sotaOverride = "z-50-fioctl.toml"
 
 type ConfigFile struct {
 	Value       string
@@ -43,18 +47,64 @@ func (h handlers) configGet(c echo.Context) error {
 		}
 	}
 
-	files := make(map[string]ConfigFile)
+	// A reference type here allows manipulating map values directly below.
+	files := make(map[string]*ConfigFile)
+	pacmanCfg := make(pacmanConfig)
 	for _, rawConfig := range configs {
-		var cfg map[string]ConfigFile
+		var cfg map[string]*ConfigFile
 		if len(rawConfig) == 0 {
 			continue
 		} else if err = json.Unmarshal([]byte(rawConfig), &cfg); err != nil {
 			return EchoError(c, err, http.StatusInternalServerError, "failed to parse config JSON")
 		}
 		for k, v := range cfg {
+			if k == sotaOverride {
+				if err = pacmanCfg.merge(v.Value); err != nil {
+					return EchoError(c, err, http.StatusInternalServerError, "failed to parse sota toml config")
+				}
+			}
 			files[k] = v
+		}
+	}
+	if !pacmanCfg.empty() {
+		if files[sotaOverride].Value, err = pacmanCfg.encode(); err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "failed to encode merged sota toml config")
 		}
 	}
 	c.Response().Header().Set("Date", cts.Format(time.RFC1123))
 	return c.JSON(http.StatusOK, files)
+}
+
+type pacmanConfig map[string]map[string]interface{}
+
+func (p pacmanConfig) empty() bool {
+	return len(p) == 0
+}
+
+func (p pacmanConfig) encode() (string, error) {
+	buf := new(bytes.Buffer)
+	encoder := toml.NewEncoder(buf)
+	encoder.Indent = ""
+	if err := encoder.Encode(p); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func (p pacmanConfig) merge(tomlString string) error {
+	var data pacmanConfig
+	err := toml.Unmarshal([]byte(tomlString), &data)
+	if err != nil {
+		return err
+	}
+	for section, values := range data {
+		if p[section] == nil {
+			p[section] = values
+			continue
+		}
+		for k, v := range values {
+			p[section][k] = v
+		}
+	}
+	return nil
 }

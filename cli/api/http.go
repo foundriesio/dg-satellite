@@ -9,13 +9,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 func (a Api) Get(resource string, result any) error {
+	_, err := a.GetWithHeaders(resource, result)
+	return err
+}
+
+func (a Api) GetWithHeaders(resource string, result any) (http.Header, error) {
 	url := a.URL + resource
 	resp, err := a.Client.Get(url)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -26,13 +32,30 @@ func (a Api) Get(resource string, result any) error {
 	if resp.StatusCode != 200 {
 		buf, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("API request failed with status %d and unreadable body", resp.StatusCode)
+			return nil, fmt.Errorf("API request failed with status %d and unreadable body", resp.StatusCode)
 		}
 		rid := resp.Header.Get("X-Request-ID")
-		return fmt.Errorf("API request (id=%s) failed with status %d: %s", rid, resp.StatusCode, string(buf))
+		return nil, fmt.Errorf("API request (id=%s) failed with status %d: %s", rid, resp.StatusCode, string(buf))
 	}
 
-	return json.NewDecoder(resp.Body).Decode(result)
+	return resp.Header, json.NewDecoder(resp.Body).Decode(result)
+}
+
+// ParseNextLink extracts the URL with rel="next" from a Link header value.
+// Returns the URL and true if found, or empty string and false otherwise.
+func ParseNextLink(linkHeader string) (string, bool) {
+	for _, part := range strings.Split(linkHeader, ",") {
+		part = strings.TrimSpace(part)
+		if !strings.Contains(part, `rel="next"`) {
+			continue
+		}
+		start := strings.Index(part, "<")
+		end := strings.Index(part, ">")
+		if start >= 0 && end > start {
+			return part[start+1 : end], true
+		}
+	}
+	return "", false
 }
 
 func (a Api) Put(resource string, body any) ([]byte, error) {

@@ -23,9 +23,18 @@ func (a *Api) Devices() DeviceApi {
 	}
 }
 
-func (d DeviceApi) List() ([]DeviceListItem, error) {
+// ListPage fetches a single page of devices. It returns the devices and
+// whether more pages are available via the Link rel="next" header.
+func (d DeviceApi) ListPage(page int, limit int) ([]DeviceListItem, bool, error) {
+	offset := page * limit
+	resource := fmt.Sprintf("/v1/devices?limit=%d&offset=%d", limit, offset)
 	var devices []DeviceListItem
-	return devices, d.api.Get("/v1/devices", &devices)
+	headers, err := d.api.GetWithHeaders(resource, &devices)
+	if err != nil {
+		return nil, false, err
+	}
+	_, hasNext := ParseNextLink(headers.Get("Link"))
+	return devices, hasNext, nil
 }
 
 func (d *DeviceApi) Get(uuid string) (*Device, error) {

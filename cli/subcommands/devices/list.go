@@ -28,27 +28,34 @@ var allColumns = []string{
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all devices",
-	Long:  `List all devices known to the server`,
+	Short: "List devices",
+	Long:  `List devices known to the server. By default shows the first page of results.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		columns, _ := cmd.Flags().GetString("columns")
+		page, _ := cmd.Flags().GetInt("page")
 		api := api.CtxGetApi(cmd.Context())
-		return listDevices(api.Devices(), columns)
+		return listDevices(api.Devices(), columnsStr, page)
 	},
 }
 
+var columnsStr string
+
 func init() {
-	colmnsStr := strings.Join(allColumns, ",")
+	allColsStr := strings.Join(allColumns, ",")
 	DevicesCmd.AddCommand(listCmd)
-	listCmd.Flags().StringP("columns", "", "uuid,target,last-seen",
-		"Comma-separated list of columns to display (available: "+colmnsStr+")")
+	listCmd.Flags().StringVar(&columnsStr, "columns", "uuid,target,last-seen",
+		"Comma-separated list of columns to display (available: "+allColsStr+")")
+	listCmd.Flags().IntP("page", "p", 0, "Page number to display (0-indexed)")
 }
 
-func listDevices(dapi api.DeviceApi, columnsStr string) error {
-	devices, err := dapi.List()
-	cobra.CheckErr(err)
+const defaultPageLimit = 1000
 
-	columns := strings.Split(columnsStr, ",")
+func listDevices(dapi api.DeviceApi, cols string, page int) error {
+	devices, hasMore, err := dapi.ListPage(page, defaultPageLimit)
+	if err != nil {
+		return err
+	}
+
+	columns := strings.Split(cols, ",")
 	for i, col := range columns {
 		columns[i] = strings.TrimSpace(col)
 		if slices.Index(allColumns, col) < 0 {
@@ -71,6 +78,9 @@ func listDevices(dapi api.DeviceApi, columnsStr string) error {
 	}
 
 	table.Render()
+	if hasMore {
+		fmt.Printf("\nMore results available. Use --page %d for the next page.\n", page+1)
+	}
 	return nil
 }
 

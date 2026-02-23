@@ -40,9 +40,10 @@ func TestStorage(t *testing.T) {
 
 	// Test we can list when there are no devices
 	opts := DeviceListOpts{}
-	devices, err := s.DevicesList(opts)
+	devices, count, err := s.DevicesList(opts)
 	require.Nil(t, err)
 	require.Equal(t, 0, len(devices))
+	require.Equal(t, 0, count)
 
 	// Create two devices to list/get on
 	d2, err := dg.DeviceCreate("uuid-1", "pubkey-value-1", false)
@@ -60,16 +61,18 @@ func TestStorage(t *testing.T) {
 
 	opts.Limit = 2
 	opts.OrderBy = OrderByDeviceCreatedAsc
-	devices, err = s.DevicesList(opts)
+	devices, count, err = s.DevicesList(opts)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(devices))
+	require.Equal(t, 2, count)
 	assert.Equal(t, "uuid-1", devices[0].Uuid)
 	assert.Equal(t, "uuid-2", devices[1].Uuid)
 
 	opts.OrderBy = OrderByDeviceCreatedDsc
-	devices, err = s.DevicesList(opts)
+	devices, count, err = s.DevicesList(opts)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(devices))
+	require.Equal(t, 2, count)
 	assert.Equal(t, "uuid-2", devices[0].Uuid)
 
 	d, err = s.DeviceGet("uuid-1")
@@ -113,8 +116,9 @@ func TestDeviceDelete(t *testing.T) {
 	require.Nil(t, err)
 	require.Nil(t, d, "deleted device should not be returned by DeviceGet")
 
-	devices, err := s.DevicesList(DeviceListOpts{Limit: 100})
+	devices, count, err := s.DevicesList(DeviceListOpts{Limit: 100})
 	require.Nil(t, err)
+	assert.Equal(t, 0, count, "deleted device should not appear in DevicesList")
 	for _, dev := range devices {
 		assert.NotEqual(t, "uuid-del", dev.Uuid, "deleted device should not appear in DevicesList")
 	}

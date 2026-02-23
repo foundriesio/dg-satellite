@@ -209,7 +209,9 @@ func TestApiDeviceList(t *testing.T) {
 
 	// No devices
 	data := tc.GET("/devices", 200)
-	require.Equal(t, "[]\n", string(data))
+	var devices []apiStorage.DeviceListItem
+	require.Nil(t, json.Unmarshal(data, &devices))
+	require.Len(t, devices, 0)
 
 	// two devices with different last seen times
 	_, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
@@ -219,7 +221,6 @@ func TestApiDeviceList(t *testing.T) {
 	require.Nil(t, err)
 
 	data = tc.GET("/devices", 200)
-	var devices []apiStorage.Device
 	require.Nil(t, json.Unmarshal(data, &devices))
 	require.Len(t, devices, 2)
 	// default sort is name-asc (name, uuid)
@@ -247,6 +248,29 @@ func TestApiDeviceList(t *testing.T) {
 	require.Nil(t, json.Unmarshal(data, &devices))
 	assert.Equal(t, "test-device-2", devices[0].Uuid)
 	assert.Equal(t, "test-device-1", devices[1].Uuid)
+
+	// test pagination Link headers
+	req := httptest.NewRequest(http.MethodGet, "/v1/devices?limit=1&order-by=name-asc", nil)
+	rec := tc.Do(req)
+	require.Equal(t, 200, rec.Code)
+	require.Nil(t, json.Unmarshal(rec.Body.Bytes(), &devices))
+	require.Len(t, devices, 1)
+	linkHeader := rec.Header().Get("Link")
+	assert.Contains(t, linkHeader, `rel="first"`)
+	assert.Contains(t, linkHeader, `rel="next"`)
+	assert.Contains(t, linkHeader, `rel="last"`)
+	assert.Contains(t, linkHeader, "offset=1")
+
+	// last page — no "next" link
+	req = httptest.NewRequest(http.MethodGet, "/v1/devices?limit=1&offset=1&order-by=name-asc", nil)
+	rec = tc.Do(req)
+	require.Equal(t, 200, rec.Code)
+	require.Nil(t, json.Unmarshal(rec.Body.Bytes(), &devices))
+	require.Len(t, devices, 1)
+	linkHeader = rec.Header().Get("Link")
+	assert.Contains(t, linkHeader, `rel="first"`)
+	assert.NotContains(t, linkHeader, `rel="next"`)
+	assert.Contains(t, linkHeader, `rel="last"`)
 
 	// Set device name to override the uuid sort.
 	tc.u.AllowedScopes = users.ScopeDevicesRU

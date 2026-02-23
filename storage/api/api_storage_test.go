@@ -36,7 +36,7 @@ func TestStorage(t *testing.T) {
 
 	// Test we can list when there are no devices
 	opts := DeviceListOpts{}
-	devices, err := s.DevicesList(opts)
+	devices, _, err := s.DevicesList(opts)
 	require.Nil(t, err)
 	require.Equal(t, 0, len(devices))
 
@@ -56,14 +56,14 @@ func TestStorage(t *testing.T) {
 
 	opts.Limit = 2
 	opts.OrderBy = OrderByDeviceCreatedAsc
-	devices, err = s.DevicesList(opts)
+	devices, _, err = s.DevicesList(opts)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(devices))
 	assert.Equal(t, "uuid-1", devices[0].Uuid)
 	assert.Equal(t, "uuid-2", devices[1].Uuid)
 
 	opts.OrderBy = OrderByDeviceCreatedDsc
-	devices, err = s.DevicesList(opts)
+	devices, _, err = s.DevicesList(opts)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(devices))
 	assert.Equal(t, "uuid-2", devices[0].Uuid)

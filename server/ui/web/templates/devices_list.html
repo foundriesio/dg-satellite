@@ -40,6 +40,22 @@
           {{ end }}
         </tbody>
       </table>
+
+      {{ if or .HasPrev .HasNext }}
+      <nav>
+        <div>
+          {{ if .HasPrev }}
+            <a href="/devices?page={{sub .Page 1}}" role="button">&larr; Previous</a>
+          {{ end }}
+        </div>
+        <span>Page {{add .Page 1}}</span>
+        <div>
+          {{ if .HasNext }}
+            <a href="/devices?page={{add .Page 1}}" role="button">Next &rarr;</a>
+          {{ end }}
+        </div>
+      </nav>
+      {{ end }}
     </section>
 
 {{ if .CanDelete }}

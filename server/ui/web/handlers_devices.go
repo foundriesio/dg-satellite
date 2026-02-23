@@ -5,6 +5,9 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server/ui/api"
@@ -13,19 +16,48 @@ import (
 )
 
 func (h handlers) devicesList(c echo.Context) error {
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	if page < 0 {
+		page = 0
+	}
+	const pageSize = 50
+	offset := page * pageSize
+
+	resource := fmt.Sprintf("/v1/devices?limit=%d&offset=%d", pageSize, offset)
+
 	var devices []api.DeviceListItem
-	if err := getJson(c.Request().Context(), "/v1/devices", &devices); err != nil {
+	headers, err := getJsonWithHeaders(c.Request().Context(), resource, &devices)
+	if err != nil {
 		return h.handleUnexpected(c, err)
 	}
+
+	hasNext := linkHasRel(headers.Get("Link"), "next")
 
 	ctx := struct {
 		baseCtx
 		Devices []api.DeviceListItem
+		Page    int
+		HasNext bool
+		HasPrev bool
 	}{
 		baseCtx: h.baseCtx(c, "Devices", "devices"),
 		Devices: devices,
+		Page:    page,
+		HasNext: hasNext,
+		HasPrev: page > 0,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "devices_list.html", ctx)
+}
+
+// linkHasRel checks if a Link header contains a given rel value.
+func linkHasRel(linkHeader, rel string) bool {
+	target := fmt.Sprintf(`rel="%s"`, rel)
+	for _, part := range strings.Split(linkHeader, ",") {
+		if strings.Contains(strings.TrimSpace(part), target) {
+			return true
+		}
+	}
+	return false
 }
 
 type ipInfo struct {

@@ -37,6 +37,22 @@
           {{ end }}
         </tbody>
       </table>
+
+      {{ if or .HasPrev .HasNext }}
+      <nav style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+        <div>
+          {{ if .HasPrev }}
+            <a href="/devices?page={{sub .Page 1}}" role="button" class="outline">&larr; Previous</a>
+          {{ end }}
+        </div>
+        <span>Page {{add .Page 1}}</span>
+        <div>
+          {{ if .HasNext }}
+            <a href="/devices?page={{add .Page 1}}" role="button" class="outline">Next &rarr;</a>
+          {{ end }}
+        </div>
+      </nav>
+      {{ end }}
     </section>
 
 {{ template "footer"}}

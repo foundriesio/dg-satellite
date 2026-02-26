@@ -40,7 +40,7 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, url string) {
 	)
 
 	mtls.POST("apps-states", h.appsStatesInfo)
-	mtls.POST("apps-proxy-url", h.appsProxyUrl)
+	mtls.POST("app-proxy-url", h.appsProxyUrl)
 	mtls.GET("device", h.deviceGet)
 	mtls.POST("events", h.eventsUpload)
 	mtls.POST("ostree/download-urls", h.ostreeUrls)
@@ -53,7 +53,7 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, url string) {
 	mtls.PUT("system_info/config", h.akTomlInfo)
 	mtls.PUT("system_info/network", h.networkInfo)
 
-	registry := e.Group("/registry/v2")
+	registry := e.Group("registry/v2")
 	registry.Use(h.authToken)
 	registry.HEAD("/:repo/:app/blobs/sha256\\::hash", h.blobHead)
 	registry.HEAD("/:repo/:app/manifests/sha256\\::hash", h.blobHead)

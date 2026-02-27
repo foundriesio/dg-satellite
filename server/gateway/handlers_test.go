@@ -164,7 +164,7 @@ func TestApiDevice(t *testing.T) {
 
 func TestApiProxy(t *testing.T) {
 	tc := NewTestClient(t)
-	resBytes := tc.POST("/apps-proxy-url", 201, nil)
+	resBytes := tc.POST("/app-proxy-url", 201, nil)
 	proxyUrl, err := url.Parse(string(resBytes))
 	require.Nil(t, err)
 	token := proxyUrl.Query().Get("token")

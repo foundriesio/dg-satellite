@@ -5,6 +5,7 @@ package api
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ import (
 	"github.com/foundriesio/dg-satellite/storage"
 	apiStorage "github.com/foundriesio/dg-satellite/storage/api"
 	gatewayStorage "github.com/foundriesio/dg-satellite/storage/gateway"
+	storageTesting "github.com/foundriesio/dg-satellite/storage/testing"
 	"github.com/foundriesio/dg-satellite/storage/users"
 )
 
@@ -143,6 +145,8 @@ func (c testClient) marshalBody(data any) io.Reader {
 		return strings.NewReader(s)
 	} else if b, ok := data.([]byte); ok {
 		return bytes.NewReader(b)
+	} else if r, ok := data.(io.Reader); ok {
+		return r
 	} else {
 		b, err := json.Marshal(data)
 		require.Nil(c.t, err)
@@ -900,4 +904,59 @@ func TestApiDeviceDelete(t *testing.T) {
 	// Verify device is gone
 	tc.u.AllowedScopes = users.ScopeDevicesR
 	tc.GET("/devices/del-device", 404)
+}
+
+func TestApiUploadConfigs(t *testing.T) {
+	tc := NewTestClient(t)
+
+	// Extensive testing of the upload logic is a part of the storage/api tests.
+	// Here we only need to test the Web part: handlers/transport/auth.
+	validTarFiles := map[string]string{
+		"factory/.journal":     "deadbeef:123456\nelvisalive:137137\n",
+		"factory/deadbeef":     `{"test":{"Value":"test factory config"}}`,
+		"group/beta/.journal":  "killbill:2003\n",
+		"group/beta/killbill":  `{"samurai":{"Value":"test group config"}}`,
+		"factory/elvisalive":   `{"test":{"Value":"test factory config latest version"}}`,
+		"device/uuid/.journal": "",
+	}
+
+	t.Run("Failure on default user scopes", func(t *testing.T) {
+		r := tarBuffer(t, validTarFiles)
+		tc.PUT("/configs", 403, r, "Content-Type", "application/x-tar")
+	})
+
+	tc.u.AllowedScopes = users.ScopeDevicesR | users.ScopeUpdatesRU
+	t.Run("Failure on updates read-write and devices read-only", func(t *testing.T) {
+		r := tarBuffer(t, validTarFiles)
+		tc.PUT("/configs", 403, r, "Content-Type", "application/x-tar")
+	})
+
+	tc.u.AllowedScopes = users.ScopeDevicesRU | users.ScopeUpdatesR
+	t.Run("Failure on devices read-write and updates read-only", func(t *testing.T) {
+		r := tarBuffer(t, validTarFiles)
+		tc.PUT("/configs", 403, r, "Content-Type", "application/x-tar")
+	})
+
+	tc.u.AllowedScopes = users.ScopeDevicesRU | users.ScopeUpdatesRU
+	t.Run("Success on devices and updates read-write and tar transport", func(t *testing.T) {
+		r := tarBuffer(t, validTarFiles)
+		tc.PUT("/configs", 200, r, "Content-Type", "application/x-tar")
+	})
+
+	t.Run("Success on devices and updates read-write and tar.gz transport", func(t *testing.T) {
+		r := gzipBuffer(t, tarBuffer(t, validTarFiles))
+		tc.PUT("/configs", 200, r, "Content-Type", "application/x-tar", "Content-Encoding", "gzip")
+	})
+}
+
+var tarBuffer = storageTesting.CreateTarBuffer
+
+func gzipBuffer(t *testing.T, data *bytes.Buffer) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	defer func() { require.NoError(t, gw.Close()) }()
+	_, err := io.Copy(gw, data)
+	require.NoError(t, err)
+	return &buf
 }

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"iter"
 	"log/slog"
 	"slices"
@@ -24,6 +25,8 @@ type (
 	AppsStates        = storage.AppsStates
 	DeviceStatus      = storage.DeviceStatus
 	DeviceUpdateEvent = storage.DeviceUpdateEvent
+
+	ErrConfigUploadBroken = storage.ErrConfigUploadBroken
 )
 
 const (
@@ -374,6 +377,13 @@ func (s Storage) TailRolloutsLog(tag, updateName string, isProd bool, stop stora
 		fs = s.fs.Updates.Prod.Logs
 	}
 	return fs.TailFileLines(tag, updateName, storage.LogRolloutsFile, stop)
+}
+
+func (s Storage) UploadConfigs(payload io.Reader) (err error) {
+	return s.fs.Configs.SaveUpload(payload, func(cleanupErr error) {
+		// This is not critical - log and let the "real" error/success return below.
+		slog.Error("Failed to clean upload directory", "error", cleanupErr)
+	})
 }
 
 func (s Storage) getRolloutsFsHandle(isProd bool) storage.RolloutsFsHandle {

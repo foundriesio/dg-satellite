@@ -4,6 +4,9 @@
 package api
 
 import (
+	"bytes"
+	"errors"
+	"io"
 	"path/filepath"
 	"testing"
 	"time"
@@ -13,6 +16,7 @@ import (
 
 	"github.com/foundriesio/dg-satellite/storage"
 	"github.com/foundriesio/dg-satellite/storage/gateway"
+	storageTesting "github.com/foundriesio/dg-satellite/storage/testing"
 )
 
 func TestStorage(t *testing.T) {
@@ -114,4 +118,103 @@ func TestDeviceDelete(t *testing.T) {
 	for _, dev := range devices {
 		assert.NotEqual(t, "uuid-del", dev.Uuid, "deleted device should not appear in DevicesList")
 	}
+}
+
+func TestUploadConfigs(t *testing.T) {
+	tmpdir := t.TempDir()
+	dbFile := filepath.Join(tmpdir, "sql.db")
+	db, err := storage.NewDb(dbFile)
+	require.Nil(t, err)
+	fs, err := storage.NewFs(tmpdir)
+	require.Nil(t, err)
+	s, err := NewStorage(db, fs)
+	require.Nil(t, err)
+
+	createTar := storageTesting.CreateTarBuffer
+
+	t.Run("Successful initial configs upload", func(t *testing.T) {
+		validTarFiles := map[string]string{
+			"factory/.journal":     "deadbeef:123456\nelvisalive:137137\n",
+			"factory/deadbeef":     `{"test":{"Value":"test factory config"}}`,
+			"group/beta/.journal":  "killbill:2003\n",
+			"group/beta/killbill":  `{"samurai":{"Value":"test group config"}}`,
+			"factory/elvisalive":   `{"test":{"Value":"test factory config latest version"}}`,
+			"device/uuid/.journal": "",
+		}
+		r := createTar(t, validTarFiles)
+		require.NoError(t, s.UploadConfigs(r))
+
+		history, err := s.fs.Configs.ReadFactoryConfigHistory(5)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(history))
+		assert.Equal(t, `{"test":{"Value":"test factory config latest version"}}`, history[0])
+		assert.Equal(t, `{"test":{"Value":"test factory config"}}`, history[1])
+		history, err = s.fs.Configs.ReadGroupConfigHistory("beta", 5)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(history))
+		assert.Equal(t, `{"samurai":{"Value":"test group config"}}`, history[0])
+		history, err = s.fs.Configs.ReadDeviceConfigHistory("uuid", 5)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(history))
+	})
+
+	t.Run("Successful upload overwrites existing configs", func(t *testing.T) {
+		validTarFiles := map[string]string{
+			"factory/.journal":     "deadbeef:123456",
+			"factory/deadbeef":     `{"test":{"Value":"overwritten"}}`,
+			"group/alpha/.journal": "beep:2003\n",
+			"group/alpha/beep":     `{"omega":{"Value":"contra spem spero"}}`,
+		}
+		r := createTar(t, validTarFiles)
+		require.NoError(t, s.UploadConfigs(r))
+
+		history, err := s.fs.Configs.ReadFactoryConfigHistory(5)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(history))
+		assert.Equal(t, `{"test":{"Value":"overwritten"}}`, history[0])
+		history, err = s.fs.Configs.ReadGroupConfigHistory("beta", 5)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(history))
+		history, err = s.fs.Configs.ReadGroupConfigHistory("alpha", 5)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(history))
+		assert.Equal(t, `{"omega":{"Value":"contra spem spero"}}`, history[0])
+		history, err = s.fs.Configs.ReadDeviceConfigHistory("uuid", 5)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(history))
+	})
+
+	t.Run("Failure on input read error", func(t *testing.T) {
+		r, w := io.Pipe()
+		fail := errors.New("some error")
+		require.NoError(t, w.CloseWithError(fail))
+		err := s.UploadConfigs(r)
+		require.ErrorIs(t, err, fail)
+		require.ErrorContains(t, err, "failed to save")
+	})
+
+	t.Run("Failure or corrupted tar file", func(t *testing.T) {
+		r := bytes.NewBufferString("bad file")
+		err := s.UploadConfigs(r)
+		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+		require.ErrorContains(t, err, "failed to unpack")
+	})
+
+	t.Run("Failure on empty file name", func(t *testing.T) {
+		r := createTar(t, map[string]string{"": "some file"})
+		err := s.UploadConfigs(r)
+		require.ErrorContains(t, err, "failed to unpack")
+		require.ErrorContains(t, err, "empty")
+	})
+
+	t.Run("Failure on escaping file path", func(t *testing.T) {
+		for _, file := range []string{"..", "../outside", "something/../../fancy"} {
+			t.Run(file, func(t *testing.T) {
+				r := createTar(t, map[string]string{file: "some file"})
+				err := s.UploadConfigs(r)
+				require.ErrorContains(t, err, "failed to unpack")
+				require.ErrorContains(t, err, "escape")
+			})
+		}
+	})
 }

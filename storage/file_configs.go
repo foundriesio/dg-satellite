@@ -4,8 +4,12 @@
 package storage
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -22,6 +26,16 @@ import (
 // - $config_sha156 - each config file contains the entire config JSON, with file name being a sha256 hash of its contents.
 // Note: a config file can be technicallt anything; using a sha256 hash as a name simply allows to avoid collisions.
 // An interesting aspect is that any config rollbacks will result into the same hash, effectively compressing disk usage.
+
+type ErrConfigUploadBroken struct {
+	err         error
+	UploadPath  string
+	ConfigsPath string
+}
+
+func (e ErrConfigUploadBroken) Error() string {
+	return e.err.Error()
+}
 
 type ConfigsFsHandle struct {
 	baseFsHandle
@@ -122,6 +136,79 @@ func (s ConfigsFsHandle) WriteDeviceConfig(uuid, content string) error {
 		return err
 	} else if err = h.writeConfig(content); err != nil {
 		return fmt.Errorf("unexpected error writing device config for %s: %w", uuid, err)
+	}
+	return nil
+}
+
+func (s ConfigsFsHandle) SaveUpload(payload io.Reader, onCleanupFailure func(error)) error {
+	actualDirPath := s.root
+	transaction := rand.Text()[:10]
+	txDirPath := filepath.Join(filepath.Dir(s.root), ".configs-upload-"+transaction)
+	uploadFilePath := filepath.Join(txDirPath, "configs.tar")
+	uploadDirPath := filepath.Join(txDirPath, "configs")
+	backupDirPath := filepath.Join(txDirPath, "configs.backup")
+
+	if err := os.MkdirAll(txDirPath, defaultDirAccess); err != nil {
+		return fmt.Errorf("failed to create a temporary upload directory: %w", err)
+	}
+	var isConfigDirCorrupted bool
+	defer func() {
+		if !isConfigDirCorrupted {
+			if err := os.RemoveAll(txDirPath); err != nil && onCleanupFailure != nil {
+				onCleanupFailure(err)
+			}
+		}
+	}()
+
+	// Need a tarball to close before processing it; thus wrap this into a function.
+	if err := func() error {
+		file, err := os.OpenFile(uploadFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, defaultFileAccess)
+		if err != nil {
+			return err
+		}
+		defer file.Close() //nolint:errcheck
+		if _, err = io.Copy(file, payload); err != nil {
+			return fmt.Errorf("failed to save configs upload tarball: %w", err)
+		}
+		return nil
+	}(); err != nil {
+		return err
+	}
+
+	// Need a tarball to close before the cleanup; thus wrap this into a function.
+	if err := func() error {
+		file, err := os.OpenFile(uploadFilePath, os.O_RDONLY, 0)
+		if err != nil {
+			return fmt.Errorf("failed to read config upload tarball: %w", err)
+		}
+		defer file.Close() //nolint:errcheck
+		h := baseFsHandle{root: uploadDirPath}
+		if err = h.unpackTar(file, ".", TarUnpackReplaceDest(true)); err != nil {
+			return fmt.Errorf("failed to unpack config upload tarball: %w", err)
+		}
+		return nil
+	}(); err != nil {
+		return err
+	}
+
+	// Two-phase commit below: move current config to backup, and then new config to current config.
+	// Both operations are atomic on Linux; but there is a tiny chance to fail in the middle.
+	// See comments below if/when/how this is recoverable.
+	if err := os.Rename(actualDirPath, backupDirPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		// Linux warrants that the rename is atomic i.e. if it failed - there was no rename.
+		// Source directory is intact here... unless there was a hard power failure, in which case this process is dead too.
+		return fmt.Errorf("failed to backup existing configs directory: %w", err)
+	}
+	if err := os.Rename(uploadDirPath, actualDirPath); err != nil {
+		// If the second phase fails, source directory is moved to backup, while uploaded directory is not yet moved.
+		// Return an upload directory path in an error to allow the user to fix manually.
+		// Alternatively, it can be fixed by re-uploading the config tarball again.
+		isConfigDirCorrupted = true
+		return ErrConfigUploadBroken{
+			err:         fmt.Errorf("failed to make uploaded config active: %s", err),
+			ConfigsPath: actualDirPath,
+			UploadPath:  txDirPath,
+		}
 	}
 	return nil
 }

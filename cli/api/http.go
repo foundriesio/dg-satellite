@@ -71,6 +71,37 @@ func (a Api) Put(resource string, body any) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+func (a Api) Post(resource string, body io.Reader, contentType string) error {
+	url := a.URL + resource
+
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", contentType)
+
+	resp, err := a.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("warning: failed to close response body: %v\n", err)
+		}
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		buf, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("API request failed with status %d and unreadable body", resp.StatusCode)
+		}
+		rid := resp.Header.Get("X-Request-ID")
+		return fmt.Errorf("API request (id=%s) failed with status %d: %s", rid, resp.StatusCode, string(buf))
+	}
+
+	return nil
+}
+
 func (a Api) GetStream(resource string) (io.ReadCloser, error) {
 	url := a.URL + resource
 	resp, err := a.Client.Get(url)

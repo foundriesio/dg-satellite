@@ -40,6 +40,7 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 
 	e.GET("/", h.index, h.requireSession)
 	e.GET("/css/:filename", h.css)
+	e.GET("/images/:filename", h.png)
 	e.GET("/auth/logout", h.authLogout, h.requireSession)
 	e.GET("/devices", h.devicesList, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/devices/:uuid", h.devicesGet, h.requireSession, h.requireScope(users.ScopeDevicesR))
@@ -86,6 +87,19 @@ func (h handlers) css(c echo.Context) error {
 	c.Response().Header().Set("Cache-Control", "public, max-age=3600") // 1 hour in seconds
 	c.Response().Header().Set("Content-Type", "text/css")
 	return h.Render(c.Response(), c.Param("filename"), nil, c)
+}
+
+func (h handlers) png(c echo.Context) error {
+	if eTag := c.Request().Header.Get("If-None-Match"); eTag == h.styleEtag {
+		return c.NoContent(http.StatusNotModified)
+	}
+	c.Response().Header().Set("ETag", h.styleEtag)
+	c.Response().Header().Set("Cache-Control", "public, max-age=3600") // 1 hour in seconds
+	buf, err := templates.Assets.ReadFile(c.Param("filename"))
+	if err != nil {
+		return EchoError(c, err, http.StatusInternalServerError, "failed to read image")
+	}
+	return c.Blob(http.StatusOK, "image/png", buf)
 }
 
 func (h handlers) index(c echo.Context) error {

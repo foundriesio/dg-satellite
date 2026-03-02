@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-//go:embed *.html *.css
+//go:embed *.html *.css *.png
 var Assets embed.FS
 var Templates *template.Template
 

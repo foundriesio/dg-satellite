@@ -6,6 +6,7 @@ package storage
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 )
 
 type DevicesFsHandle struct {
@@ -19,6 +20,11 @@ func (s DevicesFsHandle) ReadFile(uuid, name string) (string, error) {
 		err = fmt.Errorf("unexpected error reading file %s for device %s: %w", name, uuid, err)
 	}
 	return content, err
+}
+
+func (s DevicesFsHandle) FileModTime(uuid, name string) (time.Time, error) {
+	h, _ := s.deviceLocalHandle(uuid, false)
+	return h.fileModTime(name)
 }
 
 func (s DevicesFsHandle) WriteFile(uuid, name, content string) error {

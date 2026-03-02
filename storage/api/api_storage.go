@@ -24,6 +24,8 @@ type (
 	AppsStates        = storage.AppsStates
 	DeviceStatus      = storage.DeviceStatus
 	DeviceUpdateEvent = storage.DeviceUpdateEvent
+	FioconfigFiles    = storage.FioconfigFiles
+	FioconfigItem     = storage.FioconfigItem
 )
 
 const (
@@ -163,6 +165,29 @@ func (d Device) AppsStates() ([]AppsStates, error) {
 		states[len(names)-1-i] = s //store in reverse order
 	}
 	return states, nil
+}
+
+func (d Device) Config() (storage.FioconfigFiles, error) {
+	content, err := d.storage.fs.Devices.ReadFile(d.Uuid, storage.FioconfigFile)
+	if err != nil {
+		return nil, err
+	}
+	if len(content) == 0 {
+		return storage.FioconfigFiles{}, nil
+	}
+	var files storage.FioconfigFiles
+	if err := json.Unmarshal([]byte(content), &files); err != nil {
+		return nil, fmt.Errorf("unexpected error unmarshalling fioconfig json: %w", err)
+	}
+	return files, nil
+}
+
+func (d Device) SetConfig(files storage.FioconfigFiles) error {
+	data, err := json.Marshal(files)
+	if err != nil {
+		return fmt.Errorf("unexpected error marshalling fioconfig json: %w", err)
+	}
+	return d.storage.fs.Devices.WriteFile(d.Uuid, storage.FioconfigFile, string(data))
 }
 
 func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {

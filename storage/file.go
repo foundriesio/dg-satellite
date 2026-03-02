@@ -37,11 +37,12 @@ const (
 	HmacFile       = "hmac.secret"
 
 	// Per device files/dirs
-	AktomlFile   = "aktoml"
-	HwInfoFile   = "hardware-info"
-	NetInfoFile  = "network-info"
-	EventsPrefix = "events"
-	StatesPrefix = "apps-states"
+	AktomlFile    = "aktoml"
+	HwInfoFile    = "hardware-info"
+	NetInfoFile   = "network-info"
+	FioconfigFile = "fioconfig"
+	EventsPrefix  = "events"
+	StatesPrefix  = "apps-states"
 
 	// Per update files/dirs
 	// Update roots
@@ -189,6 +190,14 @@ func (s baseFsHandle) readFile(name string, ignoreNotExist bool) (string, error)
 	} else {
 		return "", err
 	}
+}
+
+func (s baseFsHandle) fileModTime(name string) (time.Time, error) {
+	info, err := os.Stat(filepath.Join(s.root, name))
+	if err != nil {
+		return time.Time{}, err
+	}
+	return info.ModTime(), nil
 }
 
 func (s baseFsHandle) readFileLines(name string, ignoreNotExist bool, infinityStop DoneChan) iter.Seq2[string, error] {

@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/labstack/echo/v4"
 
 	storage "github.com/foundriesio/dg-satellite/storage/api"
@@ -195,6 +197,102 @@ func (h *handlers) deviceLabelsPut(c echo.Context) error {
 			return EchoError(c, err, http.StatusInternalServerError, "Failed to update device labels")
 		}
 		return c.NoContent(http.StatusOK)
+	})
+}
+
+const AkliteConfigName = "z-50-fioctl.toml"
+
+// @Summary Get the configured compose apps for a device
+// @Produce json
+// @Success 200 {array} string
+// @Router  /devices/:uuid/config/apps [get]
+func (h *handlers) deviceConfigAppsGet(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		config, err := device.Config()
+		if err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to read device config")
+		}
+
+		apps := []string{}
+		if item, ok := config[AkliteConfigName]; ok {
+			var parsed struct {
+				Pacman struct {
+					ComposeApps string `toml:"compose_apps"`
+				} `toml:"pacman"`
+			}
+			if _, err := toml.Decode(item.Value, &parsed); err != nil {
+				return EchoError(c, err, http.StatusInternalServerError, "Failed to parse device config")
+			}
+			for app := range strings.SplitSeq(parsed.Pacman.ComposeApps, ",") {
+				app = strings.TrimSpace(app)
+				if app != "" {
+					apps = append(apps, app)
+				}
+			}
+		}
+		return c.JSON(http.StatusOK, apps)
+	})
+}
+
+// @Summary Set the compose apps for a device
+// @Accept json
+// @Param data body []string true "List of compose app names"
+// @Success 200
+// @Router  /devices/:uuid/config/apps [put]
+func (h *handlers) deviceConfigAppsPut(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		var apps []string
+		if err := c.Bind(&apps); err != nil {
+			return EchoError(c, err, http.StatusBadRequest, "Bad JSON body")
+		}
+
+		config, err := device.Config()
+		if err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to read device config")
+		}
+
+		val := "[pacman]\ncompose_apps = \"" + strings.Join(apps, ",") + "\"\n"
+		config[AkliteConfigName] = storage.FioconfigItem{
+			Unencrypted: true,
+			Value:       val,
+			OnChanged:   []string{"/usr/share/fioconfig/handlers/aktualizr-toml-update"},
+		}
+
+		if err := device.SetConfig(config); err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to save device config")
+		}
+		return c.NoContent(http.StatusOK)
+	})
+}
+
+// @Summary Get apps available for a device
+// @Produce json
+// @Success 200 {array} string
+// @Router  /devices/:uuid/config/apps-available [get]
+func (h *handlers) deviceConfigAppsAvailableGet(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		if len(device.Tag) == 0 || len(device.UpdateName) == 0 {
+			return EchoError(c, fmt.Errorf("device is missing tag or update name"), http.StatusInternalServerError, "Failed to get device update TUF metadata")
+		}
+
+		metas, err := h.storage.GetUpdateTufMetadata(device.Tag, device.UpdateName, device.IsProd)
+		if err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to get device update TUF metadata")
+		}
+		signed := metas["targets.json"]["signed"].(map[string]any)
+		targets := signed["targets"].(map[string]any)
+		if tgt, ok := targets[device.Target]; ok {
+			custom := tgt.(map[string]any)["custom"].(map[string]any)
+			if apps, ok := custom["docker_compose_apps"]; ok {
+				appsList := []string{}
+				for app := range apps.(map[string]any) {
+					appsList = append(appsList, app)
+				}
+				return c.JSON(http.StatusOK, appsList)
+			}
+			return c.JSON(http.StatusOK, []string{})
+		}
+		return EchoError(c, fmt.Errorf("device target not found in TUF metadata"), http.StatusInternalServerError, "Failed to get device update TUF metadata")
 	})
 }
 

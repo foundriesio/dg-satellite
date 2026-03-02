@@ -420,6 +420,54 @@ func TestApiDeviceLabelsPut(t *testing.T) {
 	assert.Equal(t, "test2", device.Labels["name"])
 }
 
+func TestApiDeviceConfigApps(t *testing.T) {
+	tc := NewTestClient(t)
+	headers := []string{"content-type", "application/json"}
+
+	// Create a device
+	_, err := tc.gw.DeviceCreate("test-device-1", "pubkey1", true)
+	require.Nil(t, err)
+
+	// Auth check - needs ScopeDevicesR for GET, ScopeDevicesRU for PUT
+	tc.GET("/devices/test-device-1/config/apps", 403)
+	tc.PUT("/devices/test-device-1/config/apps", 403, `["app1"]`, headers...)
+
+	tc.u.AllowedScopes = users.ScopeDevicesR
+	tc.PUT("/devices/test-device-1/config/apps", 403, `["app1"]`, headers...)
+
+	tc.u.AllowedScopes = users.ScopeDevicesRU
+
+	// 404 for non-existent device
+	tc.GET("/devices/does-not-exist/config/apps", 404)
+	tc.PUT("/devices/does-not-exist/config/apps", 404, `["app1"]`, headers...)
+
+	// GET with no config yet returns empty array
+	data := tc.GET("/devices/test-device-1/config/apps", 200)
+	var apps []string
+	require.Nil(t, json.Unmarshal(data, &apps))
+	assert.Empty(t, apps)
+
+	// PUT apps
+	tc.PUT("/devices/test-device-1/config/apps", 200, `["app1","app2"]`, headers...)
+
+	// GET returns what was set
+	data = tc.GET("/devices/test-device-1/config/apps", 200)
+	require.Nil(t, json.Unmarshal(data, &apps))
+	assert.Equal(t, []string{"app1", "app2"}, apps)
+
+	// Update to a different set
+	tc.PUT("/devices/test-device-1/config/apps", 200, `["app3"]`, headers...)
+	data = tc.GET("/devices/test-device-1/config/apps", 200)
+	require.Nil(t, json.Unmarshal(data, &apps))
+	assert.Equal(t, []string{"app3"}, apps)
+
+	// Set to empty list
+	tc.PUT("/devices/test-device-1/config/apps", 200, `[]`, headers...)
+	data = tc.GET("/devices/test-device-1/config/apps", 200)
+	require.Nil(t, json.Unmarshal(data, &apps))
+	assert.Empty(t, apps)
+}
+
 func TestApiAppsStates(t *testing.T) {
 	tc := NewTestClient(t)
 	tc.GET("/devices/test-device-1/apps-states", 403)

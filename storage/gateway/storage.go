@@ -33,9 +33,10 @@ const (
 	CertsTlsPemFile = storage.CertsTlsPemFile
 
 	// Per device files/dirs
-	AktomlFile  = storage.AktomlFile
-	HwInfoFile  = storage.HwInfoFile
-	NetInfoFile = storage.NetInfoFile
+	AktomlFile    = storage.AktomlFile
+	HwInfoFile    = storage.HwInfoFile
+	NetInfoFile   = storage.NetInfoFile
+	FioconfigFile = storage.FioconfigFile
 
 	EventsPrefix = storage.EventsPrefix
 	StatesPrefix = storage.StatesPrefix
@@ -91,6 +92,29 @@ func (d *Device) CheckIn(targetName, tag, ostreeHash string, apps string) error 
 
 func (d *Device) PutFile(name string, content string) error {
 	return d.storage.fs.Devices.WriteFile(d.Uuid, name, content)
+}
+
+func (d *Device) GetFile(name string) (string, error) {
+	return d.storage.fs.Devices.ReadFile(d.Uuid, name)
+}
+
+func (d *Device) Config() (storage.FioconfigFiles, error) {
+	content, err := d.GetFile(storage.FioconfigFile)
+	if err != nil {
+		return nil, err
+	}
+	if len(content) == 0 {
+		return storage.FioconfigFiles{}, nil
+	}
+	var files storage.FioconfigFiles
+	if err := json.Unmarshal([]byte(content), &files); err != nil {
+		return nil, fmt.Errorf("unexpected error unmarshalling fioconfig json: %w", err)
+	}
+	return files, nil
+}
+
+func (d *Device) ConfigModTime() (time.Time, error) {
+	return d.storage.fs.Devices.FileModTime(d.Uuid, storage.FioconfigFile)
 }
 
 func (d Device) ProcessEvents(events []storage.DeviceUpdateEvent) error {

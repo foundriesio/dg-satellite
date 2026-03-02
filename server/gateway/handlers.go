@@ -52,6 +52,8 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, url string) {
 	mtls.PUT("system_info", h.hardwareInfo)
 	mtls.PUT("system_info/config", h.akTomlInfo)
 	mtls.PUT("system_info/network", h.networkInfo)
+	mtls.GET("config", h.configGet)
+	mtls.PATCH("config", h.configPatch)
 
 	registry := e.Group("registry/v2")
 	registry.Use(h.authToken)

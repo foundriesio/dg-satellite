@@ -54,22 +54,72 @@
 
     <section class="content-section">
       <h2>TUF Metadata</h3>
-      <fieldset>
-        <legend><strong>Root expiration</strong></legend>
-        <p>{{index .Tuf "root.json" "signed" "expires"}}</p>
-      </fieldset>
-      <fieldset>
-        <legend><strong>Snapshot expiration</strong></legend>
-        <p>{{index .Tuf "snapshot.json" "signed" "expires"}}</p>
-      </fieldset>
-      <fieldset>
-        <legend><strong>Timestamp expiration</strong></legend>
-        <p>{{index .Tuf "timestamp.json" "signed" "expires"}}</p>
-      </fieldset>
-      <fieldset>
-        <legend><strong>Targets expiration</strong></legend>
-        <p>{{index .Tuf "targets.json" "signed" "expires"}}</p>
-      </fieldset>
+      <div class="grid">
+        <div>
+          <fieldset>
+            <legend><strong>Root expiration</strong></legend>
+            <p>{{index .Tuf "root.json" "signed" "expires"}}</p>
+          </fieldset>
+        </div>
+        <div>
+          <fieldset>
+            <legend><strong>Snapshot expiration</strong></legend>
+            <p>{{index .Tuf "snapshot.json" "signed" "expires"}}</p>
+          </fieldset>
+        </div>
+        <div>
+          <fieldset>
+            <legend><strong>Timestamp expiration</strong></legend>
+            <p>{{index .Tuf "timestamp.json" "signed" "expires"}}</p>
+          </fieldset>
+        </div>
+        <div>
+          <fieldset>
+            <legend><strong>Targets expiration</strong></legend>
+            <p>{{index .Tuf "targets.json" "signed" "expires"}}</p>
+          </fieldset>
+        </div>
+      </div>
+      {{ if .LatestTarget }}
+      <div class="grid">
+        <div>
+          <fieldset>
+            <legend><strong>Latest target name</strong></legend>
+            <p>{{ .LatestTarget.Name }}</p>
+          </fieldset>
+        </div>
+        <div>
+          <fieldset>
+            <legend><strong>Version</strong></legend>
+            <p>{{ .LatestTarget.Version }}</p>
+          </fieldset>
+        </div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="grid">
+        <div>
+          <fieldset>
+            <legend><strong>OSTree hash</strong></legend>
+            <p>{{ .LatestTarget.Sha256}}</p>
+          </fieldset>
+        </div>
+      </div>
+      <div class="grid">
+        <div>
+          <fieldset>
+            <legend><strong>Apps</strong></legend>
+            <dl>
+            {{ range $name, $uri := .LatestTarget.Apps }}
+              <dt>{{ $name }}</dt>
+              <dd><code>{{ $uri }}</code></dd>
+            {{ end }}
+            </dl>
+          </fieldset>
+        </div>
+      </div>
+      {{ end }}
+
       <details>
         <summary role="button">Raw data</summary>
         <pre>{{ .TufJson }}</pre>

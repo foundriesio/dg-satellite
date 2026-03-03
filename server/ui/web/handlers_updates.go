@@ -6,10 +6,85 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/foundriesio/dg-satellite/server/ui/api"
 	"github.com/labstack/echo/v4"
 )
+
+type LatestTarget struct {
+	Name    string
+	Version string
+	Sha256  string
+	Apps    map[string]string // app name -> uri
+}
+
+func findLatestTarget(tuf api.UpdateTufResp) *LatestTarget {
+	targetsJson, ok := tuf["targets.json"]
+	if !ok {
+		return nil
+	}
+	signed, ok := targetsJson["signed"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	targets, ok := signed["targets"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	var latest *LatestTarget
+	latestVersion := -1
+
+	for name, target := range targets {
+		t, ok := target.(map[string]any)
+		if !ok {
+			continue
+		}
+		custom, ok := t["custom"].(map[string]any)
+		if !ok {
+			continue
+		}
+		versionStr, ok := custom["version"].(string)
+		if !ok {
+			continue
+		}
+		version, err := strconv.Atoi(versionStr)
+		if err != nil {
+			continue
+		}
+		if version > latestVersion {
+			latestVersion = version
+
+			sha256 := ""
+			if hashes, ok := t["hashes"].(map[string]any); ok {
+				if h, ok := hashes["sha256"].(string); ok {
+					sha256 = h
+				}
+			}
+
+			apps := make(map[string]string)
+			if dockerApps, ok := custom["docker_compose_apps"].(map[string]any); ok {
+				for appName, appVal := range dockerApps {
+					if appMap, ok := appVal.(map[string]any); ok {
+						if uri, ok := appMap["uri"].(string); ok {
+							apps[appName] = uri
+						}
+					}
+				}
+			}
+
+			latest = &LatestTarget{
+				Name:    name,
+				Version: versionStr,
+				Sha256:  sha256,
+				Apps:    apps,
+			}
+		}
+	}
+
+	return latest
+}
 
 func (h handlers) updatesList(c echo.Context) error {
 	var ci map[string][]string
@@ -58,22 +133,24 @@ func (h handlers) updatesGet(c echo.Context) error {
 
 	ctx := struct {
 		baseCtx
-		Tag      string
-		Name     string
-		Prod     string
-		Rollouts []string
-		Groups   []string
-		Tuf      api.UpdateTufResp
-		TufJson  string
+		Tag          string
+		Name         string
+		Prod         string
+		Rollouts     []string
+		Groups       []string
+		Tuf          api.UpdateTufResp
+		TufJson      string
+		LatestTarget *LatestTarget
 	}{
-		baseCtx:  h.baseCtx(c, "Update Details", "updates"),
-		Tag:      c.Param("tag"),
-		Name:     c.Param("name"),
-		Prod:     c.Param("prod"),
-		Rollouts: rollouts,
-		Groups:   groups,
-		Tuf:      tuf,
-		TufJson:  string(tufJson),
+		baseCtx:      h.baseCtx(c, "Update Details", "updates"),
+		Tag:          c.Param("tag"),
+		Name:         c.Param("name"),
+		Prod:         c.Param("prod"),
+		Rollouts:     rollouts,
+		Groups:       groups,
+		Tuf:          tuf,
+		TufJson:      string(tufJson),
+		LatestTarget: findLatestTarget(tuf),
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "update.html", ctx)
 }

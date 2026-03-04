@@ -28,6 +28,9 @@ func (handlers) ostreeFileStream(c echo.Context) error {
 	req := c.Request()
 	ctx := req.Context()
 	filePath := req.URL.Path[len("/ostree/"):]
+	if strings.Contains(filePath, "..") {
+		return c.String(http.StatusNotFound, "Not Found")
+	}
 	log := CtxGetLog(ctx).With("file", filePath)
 	c.SetRequest(req.WithContext(CtxWithLog(ctx, log)))
 	d := CtxGetDevice(c.Request().Context())

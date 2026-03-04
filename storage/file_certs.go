@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type CertsFsHandle struct {
@@ -27,7 +28,11 @@ func (s CertsFsHandle) ReadFile(name string) ([]byte, error) {
 }
 
 func (s CertsFsHandle) WriteFile(name string, content []byte) error {
-	if err := s.writeFile(name, string(content), 0o740); err != nil {
+	fileAccess := defaultFileAccess
+	if strings.HasSuffix(name, ".key") {
+		fileAccess = secureFileAccess
+	}
+	if err := s.writeFile(name, string(content), fileAccess); err != nil {
 		return fmt.Errorf("error writing file %s: %w", name, err)
 	}
 	return nil

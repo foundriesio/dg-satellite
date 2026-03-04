@@ -64,7 +64,7 @@ func (s UpdatesFsHandle) TailFileLines(tag, update, name string, stop DoneChan) 
 func (s UpdatesFsHandle) WriteFile(tag, update, name, content string) error {
 	if h, err := s.updateLocalHandle(tag, update, true); err != nil {
 		return err
-	} else if err = h.writeFile(name, content, 0o644); err != nil {
+	} else if err = h.writeFile(name, content, defaultFileAccess); err != nil {
 		return fmt.Errorf("error writing %s file for tag %s update %s: %w", s.category, tag, update, err)
 	}
 	return nil
@@ -73,7 +73,7 @@ func (s UpdatesFsHandle) WriteFile(tag, update, name, content string) error {
 func (s UpdatesFsHandle) AppendFile(tag, update, name, content string) error {
 	if h, err := s.updateLocalHandle(tag, update, true); err != nil {
 		return err
-	} else if err = h.appendFile(name, content, 0o644); err != nil {
+	} else if err = h.appendFile(name, content, defaultFileAccess); err != nil {
 		return fmt.Errorf("error appending %s file for tag %s update %s: %w", s.category, tag, update, err)
 	}
 	return nil
@@ -82,7 +82,7 @@ func (s UpdatesFsHandle) AppendFile(tag, update, name, content string) error {
 func (s UpdatesFsHandle) updateLocalHandle(tag, update string, forUpdate bool) (h baseFsHandle, err error) {
 	h.root = filepath.Join(s.root, tag, update, s.category)
 	if forUpdate {
-		if err = h.mkdirs(0o744, true); err != nil {
+		if err = h.mkdirs(defaultDirAccess, true); err != nil {
 			err = fmt.Errorf("unable to create %s file storage for tag %s update %s: %w", s.category, tag, update, err)
 		}
 	}
@@ -133,7 +133,7 @@ func (s RolloutsFsHandle) ListFiles(tag, update string) ([]string, error) {
 }
 
 func (s RolloutsFsHandle) AppendJournal(content string) error {
-	return s.appendFile(rolloutJournalFile+partialFileSuffix, content, 0o664)
+	return s.appendFile(rolloutJournalFile+partialFileSuffix, content, defaultFileAccess)
 }
 
 func (s RolloutsFsHandle) RolloverJournal() (err error) {

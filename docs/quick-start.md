@@ -25,10 +25,10 @@ Copy `datadir/certs/tls.csr` to the computer with your factory PKI. This
 file does not contain sensitive information, so it's safe to share as
 needed. From the factory PKI directory run:
 ```
-  <pkidir>/sign_tls_csr <path to tls.csr>
+  fioctl keys ca sign --pki-dir <path to your factory pki> <path to tls.csr>
 ```
 
-This script will print the contents of the certificate. The contents are
+This command will print the contents of the certificate. The contents are
 not sensitive. Go back to the satellite server system and create the
 file `datadir/certs/tls.pem` with this content.
 

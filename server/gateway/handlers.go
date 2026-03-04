@@ -57,8 +57,6 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, url string) {
 
 	registry := e.Group("registry/v2")
 	registry.Use(h.authToken)
-	registry.HEAD("/:repo/:app/blobs/sha256\\::hash", h.blobHead)
-	registry.HEAD("/:repo/:app/manifests/sha256\\::hash", h.blobHead)
-	registry.GET("/:repo/:app/blobs/sha256\\::hash", h.blobGet)
-	registry.GET("/:repo/:app/manifests/sha256\\::hash", h.blobGet)
+	registry.HEAD("/*", h.blobHead)
+	registry.GET("/*", h.blobGet)
 }

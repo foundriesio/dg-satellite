@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/foundriesio/dg-satellite/clock"
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
 	baseStorage "github.com/foundriesio/dg-satellite/storage"
@@ -219,17 +220,50 @@ func TestCheckIn(t *testing.T) {
 
 func TestConfig(t *testing.T) {
 	tc := NewTestClient(t)
-	getConfig := func(status int) (cfg map[string]ConfigFile) {
-		bytes := tc.GET("/config", status)
+
+	// advance the wall clock forward manually
+	now := time.Now().Truncate(time.Second).UTC()
+	clock.Now = func() time.Time {
+		return now
+	}
+	defer func() { clock.Now = time.Now }()
+
+	var lastModifiedAt time.Time
+	getConfigSince := func(status int, ifModifiedSince time.Time) (cfg map[string]ConfigFile) {
+		req := httptest.NewRequest(http.MethodGet, "/config", nil)
+		if !ifModifiedSince.IsZero() {
+			req.Header.Add("If-Modified-Since", ifModifiedSince.Format(time.RFC1123))
+		}
+		rec := tc.Do(req)
+		require.Equal(t, status, rec.Code)
 		if status == 200 {
-			require.Nil(t, json.Unmarshal(bytes, &cfg))
+			var err error
+			require.Nil(t, json.Unmarshal(rec.Body.Bytes(), &cfg))
+			lastModifiedAt, err = time.Parse(time.RFC1123, rec.Header().Get("Date"))
+			require.Nil(t, err)
 		}
 		return
 	}
+	getConfig := func(status int) map[string]ConfigFile {
+		return getConfigSince(status, time.Time{}) // Zero time
+	}
+
+	checkpoint := now
+	tick := func(saveCheckpoint bool) {
+		if saveCheckpoint {
+			checkpoint = now
+		}
+		now = now.Add(time.Second)
+	}
+	tick(true)
 
 	// No config
 	cfg := getConfig(204)
 	require.Equal(t, 0, len(cfg))
+	require.True(t, lastModifiedAt.IsZero())
+	cfg = getConfigSince(204, checkpoint)
+	require.Equal(t, 0, len(cfg))
+	tick(false) // This test changes no configs
 
 	checkConfig := func(name, content string, onChanged ...string) {
 		v, ok := cfg[name]
@@ -240,6 +274,19 @@ func TestConfig(t *testing.T) {
 			require.Equal(t, item, v.OnChanged[idx])
 		}
 	}
+	checkTimestamp := func(isModified bool) {
+		if isModified {
+			require.Equal(t, now, lastModifiedAt)
+			cfg1 := getConfigSince(200, checkpoint)
+			require.Equal(t, cfg, cfg1)
+			cfg1 = getConfigSince(304, now)
+			require.Equal(t, 0, len(cfg1))
+		} else {
+			require.Equal(t, checkpoint, lastModifiedAt)
+			cfg1 := getConfigSince(304, checkpoint)
+			require.Equal(t, 0, len(cfg1))
+		}
+	}
 
 	// Added factory configs
 	require.Nil(t, tc.fs.Configs.WriteFactoryConfig(
@@ -248,6 +295,8 @@ func TestConfig(t *testing.T) {
 	require.Equal(t, 2, len(cfg))
 	checkConfig("foo", "foo content")
 	checkConfig("bar", "bar content", "/bin/bar")
+	checkTimestamp(true)
+	tick(true)
 
 	// Added device configs - override one factory config, adds one more
 	require.Nil(t, tc.fs.Configs.WriteDeviceConfig(tc.uuid,
@@ -257,6 +306,8 @@ func TestConfig(t *testing.T) {
 	checkConfig("foo", "foo content")
 	checkConfig("bar", "bar device")
 	checkConfig("baz", "baz device")
+	checkTimestamp(true)
+	tick(true)
 
 	// Added group configs, group not set
 	require.Nil(t, tc.fs.Configs.WriteGroupConfig("first",
@@ -268,6 +319,9 @@ func TestConfig(t *testing.T) {
 	checkConfig("foo", "foo content")
 	checkConfig("bar", "bar device")
 	checkConfig("baz", "baz device")
+	// Next test sets device group which were created above; hence the checkpoint advances despite no config change here.
+	checkTimestamp(false)
+	tick(true)
 
 	setGroupStmt, err := tc.db.Prepare("TestUpdateGroup", "UPDATE devices SET labels=jsonb_set(labels,'$.group',?) WHERE uuid=?")
 	require.Nil(t, err)
@@ -284,6 +338,9 @@ func TestConfig(t *testing.T) {
 	checkConfig("bar", "bar device")
 	checkConfig("baz", "baz device")
 	checkConfig("toe", "first toe")
+	// TODO: group change tracking is added in the next commit
+	checkTimestamp(false)
+	tick(false)
 
 	// Set second group - adds one config, overrides one factory config, both are overridden by device config
 	setGroup("second")
@@ -292,6 +349,9 @@ func TestConfig(t *testing.T) {
 	checkConfig("foo", "foo content")
 	checkConfig("bar", "bar device")
 	checkConfig("baz", "baz device")
+	// TODO: group change tracking is added in the next commit
+	checkTimestamp(false)
+	tick(false)
 
 	// Changed device config - remove one factory/group override, keep another group override, add one more config
 	require.Nil(t, tc.fs.Configs.WriteDeviceConfig(tc.uuid,
@@ -302,6 +362,8 @@ func TestConfig(t *testing.T) {
 	checkConfig("bar", "second bar")
 	checkConfig("baz", "baz device")
 	checkConfig("ooh", "ooh device")
+	checkTimestamp(true)
+	tick(true)
 
 	// Changed group config - remove factory override, add one more config
 	require.Nil(t, tc.fs.Configs.WriteGroupConfig("second",
@@ -313,6 +375,8 @@ func TestConfig(t *testing.T) {
 	checkConfig("baz", "baz device")
 	checkConfig("ooh", "ooh device")
 	checkConfig("tip", "second tip", "/big/tip")
+	checkTimestamp(true)
+	tick(true)
 
 	// Changed factory config - remove one config
 	require.Nil(t, tc.fs.Configs.WriteFactoryConfig(
@@ -323,6 +387,8 @@ func TestConfig(t *testing.T) {
 	checkConfig("baz", "baz device")
 	checkConfig("ooh", "ooh device")
 	checkConfig("tip", "second tip", "/big/tip")
+	checkTimestamp(true)
+	tick(true)
 
 	// Set third group, no group config
 	setGroup("third")
@@ -331,6 +397,8 @@ func TestConfig(t *testing.T) {
 	checkConfig("bar", "bar content", "/bin/bar")
 	checkConfig("baz", "baz device")
 	checkConfig("ooh", "ooh device")
+	// TODO: group change tracking is added in the next commit
+	checkTimestamp(false)
 }
 
 func TestInfo(t *testing.T) {

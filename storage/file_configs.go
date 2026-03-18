@@ -10,7 +10,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/foundriesio/dg-satellite/clock"
 )
 
 // Outer directory structure:
@@ -195,7 +196,7 @@ func (s configsFsHandle) writeConfig(content string) error {
 	if err := s.writeFile(name, content, defaultFileAccess); err != nil {
 		return fmt.Errorf("failed to save config file %s: %w", name, err)
 	}
-	line := fmt.Sprintf("%s:%x\n", name, time.Now().Unix())
+	line := fmt.Sprintf("%s:%x\n", name, clock.Now().Unix())
 	if err := s.appendFile(ConfigsJournalFile, line, defaultFileAccess); err != nil {
 		_ = s.deleteFile(name, true) // Silence cleanup errors - nothing we can do here.
 		return fmt.Errorf("failed to write journal for config file %s: %w", name, err)

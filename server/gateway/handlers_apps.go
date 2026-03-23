@@ -6,6 +6,8 @@ package gateway
 import (
 	"crypto/rand"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 )
@@ -29,7 +31,28 @@ func (h handlers) blobHead(c echo.Context) error {
 }
 
 func (h handlers) blobGet(c echo.Context) error {
+	path := c.Param("*")
+	if filepath.Clean(path) != path {
+		return c.String(http.StatusNotFound, "Not Found")
+	}
+	hash := parseRegistryHash(c.Param("*"))
+	if len(hash) == 0 || strings.Contains(hash, "..") {
+		return c.String(http.StatusNotFound, "Not Found")
+	}
 	device := CtxGetDevice(c.Request().Context())
-	path := device.GetAppsFilePath("blobs/sha256/" + c.Param("hash"))
+	path = device.GetAppsFilePath("blobs/sha256/" + hash)
 	return c.File(path)
+}
+
+// parseRegistryHash extracts the sha256 hash from a registry wildcard path.
+// The path is expected to end with /blobs/sha256:<hash> or /manifests/sha256:<hash>,
+// where the portion before that can contain slashes (e.g. repo/app/with/slashes/blobs/sha256:<hash>).
+func parseRegistryHash(path string) string {
+	for _, marker := range []string{"/blobs/sha256:", "/manifests/sha256:"} {
+		idx := strings.LastIndex(path, marker)
+		if idx != -1 {
+			return path[idx+len(marker):]
+		}
+	}
+	return ""
 }

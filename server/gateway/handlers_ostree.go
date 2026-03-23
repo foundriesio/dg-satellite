@@ -6,6 +6,7 @@ package gateway
 import (
 	"errors"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -28,7 +29,7 @@ func (handlers) ostreeFileStream(c echo.Context) error {
 	req := c.Request()
 	ctx := req.Context()
 	filePath := req.URL.Path[len("/ostree/"):]
-	if strings.Contains(filePath, "..") {
+	if filepath.Clean(filePath) != filePath {
 		return c.String(http.StatusNotFound, "Not Found")
 	}
 	log := CtxGetLog(ctx).With("file", filePath)

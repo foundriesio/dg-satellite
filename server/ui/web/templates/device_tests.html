@@ -15,7 +15,7 @@
         <tbody>
           {{ range .Tests }}
           <tr>
-            <td>{{.Uuid}}</td>
+            <td><a href="/devices/{{$.DeviceUuid}}/tests/{{.Uuid}}">{{.Uuid}}</a></td>
             <td>{{.Name}}</td>
             <td>{{.Status}}</td>
             <td>{{tsToString .CreatedOn}}</td>

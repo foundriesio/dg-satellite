@@ -149,6 +149,24 @@ func (h handlers) devicesTests(c echo.Context) error {
 	return h.templates.ExecuteTemplate(c.Response(), "device_tests.html", ctx)
 }
 
+func (h handlers) devicesTestGet(c echo.Context) error {
+	var test storage.TargetTest
+	if err := getJson(c.Request().Context(), "/v1/devices/"+c.Param("uuid")+"/tests/"+c.Param("testid"), &test); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+
+	ctx := struct {
+		baseCtx
+		DeviceUuid string
+		Test       storage.TargetTest
+	}{
+		baseCtx:    h.baseCtx(c, "Device - "+c.Param("uuid")+" Test - "+test.Name, "devices"),
+		DeviceUuid: c.Param("uuid"),
+		Test:       test,
+	}
+	return h.templates.ExecuteTemplate(c.Response(), "device_test.html", ctx)
+}
+
 func (h handlers) devicesLabelsGet(c echo.Context) error {
 	var device api.Device
 	if err := getJson(c.Request().Context(), "/v1/devices/"+c.Param("uuid"), &device); err != nil {

@@ -36,6 +36,8 @@ func (s UpdatesFsHandle) LatestRootMetaName(tag, update string) (string, error) 
 	files, err := h.matchFiles("", false)
 	if err != nil {
 		return "", fmt.Errorf("error find latest root metadata: %w", err)
+	} else if len(files) == 0 {
+		return "", fmt.Errorf("no metadata files found for tag %s update %s", tag, update)
 	}
 	slices.SortFunc(files, func(a, b string) int {
 		aIsRoot := strings.HasSuffix(a, ".root.json")
@@ -51,7 +53,7 @@ func (s UpdatesFsHandle) LatestRootMetaName(tag, update string) (string, error) 
 		} else if bIsRoot {
 			return 1
 		}
-		return strings.Compare(b, a)
+		return 1
 	})
 	return files[0], nil
 }

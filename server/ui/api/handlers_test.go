@@ -947,6 +947,11 @@ func TestApiUploadConfigs(t *testing.T) {
 		r := gzipBuffer(t, tarBuffer(t, validTarFiles))
 		tc.PUT("/configs", 200, r, "Content-Type", "application/x-tar", "Content-Encoding", "gzip")
 	})
+
+	t.Run("Success on devices and updates read-write and gzip transport", func(t *testing.T) {
+		r := gzipBuffer(t, tarBuffer(t, validTarFiles))
+		tc.PUT("/configs", 200, r, "Content-Type", "application/gzip")
+	})
 }
 
 var tarBuffer = storageTesting.CreateTarBuffer

@@ -43,3 +43,16 @@ func authUser(provider auth.Provider) echo.MiddlewareFunc {
 		}
 	}
 }
+
+func gzipContentTypeAsContentEncoding(next echo.HandlerFunc) echo.HandlerFunc {
+	// An echo.decompose middleware uses a standard content-encoding header to identify if content was gzipped.
+	// We also support a non-standard way to specify that in a content-type header.
+	// Although we don't know what exactly was gzipped that way, a handler may still attempt to process it.
+	return func(c echo.Context) error {
+		h := c.Request().Header
+		if h.Get(echo.HeaderContentType) == "application/gzip" {
+			h.Set(echo.HeaderContentEncoding, "gzip")
+		}
+		return next(c)
+	}
+}

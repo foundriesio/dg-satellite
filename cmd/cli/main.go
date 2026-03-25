@@ -9,6 +9,7 @@ import (
 
 	"github.com/foundriesio/dg-satellite/cli/api"
 	"github.com/foundriesio/dg-satellite/cli/config"
+	"github.com/foundriesio/dg-satellite/cli/subcommands/configs"
 	"github.com/foundriesio/dg-satellite/cli/subcommands/devices"
 	"github.com/foundriesio/dg-satellite/cli/subcommands/login"
 	"github.com/foundriesio/dg-satellite/cli/subcommands/updates"
@@ -62,6 +63,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("config", "f", "", "Specify the configuration file to use")
 
 	rootCmd.AddCommand(login.LoginCmd)
+	rootCmd.AddCommand(configs.ConfigsCmd)
 	rootCmd.AddCommand(devices.DevicesCmd)
 	rootCmd.AddCommand(updates.UpdatesCmd)
 	rootCmd.AddCommand(&cobra.Command{

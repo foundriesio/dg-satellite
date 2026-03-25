@@ -31,8 +31,8 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, userStorage *users
 	oauth2 := oauth2Handlers{users: userStorage}
 	oauth2Group := e.Group("/oauth2")
 	oauth2Group.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(rate.Limit(2))))
-	oauth2Group.POST("/device/code", oauth2.oauth2DeviceCode)
-	oauth2Group.POST("/device/token", oauth2.oauth2DeviceToken)
+	oauth2Group.POST("/authorization/device/", oauth2.oauth2DeviceCode)
+	oauth2Group.POST("/token/", oauth2.oauth2DeviceToken)
 
 	g := e.Group("/v1")
 	g.Use(authUser(a))

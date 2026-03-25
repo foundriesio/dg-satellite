@@ -4,6 +4,7 @@
 package auth
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -44,6 +45,15 @@ func (p *commonProvider) GetUser(c echo.Context) (*users.User, error) {
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 			return nil, fmt.Errorf("invalid authorization header")
+		}
+
+		if c.Request().Method == http.MethodPost && c.Request().URL.Path == "/v1/devices/" {
+			// lmp-device-register sends the token b64encoded
+			decoded, err := base64.StdEncoding.DecodeString(parts[1])
+			if err != nil {
+				return nil, fmt.Errorf("invalid base64 token: %w", err)
+			}
+			parts[1] = string(decoded)
 		}
 		user, err := p.users.GetByToken(parts[1])
 		if err != nil {

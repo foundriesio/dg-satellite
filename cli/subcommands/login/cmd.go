@@ -119,7 +119,7 @@ func oauth2DeviceFlow(configPath, contextName, serverURL, scopes string, expires
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := http.Post(serverURL+"/oauth2/device/code", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(serverURL+"/oauth2/authorization/device/", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to request device code: %w", err)
 	}
@@ -192,7 +192,7 @@ func pollForToken(serverURL, deviceCode string) (string, error) {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := http.Post(serverURL+"/oauth2/device/token", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(serverURL+"/oauth2/token/", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("failed to request token: %w", err)
 	}

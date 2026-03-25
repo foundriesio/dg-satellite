@@ -6,6 +6,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -28,12 +29,13 @@ type DeviceCodeResponse struct {
 	VerificationURI         string `json:"verification_uri"`
 	VerificationURIComplete string `json:"verification_uri_complete"`
 	Expires                 int64  `json:"expires"`
+	ExpiresInSec            int    `json:"expires_in"` // for lmp-dr
 	Interval                int    `json:"interval"`
 }
 
 type DeviceTokenRequest struct {
-	DeviceCode string `json:"device_code"`
-	GrantType  string `json:"grant_type"`
+	DeviceCode string `json:"device_code" form:"device_code"`
+	GrantType  string `json:"grant_type" form:"grant_type"`
 }
 
 type DeviceTokenResponse struct {
@@ -52,8 +54,8 @@ type oauth2Error struct {
 // @Accept json
 // @Param data body DeviceCodeRequest true "Device code request"
 // @Produce json
-// @Success 200
-// @Router  /oauth2/device/code [post]
+// @Success 200 {object} DeviceCodeResponse
+// @Router  /oauth2/authorization/device/ [post]
 func (h oauth2Handlers) oauth2DeviceCode(c echo.Context) error {
 	var req DeviceCodeRequest
 	if err := c.Bind(&req); err != nil {
@@ -63,8 +65,24 @@ func (h oauth2Handlers) oauth2DeviceCode(c echo.Context) error {
 		})
 	}
 
-	_, err := users.ScopesFromString(req.Scopes)
-	if err != nil {
+	// sanitize for lmp-device-register
+	scopes := strings.Split(req.Scopes, ",")
+	if len(scopes) == 1 {
+		// might be lmp-dr
+		parts := strings.Split(scopes[0], ":")
+		if len(parts) == 3 {
+			// looks like lmp-dr, convert to proper scope string
+			req.Scopes = parts[1] + ":" + parts[2]
+		}
+		CtxGetLog(c.Request().Context()).Info("Assumming lmp-device-register format for scopes", "scopes", req.Scopes)
+
+		if req.TokenExpires == 0 {
+			// lmp-dr doesn't send token_expires, set to 5 minutes
+			req.TokenExpires = time.Now().Add(5 * time.Minute).Unix()
+		}
+	}
+
+	if _, err := users.ScopesFromString(req.Scopes); err != nil {
 		return c.JSON(http.StatusBadRequest, oauth2Error{
 			Error:            "invalid_scope",
 			ErrorDescription: fmt.Sprintf("Invalid scopes: %v", err),
@@ -94,6 +112,7 @@ func (h oauth2Handlers) oauth2DeviceCode(c echo.Context) error {
 		VerificationURI:         verificationURI,
 		VerificationURIComplete: verificationURIComplete,
 		Expires:                 expires,
+		ExpiresInSec:            int(expires - time.Now().Unix()),
 		Interval:                5, // Poll every 5 seconds
 	})
 }
@@ -102,8 +121,8 @@ func (h oauth2Handlers) oauth2DeviceCode(c echo.Context) error {
 // @Accept json
 // @Param data body DeviceTokenRequest true "Device token request"
 // @Produce json
-// @Success 200
-// @Router  /oauth2/device/code [post]
+// @Success 200 {object} DeviceTokenResponse
+// @Router  /oauth2/token [post]
 func (h oauth2Handlers) oauth2DeviceToken(c echo.Context) error {
 	var req DeviceTokenRequest
 	if err := c.Bind(&req); err != nil {

@@ -11,43 +11,88 @@ import (
 	"net/http"
 )
 
-func (a Api) Get(resource string, result any) error {
-	url := a.URL + resource
-	resp, err := a.Client.Get(url)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			fmt.Printf("warning: failed to close response body: %v\n", err)
-		}
-	}()
+type HttpOption func(opts *httpOptions)
 
-	if resp.StatusCode != 200 {
-		buf, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("API request failed with status %d and unreadable body", resp.StatusCode)
+func HttpHeader(name, value string) HttpOption {
+	return func(opts *httpOptions) {
+		if opts.header == nil {
+			opts.header = make(http.Header)
 		}
-		rid := resp.Header.Get("X-Request-ID")
-		return fmt.Errorf("API request (id=%s) failed with status %d: %s", rid, resp.StatusCode, string(buf))
+		opts.header.Set(name, value)
 	}
-
-	return json.NewDecoder(resp.Body).Decode(result)
 }
 
-func (a Api) Put(resource string, body any) ([]byte, error) {
+func (a Api) Get(resource string, result any, opts ...HttpOption) error {
+	if body, err := a.GetStream(resource, opts...); err != nil {
+		return err
+	} else {
+		defer func() {
+			if err := body.Close(); err != nil {
+				fmt.Printf("warning: failed to close response body: %v\n", err)
+			}
+		}()
+		return json.NewDecoder(body).Decode(result)
+	}
+}
+
+func (a Api) GetStream(resource string, opts ...HttpOption) (io.ReadCloser, error) {
+	var options httpOptions
+	options.apply(opts)
 	url := a.URL + resource
 
-	jsonData, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header = options.header
+
+	resp, err := a.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Printf("warning: failed to close response body: %v\n", err)
+			}
+		}()
+		return nil, handleHttpError(resp)
+	}
+
+	// Return the response without closing the body - caller must close it
+	return resp.Body, nil
+}
+
+func (a Api) Put(resource string, body any, opts ...HttpOption) ([]byte, error) {
+	var (
+		options httpOptions
+		reader  io.Reader
+		ok      bool
+	)
+	options.apply(opts)
+	url := a.URL + resource
+
+	if reader, ok = body.(io.Reader); ok {
+		if _, ok = options.header["Content-Type"]; !ok {
+			options.header.Set("Content-Type", "application/octet-stream")
+		}
+	} else {
+		jsonData, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		reader = bytes.NewBuffer(jsonData)
+		if _, ok = options.header["Content-Type"]; !ok {
+			options.header.Set("Content-Type", "application/json")
+		}
+	}
+
+	req, err := http.NewRequest("PUT", url, reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header = options.header
 
 	resp, err := a.Client.Do(req)
 	if err != nil {
@@ -60,40 +105,29 @@ func (a Api) Put(resource string, body any) ([]byte, error) {
 	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		buf, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("API request failed with status %d and unreadable body", resp.StatusCode)
-		}
-		rid := resp.Header.Get("X-Request-ID")
-		return nil, fmt.Errorf("API request (id=%s) failed with status %d: %s", rid, resp.StatusCode, string(buf))
+		return nil, handleHttpError(resp)
 	}
 
 	return io.ReadAll(resp.Body)
 }
 
-func (a Api) GetStream(resource string) (io.ReadCloser, error) {
-	url := a.URL + resource
-	resp, err := a.Client.Get(url)
+func handleHttpError(resp *http.Response) error {
+	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("API request failed with status %d and unreadable body", resp.StatusCode)
 	}
+	rid := resp.Header.Get("X-Request-ID")
+	return fmt.Errorf("API request (id=%s) failed with status %d: %s", rid, resp.StatusCode, string(buf))
+}
 
-	if resp.StatusCode != 200 {
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("warning: failed to close response body: %v\n", err)
-			}
-		}()
-		buf, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("API request failed with status %d and unreadable body", resp.StatusCode)
-		}
-		rid := resp.Header.Get("X-Request-ID")
-		return nil, fmt.Errorf("API request (id=%s) failed with status %d: %s", rid, resp.StatusCode, string(buf))
+type httpOptions struct {
+	header http.Header
+}
+
+func (o *httpOptions) apply(opts []HttpOption) {
+	for _, f := range opts {
+		f(o)
 	}
-
-	// Return the response without closing the body - caller must close it
-	return resp.Body, nil
 }
 
 func (a Api) Delete(resource string) error {

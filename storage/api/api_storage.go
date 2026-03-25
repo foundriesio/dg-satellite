@@ -263,7 +263,7 @@ func (s Storage) GetUpdateTufMetadata(tag, updateName string, isProd bool) (map[
 	}
 
 	meta := make(map[string]map[string]any)
-	for _, x := range []string{"targets.json", "snapshot.json", "timestamp.json", latestRoot} {
+	for _, x := range []string{storage.TufTargetsFile, storage.TufSnapshotFile, storage.TufTimestampFile, latestRoot} {
 		metaStr, err := handle.Tuf.ReadFile(tag, updateName, x)
 		if err != nil {
 			return nil, err
@@ -273,7 +273,7 @@ func (s Storage) GetUpdateTufMetadata(tag, updateName string, isProd bool) (map[
 			return nil, fmt.Errorf("failed to unmarshal %s: %w", x, err)
 		}
 		if x == latestRoot {
-			x = "root.json"
+			x = storage.TufRootFile
 		}
 		meta[x] = metaDict
 	}

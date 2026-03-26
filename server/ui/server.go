@@ -45,9 +45,14 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 
 	daemons := daemons.New(ctx, strg, users)
 
+	ca, err := apiHandlers.LoadDeviceCa(fs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load device CA: %w", err)
+	}
+
 	srv := server.NewServer(ctx, e, serverName, port, nil)
 	e.Use(auth.CsrfCheck)
-	apiHandlers.RegisterHandlers(e, strg, users, provider)
+	apiHandlers.RegisterHandlers(e, ca, strg, users, provider)
 	webHandlers.RegisterHandlers(e, users, provider)
 	return &apiServer{server: srv, daemons: daemons}, nil
 }

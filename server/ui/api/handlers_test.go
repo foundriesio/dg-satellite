@@ -212,7 +212,7 @@ func NewTestClient(t *testing.T) *testClient {
 		Username:      "root",
 		AllowedScopes: 0,
 	}
-	RegisterHandlers(e, apiS, userS, &testAuthProvider{user: u})
+	RegisterHandlers(e, nil, apiS, userS, &testAuthProvider{user: u})
 
 	tc := testClient{
 		t:   t,

@@ -4,6 +4,8 @@
 package api
 
 import (
+	"log/slog"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"golang.org/x/time/rate"
@@ -15,14 +17,16 @@ import (
 )
 
 type handlers struct {
+	ca      *DeviceCa
 	storage *storage.Storage
 	users   *users.Storage
 }
 
 var EchoError = server.EchoError
 
-func RegisterHandlers(e *echo.Echo, storage *storage.Storage, userStorage *users.Storage, a auth.Provider) {
+func RegisterHandlers(e *echo.Echo, ca *DeviceCa, storage *storage.Storage, userStorage *users.Storage, a auth.Provider) {
 	h := handlers{
+		ca:      ca,
 		storage: storage,
 		users:   userStorage,
 	}
@@ -40,6 +44,10 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, userStorage *users
 	g.PUT("/configs", h.configsUpload, requireScope(users.ScopeDevicesRU|users.ScopeUpdatesRU),
 		gzipContentTypeAsContentEncoding, middleware.Decompress())
 	g.GET("/devices", h.deviceList, requireScope(users.ScopeDevicesR))
+	if ca != nil {
+		slog.Info("Device CA is configured, enabling device registration endpoint")
+		g.POST("/devices/", h.deviceCreate, requireScope(users.ScopeDevicesC))
+	}
 	g.GET("/devices/:uuid", h.deviceGet, requireScope(users.ScopeDevicesR))
 	g.DELETE("/devices/:uuid", h.deviceDelete, requireScope(users.ScopeDevicesD))
 	g.GET("/devices/:uuid/apps-states", h.deviceAppsStatesGet, requireScope(users.ScopeDevicesR))

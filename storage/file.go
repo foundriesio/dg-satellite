@@ -34,6 +34,9 @@ const (
 	CertsTlsCsrFile = "tls.csr"
 	CertsTlsKeyFile = "tls.key"
 	CertsTlsPemFile = "tls.pem"
+	CertsCaKeyFile  = "ca.key"
+	CertsCaPemFile  = "ca.pem"
+	CertsCaRootFile = "root.pem"
 
 	AuthConfigFile = "auth-config.json"
 	HmacFile       = "hmac.secret"

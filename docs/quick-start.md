@@ -62,3 +62,4 @@ The `/var/sota/sota.toml` file has several "server" settings that need to point 
  * provision.server
  * uptane.repo_server
  * pacman.ostree_server
+ * pacman.compose_apps_proxy = "https://<HOSTNAME>:8443/app-proxy-url"

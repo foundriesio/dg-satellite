@@ -5,12 +5,14 @@ package configs
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/foundriesio/dg-satellite/cli/api"
+	"github.com/foundriesio/dg-satellite/cli/subcommands"
 )
 
 var uploadCmd = &cobra.Command{
@@ -54,10 +56,18 @@ func uploadConfigs(capi api.ConfigsApi, path string) error {
 		return fmt.Errorf("a '%s' is neither a regular file nor a symlink to a regular file", path)
 	}
 
-	var opts []api.HttpOption
-	opts = append(opts, api.HttpHeader("Content-Type", "application/x-tar"))
-	if isGzip {
-		opts = append(opts, api.HttpHeader("Content-Encoding", "gzip"))
+	var reader io.ReadCloser = fd
+	if !isGzip {
+		// Gzip raw tar files on-the-fly to save network traffic
+		reader = subcommands.GzipStream(func(gzipper io.Writer) error {
+			_, err = io.Copy(gzipper, fd)
+			return err
+		})
+		defer reader.Close() //nolint:errcheck
 	}
-	return capi.Upload(fd, opts...)
+
+	return capi.Upload(reader,
+		api.HttpHeader("Content-Type", "application/x-tar"),
+		api.HttpHeader("Content-Encoding", "gzip"),
+	)
 }

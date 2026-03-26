@@ -117,6 +117,7 @@ type Storage struct {
 	stmtDeviceGetGroups stmtDeviceGetGroups
 	stmtDeviceGetLabels stmtDeviceGetLabels
 	stmtDeviceList      map[OrderBy]stmtDeviceList
+	stmtDevicePut       stmtDevicePut
 	stmtDeviceSetLabels stmtDeviceSetLabels
 	stmtDeviceSetUpdate stmtDeviceSetUpdate
 }
@@ -190,6 +191,7 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 		&handle.stmtDeviceGet,
 		&handle.stmtDeviceGetGroups,
 		&handle.stmtDeviceGetLabels,
+		&handle.stmtDevicePut,
 		&handle.stmtDeviceSetLabels,
 		&handle.stmtDeviceSetUpdate,
 	); err != nil {
@@ -269,6 +271,10 @@ func (s Storage) DeviceGet(uuid string) (*Device, error) {
 	}
 
 	return &d, nil
+}
+
+func (s Storage) DeviceCreate(uuid, pubkey string, isProd bool, labels Labels) error {
+	return s.stmtDevicePut.run(uuid, pubkey, isProd, labels)
 }
 
 func (s Storage) ListUpdates(tag string, isProd bool) (map[string][]string, error) {
@@ -615,5 +621,23 @@ func (s *stmtDeviceDelete) Init(db storage.DbHandle) (err error) {
 
 func (s *stmtDeviceDelete) run(uuid string) error {
 	_, err := s.Stmt.Exec(uuid)
+	return err
+}
+
+type stmtDevicePut storage.DbStmt
+
+func (s *stmtDevicePut) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("apiDevicePut", `
+		INSERT INTO devices (uuid, pubkey, is_prod, labels, deleted, created_at)
+		VALUES (?, ?, ?, ?, 0, unixepoch())`)
+	return
+}
+
+func (s *stmtDevicePut) run(uuid, pubkey string, isProd bool, labels Labels) error {
+	labelsJson, err := json.Marshal(labels)
+	if err != nil {
+		return fmt.Errorf("unexpected error marshalling labels to JSON: %w", err)
+	}
+	_, err = s.Stmt.Exec(uuid, pubkey, isProd, labelsJson)
 	return err
 }

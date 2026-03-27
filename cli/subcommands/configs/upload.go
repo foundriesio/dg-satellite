@@ -36,7 +36,10 @@ func init() {
 }
 
 func uploadConfigs(capi api.ConfigsApi, path string, isDir bool) error {
-	var reader io.ReadCloser
+	var (
+		reader   io.ReadCloser
+		reporter func(string, chan bool, chan bool)
+	)
 
 	if isDir {
 		if stat, err := os.Stat(path); err != nil {
@@ -53,7 +56,10 @@ func uploadConfigs(capi api.ConfigsApi, path string, isDir bool) error {
 			return fmt.Errorf("only regular files and directories are allowed for configs, but '%s' is neither", entry.Path)
 		}
 
-		reader = subcommands.GzipStream(subcommands.TarStream(subcommands.ArchiveSourcer(path, denyNonRegular)))
+		progress, sourcer := subcommands.TarProgress(subcommands.ArchiveSourcer(path, denyNonRegular))
+		reporter = progress.Report
+
+		reader = subcommands.GzipStream(progress.StreamWriter(subcommands.TarStream(sourcer)))
 		defer reader.Close() //nolint:errcheck
 	} else {
 		var isGzip bool
@@ -72,26 +78,42 @@ func uploadConfigs(capi api.ConfigsApi, path string, isDir bool) error {
 		}
 		defer fd.Close() //nolint:errcheck
 
-		if stat, err := fd.Stat(); err != nil {
+		stat, err := fd.Stat()
+		if err != nil {
 			return fmt.Errorf("failed to read file '%s': %w", path, err)
 		} else if !stat.Mode().IsRegular() {
 			return fmt.Errorf("a '%s' is neither a regular file nor a symlink to a regular file", path)
 		}
 
+		progress := subcommands.FileProgress(stat.Size())
+		reporter = progress.Report
+
 		if !isGzip {
 			// Gzip raw tar files on-the-fly to save network traffic
-			reader = subcommands.GzipStream(func(gzipper io.Writer) error {
+			reader = subcommands.GzipStream(progress.StreamWriter(func(gzipper io.Writer) error {
 				_, err = io.Copy(gzipper, fd)
 				return err
-			})
+			}))
 			defer reader.Close() //nolint:errcheck
 		} else {
-			reader = fd
+			reader = progress.StreamReader(fd)
 		}
 	}
 
-	return capi.Upload(reader,
+	stop := make(chan bool)
+	done := make(chan bool)
+	// Reporter is reporting based on the raw (disk) file sizes before compression.
+	// Rationale: gzip compression is a part of a transport, not storage.
+	// An io.Pipe|Reader|Writer interfaces warrant that a difference between actual bytes read/written is minimal.
+	// As per documentation it is up to 32KB, unless we decide to reconfigure default buffers.
+	// This gives us an extremely accurate precision, when we focus solely on input data sizes.
+	go reporter("Uploaded:", stop, done)
+
+	err := capi.Upload(reader,
 		api.HttpHeader("Content-Type", "application/x-tar"),
 		api.HttpHeader("Content-Encoding", "gzip"),
 	)
+	stop <- err == nil
+	<-done
+	return err
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server/ui/api"
 	"github.com/foundriesio/dg-satellite/storage"
+	"github.com/foundriesio/dg-satellite/storage/users"
 	"github.com/labstack/echo/v4"
 )
 
@@ -20,10 +21,12 @@ func (h handlers) devicesList(c echo.Context) error {
 
 	ctx := struct {
 		baseCtx
-		Devices []api.DeviceListItem
+		Devices   []api.DeviceListItem
+		CanDelete bool
 	}{
-		baseCtx: h.baseCtx(c, "Devices", "devices"),
-		Devices: devices,
+		baseCtx:   h.baseCtx(c, "Devices", "devices"),
+		Devices:   devices,
+		CanDelete: CtxGetSession(c.Request().Context()).User.AllowedScopes.Has(users.ScopeDevicesD),
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "devices_list.html", ctx)
 }

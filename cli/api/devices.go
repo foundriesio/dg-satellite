@@ -45,3 +45,7 @@ func (d DeviceApi) UpdateEvents(uuid, updateId string) ([]DeviceUpdateEvent, err
 	var events []DeviceUpdateEvent
 	return events, d.api.Get(fmt.Sprintf("/v1/devices/%s/updates/%s", uuid, updateId), &events)
 }
+
+func (d DeviceApi) Delete(uuid string) error {
+	return d.api.Delete(fmt.Sprintf("/v1/devices/%s", uuid))
+}

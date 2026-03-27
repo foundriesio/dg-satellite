@@ -77,3 +77,41 @@ func TestStorage(t *testing.T) {
 	assert.Equal(t, "update42", d.UpdateName)
 	assert.Equal(t, "aktoml content", d.Aktoml)
 }
+
+func TestDeviceDelete(t *testing.T) {
+	tmpdir := t.TempDir()
+	dbFile := filepath.Join(tmpdir, "sql.db")
+	db, err := storage.NewDb(dbFile)
+	require.Nil(t, err)
+	fs, err := storage.NewFs(tmpdir)
+	require.Nil(t, err)
+
+	s, err := NewStorage(db, fs)
+	require.Nil(t, err)
+
+	dg, err := gateway.NewStorage(db, fs)
+	require.Nil(t, err)
+
+	// Create a device
+	_, err = dg.DeviceCreate("uuid-del", "pubkey-del", false)
+	require.Nil(t, err)
+
+	// Verify it exists
+	d, err := s.DeviceGet("uuid-del")
+	require.Nil(t, err)
+	require.NotNil(t, d)
+
+	// Delete it
+	require.Nil(t, d.Delete())
+
+	// Verify it no longer shows up in Get or List
+	d, err = s.DeviceGet("uuid-del")
+	require.Nil(t, err)
+	require.Nil(t, d, "deleted device should not be returned by DeviceGet")
+
+	devices, err := s.DevicesList(DeviceListOpts{Limit: 100})
+	require.Nil(t, err)
+	for _, dev := range devices {
+		assert.NotEqual(t, "uuid-del", dev.Uuid, "deleted device should not appear in DevicesList")
+	}
+}

@@ -6,6 +6,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"log/slog"
@@ -103,12 +104,19 @@ type Storage struct {
 	db *storage.DbHandle
 	fs *storage.FsHandle
 
+	stmtDeviceDelete    stmtDeviceDelete
 	stmtDeviceGet       stmtDeviceGet
 	stmtDeviceGetGroups stmtDeviceGetGroups
 	stmtDeviceGetLabels stmtDeviceGetLabels
 	stmtDeviceList      map[OrderBy]stmtDeviceList
 	stmtDeviceSetLabels stmtDeviceSetLabels
 	stmtDeviceSetUpdate stmtDeviceSetUpdate
+}
+
+func (d Device) Delete() error {
+	err1 := d.storage.stmtDeviceDelete.run(d.Uuid)
+	err2 := d.storage.fs.Devices.Delete(d.Uuid)
+	return errors.Join(err1, err2)
 }
 
 func (d Device) Updates() ([]string, error) {
@@ -169,6 +177,7 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	handle := Storage{db: db, fs: fs}
 
 	if err := db.InitStmt(
+		&handle.stmtDeviceDelete,
 		&handle.stmtDeviceGet,
 		&handle.stmtDeviceGetGroups,
 		&handle.stmtDeviceGetLabels,
@@ -546,4 +555,17 @@ func (s *stmtDeviceSetUpdate) run(tag, updateName string, isProd bool, uuids, gr
 		}
 	}
 	return nil
+}
+
+type stmtDeviceDelete storage.DbStmt
+
+func (s *stmtDeviceDelete) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("apiDeviceDelete", `
+		UPDATE devices SET deleted=1 WHERE uuid=?`)
+	return
+}
+
+func (s *stmtDeviceDelete) run(uuid string) error {
+	_, err := s.Stmt.Exec(uuid)
+	return err
 }

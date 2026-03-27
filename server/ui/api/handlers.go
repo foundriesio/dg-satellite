@@ -25,6 +25,7 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, a auth.Provider) {
 
 	g.GET("/devices", h.deviceList, requireScope(users.ScopeDevicesR))
 	g.GET("/devices/:uuid", h.deviceGet, requireScope(users.ScopeDevicesR))
+	g.DELETE("/devices/:uuid", h.deviceDelete, requireScope(users.ScopeDevicesD))
 	g.GET("/devices/:uuid/apps-states", h.deviceAppsStatesGet, requireScope(users.ScopeDevicesR))
 	g.GET("/devices/:uuid/updates", h.deviceUpdatesList, requireScope(users.ScopeDevicesR))
 	g.GET("/devices/:uuid/updates/:id", h.deviceUpdatesGet, requireScope(users.ScopeDevicesR))

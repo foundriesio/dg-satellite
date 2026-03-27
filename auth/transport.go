@@ -8,21 +8,21 @@ import (
 	"net/http"
 )
 
-func newHttpClientWithSessionCookie(cookie *http.Cookie) *http.Client {
+func newHttpClientWithInternalToken(token string) *http.Client {
 	return &http.Client{
-		Transport: &cookieRoundTripper{
-			base:   http.DefaultTransport,
-			cookie: cookie,
+		Transport: &roundTripper{
+			base:  http.DefaultTransport,
+			token: token,
 		},
 	}
 }
 
-type cookieRoundTripper struct {
-	base   http.RoundTripper
-	cookie *http.Cookie
+type roundTripper struct {
+	base  http.RoundTripper
+	token string
 }
 
-func (t cookieRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	reqBodyClosed := false
 	if req.Body != nil {
 		defer func() {
@@ -35,7 +35,7 @@ func (t cookieRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 
 	req2 := req.Clone(req.Context())
-	req2.AddCookie(t.cookie)
+	req2.Header.Set("Authorization", "X-Internal "+t.token)
 
 	// req.Body is assumed to be closed by the base RoundTripper.
 	reqBodyClosed = true

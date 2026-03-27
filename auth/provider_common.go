@@ -4,7 +4,6 @@
 package auth
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -38,24 +37,29 @@ func (p *commonProvider) GetUser(c echo.Context) (*users.User, error) {
 	authHeader := c.Request().Header.Get("Authorization")
 	if len(authHeader) > 0 {
 		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			return nil, fmt.Errorf("invalid authorization header")
+		if len(parts) != 2 {
+			return nil, c.String(http.StatusUnauthorized, "invalid authorization header")
 		}
-		user, err := p.users.GetByToken(parts[1])
+
+		var user *users.User
+		var err error
+		if strings.ToLower(parts[0]) == "bearer" {
+			user, err = p.users.GetByToken(parts[1])
+		} else if strings.ToLower(parts[0]) == "x-internal" {
+			user, err = p.users.GetByInternalToken(parts[1])
+		} else {
+			return nil, c.String(http.StatusUnauthorized, "Unsupported authorization type")
+		}
 		if err != nil {
-			slog.Warn("unable to get user by token", "error", err)
+			slog.Warn("unable to find user", "auth-type", parts[0], "error", err)
 			return nil, c.String(http.StatusInternalServerError, "Could not get user by token")
 		} else if user == nil {
-			return nil, c.String(http.StatusUnauthorized, "Invalid token")
+			return nil, c.String(http.StatusUnauthorized, "Invalid internal token")
 		}
 		return user, nil
 	}
 
-	session, err := p.GetSession(c)
-	if err != nil || session == nil {
-		return nil, err
-	}
-	return session.User, nil
+	return nil, c.String(http.StatusUnauthorized, "Missing authentication")
 }
 
 func (p *commonProvider) GetSession(c echo.Context) (*Session, error) {
@@ -69,12 +73,12 @@ func (p *commonProvider) GetSession(c echo.Context) (*Session, error) {
 		return nil, p.renderer.renderLoginPage(c, "Cookie expired")
 	}
 	sessionID := cookie.Value
-	user, _, err := p.users.GetBySession(sessionID)
+	user, token, err := p.users.GetBySession(sessionID)
 	if user != nil {
 		session := &Session{
 			BaseUrl: c.Scheme() + "://" + c.Request().Host,
 			User:    user,
-			Client:  newHttpClientWithSessionCookie(cookie),
+			Client:  newHttpClientWithInternalToken(token),
 		}
 		return session, nil
 	}

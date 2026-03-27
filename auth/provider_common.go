@@ -69,7 +69,7 @@ func (p *commonProvider) GetSession(c echo.Context) (*Session, error) {
 		return nil, p.renderer.renderLoginPage(c, "Cookie expired")
 	}
 	sessionID := cookie.Value
-	user, err := p.users.GetBySession(sessionID)
+	user, _, err := p.users.GetBySession(sessionID)
 	if user != nil {
 		session := &Session{
 			BaseUrl: c.Scheme() + "://" + c.Request().Host,

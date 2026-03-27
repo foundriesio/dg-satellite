@@ -216,7 +216,7 @@ func TestGc(t *testing.T) {
 	require.Nil(t, err)
 	require.Len(t, tokens, 0)
 
-	u2, err := users.GetBySession(session)
+	u2, _, err := users.GetBySession(session)
 	require.Nil(t, err)
 	require.Nil(t, u2)
 }

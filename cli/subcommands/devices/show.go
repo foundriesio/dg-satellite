@@ -18,11 +18,11 @@ var showCmd = &cobra.Command{
 	Short: "Show details for a specific device",
 	Long:  `Display detailed information about a device`,
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		api := api.CtxGetApi(cmd.Context())
 		aktoml, _ := cmd.Flags().GetBool("aktoml")
 		hwinfo, _ := cmd.Flags().GetBool("hwinfo")
-		return showDevice(api.Devices(), args[0], aktoml, hwinfo)
+		showDevice(api.Devices(), args[0], aktoml, hwinfo)
 	},
 }
 
@@ -32,7 +32,7 @@ func init() {
 	showCmd.Flags().Bool("aktoml", false, "Display devices' reported configuration")
 }
 
-func showDevice(devices api.DeviceApi, uuid string, aktoml, hwinfo bool) error {
+func showDevice(devices api.DeviceApi, uuid string, aktoml, hwinfo bool) {
 	device, err := devices.Get(uuid)
 	cobra.CheckErr(err)
 
@@ -91,6 +91,4 @@ func showDevice(devices api.DeviceApi, uuid string, aktoml, hwinfo bool) error {
 			fmt.Println(" ", string(hwinfoBytes))
 		}
 	}
-
-	return nil
 }

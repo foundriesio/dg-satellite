@@ -20,7 +20,7 @@ var LoginCmd = &cobra.Command{
 This command will guide you through the authentication process and save
 the configuration to ~/.config/satcli.yaml.`,
 	Args: cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		contextName := args[0]
 		serverURL := args[1]
 
@@ -28,7 +28,7 @@ the configuration to ~/.config/satcli.yaml.`,
 		setDefault, _ := cmd.Flags().GetBool("set-default")
 		configPath, _ := cmd.Flags().GetString("config")
 
-		return login(contextName, serverURL, token, configPath, setDefault)
+		cobra.CheckErr(login(contextName, serverURL, token, configPath, setDefault))
 	},
 }
 

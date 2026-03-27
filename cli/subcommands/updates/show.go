@@ -26,7 +26,8 @@ var showCmd = &cobra.Command{
 		}
 
 		updates := api.Updates(prodType)
-		return showUpdate(updates, args[1], args[2])
+		showUpdate(updates, args[1], args[2])
+		return nil
 	},
 }
 
@@ -34,13 +35,13 @@ func init() {
 	UpdatesCmd.AddCommand(showCmd)
 }
 
-func showUpdate(updates api.UpdatesApi, tag, updateName string) error {
+func showUpdate(updates api.UpdatesApi, tag, updateName string) {
 	rollouts, err := updates.Get(tag, updateName)
 	cobra.CheckErr(err)
 
 	if len(rollouts) == 0 {
 		fmt.Printf("No rollouts found for %s update %s/%s\n", updates.Type, tag, updateName)
-		return nil
+		return
 	}
 
 	fmt.Printf("Update: %s (%s)\n", updateName, strings.ToUpper(updates.Type))
@@ -53,5 +54,4 @@ func showUpdate(updates api.UpdatesApi, tag, updateName string) error {
 	}
 
 	t.Render()
-	return nil
 }

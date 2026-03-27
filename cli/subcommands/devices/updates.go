@@ -18,12 +18,13 @@ var updatesCmd = &cobra.Command{
 	Short: "Show device updates",
 	Long:  `List all updates for a device, or show details for a specific update`,
 	Args:  cobra.RangeArgs(1, 2),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		api := api.CtxGetApi(cmd.Context())
 		if len(args) == 1 {
-			return listUpdates(api.Devices(), args[0])
+			listUpdates(api.Devices(), args[0])
+		} else {
+			showUpdate(api.Devices(), args[0], args[1])
 		}
-		return showUpdate(api.Devices(), args[0], args[1])
 	},
 }
 
@@ -31,13 +32,13 @@ func init() {
 	DevicesCmd.AddCommand(updatesCmd)
 }
 
-func listUpdates(devices api.DeviceApi, uuid string) error {
+func listUpdates(devices api.DeviceApi, uuid string) {
 	updates, err := devices.Updates(uuid)
 	cobra.CheckErr(err)
 
 	if len(updates) == 0 {
 		fmt.Println("No updates found for this device")
-		return nil
+		return
 	}
 
 	t := subcommands.NewTableWriter([]string{"UPDATE ID"})
@@ -46,16 +47,15 @@ func listUpdates(devices api.DeviceApi, uuid string) error {
 		t.AddRow(updateId)
 	}
 	t.Render()
-	return nil
 }
 
-func showUpdate(devices api.DeviceApi, uuid, updateId string) error {
+func showUpdate(devices api.DeviceApi, uuid, updateId string) {
 	events, err := devices.UpdateEvents(uuid, updateId)
 	cobra.CheckErr(err)
 
 	if len(events) == 0 {
 		fmt.Printf("No events found for update %s\n", updateId)
-		return nil
+		return
 	}
 
 	fmt.Printf("Update: %s\n", updateId)
@@ -88,6 +88,4 @@ func showUpdate(devices api.DeviceApi, uuid, updateId string) error {
 			}
 		}
 	}
-
-	return nil
 }

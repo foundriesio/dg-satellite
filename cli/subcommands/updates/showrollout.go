@@ -26,7 +26,8 @@ var showRolloutCmd = &cobra.Command{
 		}
 
 		updates := api.Updates(prodType)
-		return showRollout(updates, args[1], args[2], args[3])
+		showRollout(updates, args[1], args[2], args[3])
+		return nil
 	},
 }
 
@@ -34,7 +35,7 @@ func init() {
 	UpdatesCmd.AddCommand(showRolloutCmd)
 }
 
-func showRollout(updates api.UpdatesApi, tag, updateName, rollout string) error {
+func showRollout(updates api.UpdatesApi, tag, updateName, rollout string) {
 	rolloutData, err := updates.GetRollout(tag, updateName, rollout)
 	cobra.CheckErr(err)
 
@@ -67,6 +68,4 @@ func showRollout(updates api.UpdatesApi, tag, updateName, rollout string) error 
 	} else {
 		fmt.Println("The rollout is request is still being processed.")
 	}
-
-	return nil
 }

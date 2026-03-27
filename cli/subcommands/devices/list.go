@@ -31,9 +31,13 @@ var listCmd = &cobra.Command{
 	Short: "List all devices",
 	Long:  `List all devices known to the server`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		columns, _ := cmd.Flags().GetString("columns")
+		columns, err := validateColumns(cmd.Flag("columns").Value.String())
+		if err != nil {
+			return err
+		}
 		api := api.CtxGetApi(cmd.Context())
-		return listDevices(api.Devices(), columns)
+		listDevices(api.Devices(), columns)
+		return nil
 	},
 }
 
@@ -44,17 +48,19 @@ func init() {
 		"Comma-separated list of columns to display (available: "+colmnsStr+")")
 }
 
-func listDevices(dapi api.DeviceApi, columnsStr string) error {
-	devices, err := dapi.List()
-	cobra.CheckErr(err)
-
+func validateColumns(columnsStr string) ([]string, error) {
 	columns := strings.Split(columnsStr, ",")
-	for i, col := range columns {
-		columns[i] = strings.TrimSpace(col)
+	for _, col := range columns {
 		if slices.Index(allColumns, col) < 0 {
-			return fmt.Errorf("invalid column: %s", col)
+			return nil, fmt.Errorf("invalid column: %s", col)
 		}
 	}
+	return columns, nil
+}
+
+func listDevices(dapi api.DeviceApi, columns []string) {
+	devices, err := dapi.List()
+	cobra.CheckErr(err)
 
 	headers := make([]string, 0, len(columns))
 	for _, col := range columns {
@@ -71,7 +77,6 @@ func listDevices(dapi api.DeviceApi, columnsStr string) error {
 	}
 
 	table.Render()
-	return nil
 }
 
 func getColumnValue(device *api.DeviceListItem, column string) string {

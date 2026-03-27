@@ -29,7 +29,8 @@ var tailCmd = &cobra.Command{
 
 		rollout, _ := cmd.Flags().GetString("rollout")
 		updates := api.Updates(prodType)
-		return tailUpdate(cmd, updates, args[1], args[2], rollout)
+		cobra.CheckErr(tailUpdate(cmd, updates, args[1], args[2], rollout))
+		return nil
 	},
 }
 

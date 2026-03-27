@@ -13,9 +13,9 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all updates",
 	Long:  `List all CI and production updates`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		api := api.CtxGetApi(cmd.Context())
-		return listUpdates(api)
+		listUpdates(api)
 	},
 }
 
@@ -23,7 +23,7 @@ func init() {
 	UpdatesCmd.AddCommand(listCmd)
 }
 
-func listUpdates(api *api.Api) error {
+func listUpdates(api *api.Api) {
 	ciUpdates, err := api.Updates("ci").List()
 	cobra.CheckErr(err)
 
@@ -45,5 +45,4 @@ func listUpdates(api *api.Api) error {
 	}
 
 	t.Render()
-	return nil
 }

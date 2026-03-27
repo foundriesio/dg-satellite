@@ -29,7 +29,8 @@ var createRolloutCmd = &cobra.Command{
 		groups, _ := cmd.Flags().GetString("groups")
 
 		updates := api.Updates(prodType)
-		return createRollout(updates, args[1], args[2], args[3], uuids, groups)
+		cobra.CheckErr(createRollout(updates, args[1], args[2], args[3], uuids, groups))
+		return nil
 	},
 }
 

@@ -31,6 +31,25 @@ func (s Storage) GetBySession(id string) (*User, string, error) {
 	return u, sess.InternalToken, err
 }
 
+func (s Storage) GetByInternalToken(token string) (*User, error) {
+	sess, err := s.stmtUserGetByInternalToken.run(token)
+	if err != nil {
+		return nil, err
+	} else if sess == nil {
+		return nil, nil
+	}
+	if sess.ExpiresAt < time.Now().Unix() {
+		return nil, nil
+	}
+	u, err := s.stmtUserGetById.run(sess.UserID)
+	if u != nil {
+		u.h = s
+		u.AllowedScopes = sess.Scopes & u.AllowedScopes
+	}
+
+	return u, err
+}
+
 func (u User) CreateSession(remoteIP string, expires int64, scopes Scopes) (string, error) {
 	if scopes&u.AllowedScopes != scopes {
 		return "", fmt.Errorf("requested scopes %s exceed allowed scopes %s", scopes.String(), u.AllowedScopes.String())
@@ -133,6 +152,39 @@ func (s *stmtSessionGet) run(id string) (*session, error) {
 	err := s.Stmt.QueryRow(id).Scan(
 		&sess.UserID,
 		&sess.InternalToken,
+		&sess.RemoteIP,
+		&sess.ExpiresAt,
+		&scopesStr,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	} else {
+		sess.Scopes, err = ScopesFromString(scopesStr)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse scopes: %w", err)
+		}
+	}
+	return &sess, nil
+}
+
+type stmtUserGetByInternalToken storage.DbStmt
+
+func (s *stmtUserGetByInternalToken) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("sessionGetByInternalToken", `
+		SELECT user_id, remote_ip, expires_at, scopes
+		FROM session
+		WHERE internal_token = ?`,
+	)
+	return
+}
+
+func (s *stmtUserGetByInternalToken) run(token string) (*session, error) {
+	var sess session
+	var scopesStr string
+	err := s.Stmt.QueryRow(token).Scan(
+		&sess.UserID,
 		&sess.RemoteIP,
 		&sess.ExpiresAt,
 		&scopesStr,

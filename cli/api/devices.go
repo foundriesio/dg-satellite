@@ -28,7 +28,7 @@ func (d DeviceApi) List() ([]DeviceListItem, error) {
 	return devices, d.api.Get("/v1/devices", &devices)
 }
 
-func (d *DeviceApi) Get(uuid string) (*Device, error) {
+func (d DeviceApi) Get(uuid string) (*Device, error) {
 	var device Device
 	if err := d.api.Get("/v1/devices/"+uuid, &device); err != nil {
 		return nil, err
@@ -36,12 +36,12 @@ func (d *DeviceApi) Get(uuid string) (*Device, error) {
 	return &device, nil
 }
 
-func (d *DeviceApi) Updates(uuid string) ([]string, error) {
+func (d DeviceApi) Updates(uuid string) ([]string, error) {
 	var updates []string
 	return updates, d.api.Get(fmt.Sprintf("/v1/devices/%s/updates", uuid), &updates)
 }
 
-func (d *DeviceApi) UpdateEvents(uuid, updateId string) ([]DeviceUpdateEvent, error) {
+func (d DeviceApi) UpdateEvents(uuid, updateId string) ([]DeviceUpdateEvent, error) {
 	var events []DeviceUpdateEvent
 	return events, d.api.Get(fmt.Sprintf("/v1/devices/%s/updates/%s", uuid, updateId), &events)
 }

@@ -181,6 +181,11 @@ func (h handlers) updatesRollout(c echo.Context) error {
 	return h.templates.ExecuteTemplate(c.Response(), "update_rollout.html", ctx)
 }
 
+func (h handlers) updatesRolloutCreate(c echo.Context) error {
+	resource := fmt.Sprintf("/v1/updates/%s/%s/%s/rollouts/%s", c.Param("prod"), c.Param("tag"), c.Param("name"), c.Param("rollout"))
+	return proxyApi(c, resource)
+}
+
 func (h handlers) updatesTail(c echo.Context) error {
 	ctx := struct {
 		baseCtx

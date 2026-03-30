@@ -52,6 +52,7 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 	e.GET("/updates/:prod/:tag/:name", h.updatesGet, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/updates/:prod/:tag/:name/tail", h.updatesTail, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/updates/:prod/:tag/:name/rollouts/:rollout", h.updatesRollout, h.requireSession, h.requireScope(users.ScopeUpdatesR))
+	e.PUT("/updates/:prod/:tag/:name/rollouts/:rollout", h.updatesRolloutCreate, h.requireSession, h.requireScope(users.ScopeUpdatesRU))
 	e.GET("/updates/:prod/:tag/:name/rollouts/:rollout/tail", h.updatesRolloutTail, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/users", h.usersList, h.requireSession, h.requireScope(users.ScopeUsersR))
 	e.DELETE("/users/:username", h.userDelete, h.requireSession, h.requireScope(users.ScopeUsersD))

@@ -4,12 +4,25 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 )
 
 type DevicesFsHandle struct {
 	baseFsHandle
+}
+
+func (s DevicesFsHandle) Delete(uuid string) error {
+	h, _ := s.deviceLocalHandle(uuid, false)
+	if err := os.RemoveAll(h.root); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("error deleting file storage for device %s: %w", uuid, err)
+	}
+	return nil
 }
 
 func (s DevicesFsHandle) ReadFile(uuid, name string) (string, error) {

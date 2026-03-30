@@ -67,6 +67,19 @@ func (h *handlers) deviceGet(c echo.Context) error {
 	})
 }
 
+// @Summary Delete a device
+// @Produce json
+// @Success 204
+// @Router  /devices/:uuid [delete]
+func (h *handlers) deviceDelete(c echo.Context) error {
+	return h.handleDevice(c, func(device *Device) error {
+		if err := device.Delete(); err != nil {
+			return EchoError(c, err, http.StatusInternalServerError, "Failed to delete device")
+		}
+		return c.NoContent(http.StatusNoContent)
+	})
+}
+
 // @Summary Get a list of updates for a device
 // @Produce json
 // @Success 200 []string

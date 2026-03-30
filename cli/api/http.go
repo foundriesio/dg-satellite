@@ -95,3 +95,30 @@ func (a Api) GetStream(resource string) (io.ReadCloser, error) {
 	// Return the response without closing the body - caller must close it
 	return resp.Body, nil
 }
+
+func (a Api) Delete(resource string) error {
+	url := a.URL + resource
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	resp, err := a.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("warning: failed to close response body: %v\n", err)
+		}
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		buf, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("API request failed with status %d and unreadable body", resp.StatusCode)
+		}
+		rid := resp.Header.Get("X-Request-ID")
+		return fmt.Errorf("API request (id=%s) failed with status %d: %s", rid, resp.StatusCode, string(buf))
+	}
+	return nil
+}

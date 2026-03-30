@@ -124,6 +124,13 @@ func (c testClient) PUT(resource string, status int, data any, headers ...string
 	return rec.Body.Bytes()
 }
 
+func (c testClient) DELETE(resource string, status int) []byte {
+	req := httptest.NewRequest(http.MethodDelete, "/v1"+resource, nil)
+	rec := c.Do(req)
+	require.Equal(c.t, status, rec.Code)
+	return rec.Body.Bytes()
+}
+
 func (c testClient) marshalHeaders(headers []string, req *http.Request) {
 	require.Zero(c.t, len(headers)%2, "Headers must be a sequence of names and values - even number")
 	for i := 0; i < len(headers)/2; i++ {
@@ -865,4 +872,32 @@ data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-core
 	tc.assertDone(done3)
 
 	// TODO: Add rollout tail tests
+}
+
+func TestApiDeviceDelete(t *testing.T) {
+	tc := NewTestClient(t)
+
+	// Create a device
+	_, err := tc.gw.DeviceCreate("del-device", "pubkey", false)
+	require.Nil(t, err)
+
+	// No permission
+	tc.DELETE("/devices/del-device", 403)
+
+	// Wrong scope
+	tc.u.AllowedScopes = users.ScopeDevicesR
+	tc.DELETE("/devices/del-device", 403)
+
+	// With delete scope
+	tc.u.AllowedScopes = users.ScopeDevicesD
+
+	// 404 for non-existent device
+	tc.DELETE("/devices/no-such-device", 404)
+
+	// Successful delete
+	tc.DELETE("/devices/del-device", 204)
+
+	// Verify device is gone
+	tc.u.AllowedScopes = users.ScopeDevicesR
+	tc.GET("/devices/del-device", 404)
 }

@@ -56,7 +56,7 @@ func (h handlers) authDevice(next echo.HandlerFunc) echo.HandlerFunc {
 			/*if err := device.RotatePubKey(pub); err != nil {
 				return c.String(http.StatusForbidden, err.Error())
 			}*/
-			panic("TODO ROTATE KEY")
+			return c.String(http.StatusBadGateway, "Key rotation is not supported")
 		}
 
 		ctx = CtxWithDevice(ctx, device)

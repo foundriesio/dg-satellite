@@ -8,7 +8,8 @@ import (
 )
 
 var ConfigsCmd = &cobra.Command{
-	Use:   "configs",
-	Short: "Manage configs",
-	Long:  `Commands for managing configs in the Satellite server`,
+	Use:    "configs",
+	Short:  "Manage configs",
+	Long:   `Commands for managing configs in the Satellite server`,
+	Hidden: true,
 }

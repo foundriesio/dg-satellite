@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/foundriesio/dg-satellite/context"
+	"github.com/labstack/echo/v4"
 )
 
 func getJson(ctx context.Context, resource string, result any) error {
@@ -36,4 +37,37 @@ func getJson(ctx context.Context, resource string, result any) error {
 	}
 
 	return json.NewDecoder(resp.Body).Decode(result)
+}
+
+func proxyApi(c echo.Context, resource string) error {
+	s := CtxGetSession(c.Request().Context())
+
+	req, err := http.NewRequest(c.Request().Method, s.BaseUrl+resource, c.Request().Body)
+	if err != nil {
+		return err
+	}
+	for key, values := range c.Request().Header {
+		for _, v := range values {
+			req.Header.Add(key, v)
+		}
+	}
+
+	apiResp, err := s.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := apiResp.Body.Close(); err != nil {
+			context.CtxGetLog(c.Request().Context()).Error("unable to close response body", "error", err)
+		}
+	}()
+
+	for key, values := range apiResp.Header {
+		for _, v := range values {
+			c.Response().Header().Add(key, v)
+		}
+	}
+	c.Response().WriteHeader(apiResp.StatusCode)
+	_, err = io.Copy(c.Response(), apiResp.Body)
+	return err
 }

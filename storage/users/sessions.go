@@ -12,8 +12,27 @@ import (
 	"github.com/foundriesio/dg-satellite/storage"
 )
 
-func (s Storage) GetBySession(id string) (*User, error) {
+func (s Storage) GetBySession(id string) (*User, string, error) {
 	sess, err := s.stmtSessionGet.run(id)
+	if err != nil {
+		return nil, "", err
+	} else if sess == nil {
+		return nil, "", nil
+	}
+	if sess.ExpiresAt < time.Now().Unix() {
+		return nil, "", nil
+	}
+	u, err := s.stmtUserGetById.run(sess.UserID)
+	if u != nil {
+		u.h = s
+		u.AllowedScopes = sess.Scopes & u.AllowedScopes
+	}
+
+	return u, sess.InternalToken, err
+}
+
+func (s Storage) GetByInternalToken(token string) (*User, error) {
+	sess, err := s.stmtUserGetByInternalToken.run(token)
 	if err != nil {
 		return nil, err
 	} else if sess == nil {
@@ -36,7 +55,8 @@ func (u User) CreateSession(remoteIP string, expires int64, scopes Scopes) (stri
 		return "", fmt.Errorf("requested scopes %s exceed allowed scopes %s", scopes.String(), u.AllowedScopes.String())
 	}
 	idStr := rand.Text()
-	if err := u.h.stmtSessionCreate.run(u, idStr, remoteIP, time.Now().Unix(), expires, scopes); err != nil {
+	internalToken := rand.Text()
+	if err := u.h.stmtSessionCreate.run(u, idStr, internalToken, remoteIP, time.Now().Unix(), expires, scopes); err != nil {
 		return "", fmt.Errorf("unable to create session: %w", err)
 	}
 
@@ -55,26 +75,28 @@ func (u User) DeleteSession(id string) error {
 }
 
 type session struct {
-	UserID    int64
-	RemoteIP  string
-	ExpiresAt int64
-	Scopes    Scopes
+	UserID        int64
+	RemoteIP      string
+	ExpiresAt     int64
+	Scopes        Scopes
+	InternalToken string
 }
 
 type stmtSessionCreate storage.DbStmt
 
 func (s *stmtSessionCreate) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("sessionCreate", `
-		INSERT INTO session (id, user_id, remote_ip, created_at, expires_at, scopes)
-		VALUES (?, ?, ?, ?, ?, ?)`,
+		INSERT INTO session (id, user_id, internal_token, remote_ip, created_at, expires_at, scopes)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 	)
 	return
 }
 
-func (s *stmtSessionCreate) run(u User, id, remoteIP string, created, expires int64, scopes Scopes) error {
+func (s *stmtSessionCreate) run(u User, id, internalToken, remoteIP string, created, expires int64, scopes Scopes) error {
 	_, err := s.Stmt.Exec(
 		id,
 		u.id,
+		internalToken,
 		remoteIP,
 		created,
 		expires,
@@ -117,7 +139,7 @@ type stmtSessionGet storage.DbStmt
 
 func (s *stmtSessionGet) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("sessionGet", `
-		SELECT user_id, expires_at, scopes
+		SELECT user_id, internal_token, remote_ip, expires_at, scopes
 		FROM session
 		WHERE id = ?`,
 	)
@@ -129,6 +151,41 @@ func (s *stmtSessionGet) run(id string) (*session, error) {
 	var scopesStr string
 	err := s.Stmt.QueryRow(id).Scan(
 		&sess.UserID,
+		&sess.InternalToken,
+		&sess.RemoteIP,
+		&sess.ExpiresAt,
+		&scopesStr,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	} else {
+		sess.Scopes, err = ScopesFromString(scopesStr)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse scopes: %w", err)
+		}
+	}
+	return &sess, nil
+}
+
+type stmtUserGetByInternalToken storage.DbStmt
+
+func (s *stmtUserGetByInternalToken) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("sessionGetByInternalToken", `
+		SELECT user_id, remote_ip, expires_at, scopes
+		FROM session
+		WHERE internal_token = ?`,
+	)
+	return
+}
+
+func (s *stmtUserGetByInternalToken) run(token string) (*session, error) {
+	var sess session
+	var scopesStr string
+	err := s.Stmt.QueryRow(token).Scan(
+		&sess.UserID,
+		&sess.RemoteIP,
 		&sess.ExpiresAt,
 		&scopesStr,
 	)

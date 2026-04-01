@@ -31,6 +31,10 @@ func (h handlers) devicesList(c echo.Context) error {
 	return h.templates.ExecuteTemplate(c.Response(), "devices_list.html", ctx)
 }
 
+func (h handlers) devicesDelete(c echo.Context) error {
+	return proxyApi(c, "/v1/devices/"+c.Param("uuid"))
+}
+
 type ipInfo struct {
 	Hostname string `json:"hostname"`
 	IP       string `json:"local_ipv4"`
@@ -157,4 +161,9 @@ func (h handlers) devicesLabelsGet(c echo.Context) error {
 		KnownGroups: knownGroups,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "device_labels.html", ctx)
+}
+
+func (h handlers) devicesLabelsPut(c echo.Context) error {
+	resource := "/v1/devices/" + c.Param("uuid") + "/labels"
+	return proxyApi(c, resource)
 }

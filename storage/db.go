@@ -132,6 +132,7 @@ func createTables(db *sql.DB) error {
 			created_at     INT,
 			expires_at     INT,
 			scopes         TEXT,
+			internal_token VARCHAR(64) NOT NULL UNIQUE,
 			FOREIGN KEY(user_id) REFERENCES user(id)
 		) WITHOUT ROWID;
 	`

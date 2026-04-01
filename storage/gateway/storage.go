@@ -24,6 +24,8 @@ type (
 var (
 	NewDb = storage.NewDb
 	NewFs = storage.NewFs
+
+	ValidCorrelationId = storage.ValidCorrelationId
 )
 
 const (

@@ -101,6 +101,9 @@ func (h *handlers) deviceUpdatesList(c echo.Context) error {
 func (h *handlers) deviceUpdatesGet(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
 		updateId := c.Param("id")
+		if !storage.ValidCorrelationId(updateId) {
+			return c.NoContent(http.StatusNotFound)
+		}
 		events, err := device.Events(updateId)
 		if err != nil {
 			return EchoError(c, err, http.StatusInternalServerError, "Failed to lookup device update events")

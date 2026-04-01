@@ -3,6 +3,8 @@
 
 package storage
 
+import "regexp"
+
 // DeviceUpdateEvent represents update events that devices send the
 // device-gateway.
 type DeviceUpdateEvent struct {
@@ -11,6 +13,8 @@ type DeviceUpdateEvent struct {
 	Event      DeviceEvent     `json:"event"`
 	EventType  DeviceEventType `json:"eventType"`
 }
+
+var ValidCorrelationId = regexp.MustCompile(`^[a-zA-Z0-9_\-]+$`).MatchString
 
 type DeviceEvent struct {
 	CorrelationId string `json:"correlationId"`

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	storage "github.com/foundriesio/dg-satellite/storage/gateway"
 	"github.com/labstack/echo/v4"
 )
 
@@ -35,6 +36,10 @@ func (handlers) eventsUpload(c echo.Context) error {
 		}
 		if len(event.Event.CorrelationId) == 0 {
 			log.Warn("Missing event correlation ID - skip it", "event", event.Id)
+			continue
+		}
+		if !storage.ValidCorrelationId(event.Event.CorrelationId) {
+			log.Warn("Invalid event correlation ID - skip it", "event", event.Id, "corr-id", event.Event.CorrelationId)
 			continue
 		}
 		if _, err := time.Parse(time.RFC3339, event.DeviceTime); err != nil {

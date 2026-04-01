@@ -59,6 +59,8 @@ var (
 
 	DbFile = storage.DbFile
 
+	ValidCorrelationId = storage.ValidCorrelationId
+
 	IsDbError             = storage.IsDbError
 	ErrDbConstraintUnique = storage.ErrDbConstraintUnique
 )

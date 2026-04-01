@@ -28,6 +28,7 @@ var uploadCmd = &cobra.Command{
 		api := api.CtxGetApi(cmd.Context())
 		cobra.CheckErr(uploadConfigs(api.Configs(), path, isDir))
 	},
+	Hidden: true,
 }
 
 func init() {

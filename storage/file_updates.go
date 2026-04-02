@@ -13,6 +13,29 @@ import (
 	"strings"
 )
 
+type updatesFsHandleWrap struct {
+	baseFsHandle
+	Apps     UpdatesFsHandle
+	Ostree   UpdatesFsHandle
+	Tuf      UpdatesFsHandle
+	Rollouts RolloutsFsHandle
+	Logs     UpdatesFsHandle
+}
+
+func (s *updatesFsHandleWrap) init(root string) {
+	s.root = root
+	s.Apps.root = root
+	s.Apps.category = UpdatesAppsDir
+	s.Ostree.root = root
+	s.Ostree.category = UpdatesOstreeDir
+	s.Rollouts.root = root
+	s.Rollouts.category = UpdatesRolloutsDir
+	s.Tuf.root = root
+	s.Tuf.category = UpdatesTufDir
+	s.Logs.root = root
+	s.Logs.category = UpdatesLogsDir
+}
+
 type UpdatesFsHandle struct {
 	baseFsHandle
 	category string

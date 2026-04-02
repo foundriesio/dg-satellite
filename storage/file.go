@@ -135,14 +135,6 @@ type FsHandle struct {
 	}
 }
 
-type updatesFsHandleWrap struct {
-	Apps     UpdatesFsHandle
-	Ostree   UpdatesFsHandle
-	Tuf      UpdatesFsHandle
-	Rollouts RolloutsFsHandle
-	Logs     UpdatesFsHandle
-}
-
 func NewFs(root string) (*FsHandle, error) {
 	fs := &FsHandle{Config: FsConfig(root)}
 	fs.Audit.root = fs.Config.AuditDir()
@@ -150,25 +142,8 @@ func NewFs(root string) (*FsHandle, error) {
 	fs.Certs.root = fs.Config.CertsDir()
 	fs.Configs.root = fs.Config.ConfigsDir()
 	fs.Devices.root = fs.Config.DevicesDir()
-
-	for _, h := range []struct {
-		handle *updatesFsHandleWrap
-		root   string
-	}{
-		{&fs.Updates.Ci, fs.Config.UpdatesCiDir()},
-		{&fs.Updates.Prod, fs.Config.UpdatesProdDir()},
-	} {
-		h.handle.Apps.root = h.root
-		h.handle.Apps.category = UpdatesAppsDir
-		h.handle.Ostree.root = h.root
-		h.handle.Ostree.category = UpdatesOstreeDir
-		h.handle.Rollouts.root = h.root
-		h.handle.Rollouts.category = UpdatesRolloutsDir
-		h.handle.Tuf.root = h.root
-		h.handle.Tuf.category = UpdatesTufDir
-		h.handle.Logs.root = h.root
-		h.handle.Logs.category = UpdatesLogsDir
-	}
+	fs.Updates.Ci.init(fs.Config.UpdatesCiDir())
+	fs.Updates.Prod.init(fs.Config.UpdatesProdDir())
 
 	for _, h := range []baseFsHandle{
 		fs.Audit.baseFsHandle,
@@ -176,9 +151,8 @@ func NewFs(root string) (*FsHandle, error) {
 		fs.Certs.baseFsHandle,
 		fs.Configs.baseFsHandle,
 		fs.Devices.baseFsHandle,
-		// All updates categories have the same base dir, so only one of Ci/prod is needed.
-		fs.Updates.Ci.Tuf.baseFsHandle,
-		fs.Updates.Prod.Tuf.baseFsHandle,
+		fs.Updates.Ci.baseFsHandle,
+		fs.Updates.Prod.baseFsHandle,
 	} {
 		if err := h.mkdirs(defaultDirAccess, true); err != nil {
 			return nil, fmt.Errorf("unable to initialize file storage: %w", err)

@@ -240,6 +240,7 @@ func TestConfig(t *testing.T) {
 			var err error
 			require.Nil(t, json.Unmarshal(rec.Body.Bytes(), &cfg))
 			lastModifiedAt, err = time.Parse(time.RFC1123, rec.Header().Get("Date"))
+			lastModifiedAt = lastModifiedAt.UTC()
 			require.Nil(t, err)
 		}
 		return

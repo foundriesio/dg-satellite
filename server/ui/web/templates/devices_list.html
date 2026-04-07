@@ -73,7 +73,7 @@ function showDeleteDialog(uuid, name) {
 }
 
 function deleteDevice(uuid) {
-  fetch('/devices/' + uuid, {
+  fetch('/v1/devices/' + uuid, {
     method: 'DELETE',
   })
   .then(async response => {

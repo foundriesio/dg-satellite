@@ -42,7 +42,6 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 	e.GET("/css/:filename", h.css)
 	e.GET("/auth/logout", h.authLogout, h.requireSession)
 	e.GET("/devices", h.devicesList, h.requireSession, h.requireScope(users.ScopeDevicesR))
-	e.DELETE("/devices/:uuid", h.devicesDelete, h.requireSession, h.requireScope(users.ScopeDevicesD))
 	e.GET("/devices/:uuid", h.devicesGet, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/devices/:uuid/apps-states", h.devicesAppsStates, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/devices/:uuid/labels", h.devicesLabelsGet, h.requireSession, h.requireScope(users.ScopeDevicesR))

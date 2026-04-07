@@ -54,12 +54,11 @@ type Storage struct {
 
 	hmacSecret []byte
 
-	stmtUserCreate             stmtUserCreate
-	stmtUserGetById            stmtUserGetById
-	stmtUserGetByInternalToken stmtUserGetByInternalToken
-	stmtUserGetByName          stmtUserGetByName
-	stmtUserList               stmtUserList
-	stmtUserUpdate             stmtUserUpdate
+	stmtUserCreate    stmtUserCreate
+	stmtUserGetById   stmtUserGetById
+	stmtUserGetByName stmtUserGetByName
+	stmtUserList      stmtUserList
+	stmtUserUpdate    stmtUserUpdate
 
 	stmtSessionCreate        stmtSessionCreate
 	stmtSessionDelete        stmtSessionDelete
@@ -88,7 +87,6 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	if err := db.InitStmt(
 		&handle.stmtUserCreate,
 		&handle.stmtUserGetById,
-		&handle.stmtUserGetByInternalToken,
 		&handle.stmtUserGetByName,
 		&handle.stmtUserList,
 		&handle.stmtUserUpdate,

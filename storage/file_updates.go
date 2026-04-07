@@ -4,14 +4,80 @@
 package storage
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 )
+
+var ErrInvalidUpdate = errors.New("invalid update archive")
+
+type updatesFsHandleWrap struct {
+	baseFsHandle
+	Apps     UpdatesFsHandle
+	Ostree   UpdatesFsHandle
+	Tuf      UpdatesFsHandle
+	Rollouts RolloutsFsHandle
+	Logs     UpdatesFsHandle
+}
+
+func (s *updatesFsHandleWrap) init(root string) {
+	s.root = root
+	s.Apps.root = root
+	s.Apps.category = UpdatesAppsDir
+	s.Ostree.root = root
+	s.Ostree.category = UpdatesOstreeDir
+	s.Rollouts.root = root
+	s.Rollouts.category = UpdatesRolloutsDir
+	s.Tuf.root = root
+	s.Tuf.category = UpdatesTufDir
+	s.Logs.root = root
+	s.Logs.category = UpdatesLogsDir
+}
+
+func (s updatesFsHandleWrap) SaveUpload(tag, update string, payload io.Reader, onCleanupFailure func(error)) error {
+	const (
+		appsDir   = UpdatesAppsDir + string(filepath.Separator)
+		ostreeDir = UpdatesOstreeDir + string(filepath.Separator)
+		tufDir    = UpdatesTufDir + string(filepath.Separator)
+	)
+	var sawTuf, sawOstree, sawApps bool
+	txDir := ".update-upload-" + rand.Text()[:10]
+	root, destDir := filepath.Split(s.root)
+	destDir = filepath.Join(destDir, tag, update)
+	h := tarFsHandle{root: root}
+	return h.unpackTar(payload, destDir,
+		TarUnpackReplaceDest(false), // Fail if the update with the same tag and name already exists.
+		TarUnpackUseTmpFile("update.tar"),
+		TarUnpackUseTmpDir(txDir),
+		TarUnpackOnEvents(tarUnpackEvents{
+			onTmpCleanupError: onCleanupFailure,
+			onTarHeaderSeen: func(hdr *TarHeader) (skip bool, err error) {
+				// If any check below fails due to header name being unclean - whose problem is that?
+				// For tarballs with many files, below boolean algebra is way faster than a switch over name patterns.
+				sawApps = sawApps || strings.HasPrefix(hdr.Name, appsDir)
+				sawOstree = sawOstree || strings.HasPrefix(hdr.Name, ostreeDir)
+				sawTuf = sawTuf || strings.HasPrefix(hdr.Name, tufDir)
+				return
+			},
+			onUnpackComplete: func() error {
+				if !sawTuf {
+					return fmt.Errorf("%w: missing required %q directory", ErrInvalidUpdate, UpdatesTufDir)
+				}
+				if !sawOstree && !sawApps {
+					return fmt.Errorf("%w: must contain %q and/or %q directory",
+						ErrInvalidUpdate, UpdatesOstreeDir, UpdatesAppsDir)
+				}
+				return nil
+			},
+		}),
+	)
+}
 
 type UpdatesFsHandle struct {
 	baseFsHandle

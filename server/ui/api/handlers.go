@@ -22,7 +22,6 @@ var EchoError = server.EchoError
 func RegisterHandlers(e *echo.Echo, storage *storage.Storage, a auth.Provider) {
 	h := handlers{storage: storage}
 	g := e.Group("/v1")
-	g.Use(auth.CsrfCheck)
 	g.Use(authUser(a))
 
 	g.PUT("/configs", h.configsUpload, requireScope(users.ScopeDevicesRU|users.ScopeUpdatesRU),

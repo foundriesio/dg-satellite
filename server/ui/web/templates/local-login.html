@@ -4,6 +4,7 @@
       <h2>{{.Title}}</h2>
 
       <form method="post" action="/auth/login">
+        {{ if .CsrfToken }}<input type="hidden" name="_csrf" value="{{.CsrfToken}}">{{ end }}
         <fieldset>
           <legend><strong>Username</strong></legend>
           <input type="text" name="username" required />

@@ -158,8 +158,3 @@ func (h handlers) devicesLabelsGet(c echo.Context) error {
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "device_labels.html", ctx)
 }
-
-func (h handlers) devicesLabelsPut(c echo.Context) error {
-	resource := "/v1/devices/" + c.Param("uuid") + "/labels"
-	return proxyApi(c, resource)
-}

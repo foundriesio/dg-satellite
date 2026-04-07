@@ -83,7 +83,7 @@
           }
         });
 
-        fetch('/devices/{{.Device.Uuid}}/labels', {
+        fetch('/v1/devices/{{.Device.Uuid}}/labels', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

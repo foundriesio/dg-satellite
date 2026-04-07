@@ -4,7 +4,9 @@
 package users
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"time"
@@ -12,8 +14,24 @@ import (
 	"github.com/foundriesio/dg-satellite/storage"
 )
 
+func (s Storage) hashSessionID(id string) (string, error) {
+	key, err := s.genTokenKey(id)
+	if err != nil {
+		return "", err
+	}
+	hasher := hmac.New(sha256.New, key)
+	if _, err := hasher.Write([]byte(id)); err != nil {
+		return "", fmt.Errorf("unable to hash session id: %w", err)
+	}
+	return fmt.Sprintf("%x", hasher.Sum(nil)), nil
+}
+
 func (s Storage) GetBySession(id string) (*User, error) {
-	sess, err := s.stmtSessionGet.run(id)
+	hashed, err := s.hashSessionID(id)
+	if err != nil {
+		return nil, err
+	}
+	sess, err := s.stmtSessionGet.run(hashed)
 	if err != nil {
 		return nil, err
 	} else if sess == nil {
@@ -36,7 +54,11 @@ func (u User) CreateSession(remoteIP string, expires int64, scopes Scopes) (stri
 		return "", fmt.Errorf("requested scopes %s exceed allowed scopes %s", scopes.String(), u.AllowedScopes.String())
 	}
 	idStr := rand.Text()
-	if err := u.h.stmtSessionCreate.run(u, idStr, remoteIP, time.Now().Unix(), expires, scopes); err != nil {
+	hashed, err := u.h.hashSessionID(idStr)
+	if err != nil {
+		return "", fmt.Errorf("unable to hash session id: %w", err)
+	}
+	if err := u.h.stmtSessionCreate.run(u, hashed, remoteIP, time.Now().Unix(), expires, scopes); err != nil {
 		return "", fmt.Errorf("unable to create session: %w", err)
 	}
 
@@ -46,7 +68,11 @@ func (u User) CreateSession(remoteIP string, expires int64, scopes Scopes) (stri
 }
 
 func (u User) DeleteSession(id string) error {
-	if err := u.h.stmtSessionDelete.run(id); err != nil {
+	hashed, err := u.h.hashSessionID(id)
+	if err != nil {
+		return fmt.Errorf("unable to hash session id: %w", err)
+	}
+	if err := u.h.stmtSessionDelete.run(hashed); err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
 	msg := fmt.Sprintf("Session deleted id=%s", id)

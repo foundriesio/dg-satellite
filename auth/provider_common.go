@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/foundriesio/dg-satellite/storage/users"
 	"github.com/labstack/echo/v4"
@@ -64,9 +63,6 @@ func (p *commonProvider) GetSession(c echo.Context) (*Session, error) {
 		return nil, p.renderer.renderLoginPage(c, err.Error())
 	} else if len(cookie.Value) == 0 {
 		return nil, p.renderer.renderLoginPage(c, "")
-	}
-	if cookie.Expires.Before(time.Now()) {
-		return nil, p.renderer.renderLoginPage(c, "Cookie expired")
 	}
 	sessionID := cookie.Value
 	user, err := p.users.GetBySession(sessionID)

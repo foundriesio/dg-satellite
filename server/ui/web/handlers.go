@@ -61,16 +61,22 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 }
 
 type baseCtx struct {
-	User     *users.User
-	Title    string
-	NavItems []navItem
+	User      *users.User
+	Title     string
+	NavItems  []navItem
+	CsrfToken string
 }
 
 func (h handlers) baseCtx(c echo.Context, title, selected string) baseCtx {
+	var csrfToken string
+	if cookie, err := c.Cookie(auth.CsrfCookieName); err == nil {
+		csrfToken = cookie.Value
+	}
 	return baseCtx{
-		User:     CtxGetSession(c.Request().Context()).User,
-		Title:    title,
-		NavItems: h.genNavItems(selected),
+		User:      CtxGetSession(c.Request().Context()).User,
+		Title:     title,
+		NavItems:  h.genNavItems(selected),
+		CsrfToken: csrfToken,
 	}
 }
 

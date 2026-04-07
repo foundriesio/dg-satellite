@@ -5,11 +5,30 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
+    {{ if .CsrfToken }}<meta name="csrf-token" content="{{.CsrfToken}}">{{ end }}
 
     <title>{{.Title}} - Satellite Server</title>
 
     <link rel="stylesheet" href="/css/pico_min_211.css">
     <link rel="stylesheet" href="/css/style.css">
+    <script>
+    (function() {
+      const token = document.querySelector('meta[name="csrf-token"]')?.content;
+      if (token) {
+        const origFetch = window.fetch;
+        window.fetch = function(url, opts) {
+          opts = opts || {};
+          opts.headers = opts.headers || {};
+          if (opts.headers instanceof Headers) {
+            if (!opts.headers.has('X-CSRF-Token')) opts.headers.set('X-CSRF-Token', token);
+          } else {
+            if (!opts.headers['X-CSRF-Token']) opts.headers['X-CSRF-Token'] = token;
+          }
+          return origFetch.call(this, url, opts);
+        };
+      }
+    })();
+    </script>
   </head>
 
   <body>

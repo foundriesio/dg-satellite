@@ -135,6 +135,7 @@ func (p oauth2BaseProvider) handleOauthCallback(c echo.Context) error {
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 	})
+	SetCsrfCookie(c, expires)
 
 	return c.Redirect(http.StatusTemporaryRedirect, "/")
 }

@@ -169,6 +169,7 @@ func (p *localProvider) handleLogin(c echo.Context) error {
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 	})
+	SetCsrfCookie(c, expires)
 
 	return c.Redirect(http.StatusSeeOther, "/")
 }

@@ -21,10 +21,17 @@ func (h handlers) devicesList(c echo.Context) error {
 	if page < 0 {
 		page = 0
 	}
+	sort := c.QueryParam("sort")
+	if sort == "" {
+		sort = "created-at-desc"
+	}
 	const pageSize = 50
 	offset := page * pageSize
 
 	resource := fmt.Sprintf("/v1/devices?limit=%d&offset=%d", pageSize, offset)
+	if sort != "" {
+		resource += "&order-by=" + sort
+	}
 
 	var devices []api.DeviceListItem
 	headers, err := getJsonWithHeaders(c.Request().Context(), resource, &devices)
@@ -41,6 +48,7 @@ func (h handlers) devicesList(c echo.Context) error {
 		Page      int
 		HasNext   bool
 		HasPrev   bool
+		Sort      string
 	}{
 		baseCtx:   h.baseCtx(c, "Devices", "devices"),
 		Devices:   devices,
@@ -48,6 +56,7 @@ func (h handlers) devicesList(c echo.Context) error {
 		Page:      page,
 		HasNext:   hasNext,
 		HasPrev:   page > 0,
+		Sort:      sort,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "devices_list.html", ctx)
 }

@@ -143,7 +143,14 @@ func (p oauth2BaseProvider) handleOauthCallback(c echo.Context) error {
 	})
 	SetCsrfCookie(c, expires)
 
-	return c.Redirect(http.StatusTemporaryRedirect, "/")
+	// Return an HTML page that performs a same-site navigation instead of
+	// a direct redirect. Browsers won't send SameSiteStrict cookies on a
+	// cross-site redirect (the OAuth callback is a cross-site navigation),
+	// but they will send them on a navigation initiated from the same site.
+	c.Response().Header().Set("Location", "/")
+	c.Response().Header().Set("Cache-Control", "no-store")
+	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+	return c.HTML(http.StatusOK, `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/"></head><body>Redirecting <a href="/">here</a>...</body></html>`)
 }
 
 func generateStateOauthCookie(c echo.Context) string {

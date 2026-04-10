@@ -49,8 +49,9 @@ func TestServe(t *testing.T) {
 	require.Nil(t, err)
 	caKeyFile, caFile := createSelfSignedRoot(t, fs)
 	sign := CsrSignCmd{
-		CaKey:  caKeyFile,
-		CaCert: caFile,
+		CaKey:      caKeyFile,
+		CaCert:     caFile,
+		ExpiryDays: 10,
 	}
 	require.Nil(t, sign.Run(common))
 	// create an empty ca file to make the server happy. no client will be able to handshake with it

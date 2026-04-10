@@ -42,18 +42,15 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 	e.GET("/css/:filename", h.css)
 	e.GET("/auth/logout", h.authLogout, h.requireSession)
 	e.GET("/devices", h.devicesList, h.requireSession, h.requireScope(users.ScopeDevicesR))
-	e.DELETE("/devices/:uuid", h.devicesDelete, h.requireSession, h.requireScope(users.ScopeDevicesD))
 	e.GET("/devices/:uuid", h.devicesGet, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/devices/:uuid/apps-states", h.devicesAppsStates, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/devices/:uuid/labels", h.devicesLabelsGet, h.requireSession, h.requireScope(users.ScopeDevicesR))
-	e.PUT("/devices/:uuid/labels", h.devicesLabelsPut, h.requireSession, h.requireScope(users.ScopeDevicesRU))
 	e.GET("/devices/:uuid/update/:update", h.devicesUpdateGet, h.requireSession, h.requireScope(users.ScopeDevicesR))
 	e.GET("/settings", h.settings, h.requireSession)
 	e.GET("/updates", h.updatesList, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/updates/:prod/:tag/:name", h.updatesGet, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/updates/:prod/:tag/:name/tail", h.updatesTail, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/updates/:prod/:tag/:name/rollouts/:rollout", h.updatesRollout, h.requireSession, h.requireScope(users.ScopeUpdatesR))
-	e.PUT("/updates/:prod/:tag/:name/rollouts/:rollout", h.updatesRolloutCreate, h.requireSession, h.requireScope(users.ScopeUpdatesRU))
 	e.GET("/updates/:prod/:tag/:name/rollouts/:rollout/tail", h.updatesRolloutTail, h.requireSession, h.requireScope(users.ScopeUpdatesR))
 	e.GET("/users", h.usersList, h.requireSession, h.requireScope(users.ScopeUsersR))
 	e.DELETE("/users/:username", h.userDelete, h.requireSession, h.requireScope(users.ScopeUsersD))
@@ -64,16 +61,22 @@ func RegisterHandlers(e *echo.Echo, storage *users.Storage, authProvider auth.Pr
 }
 
 type baseCtx struct {
-	User     *users.User
-	Title    string
-	NavItems []navItem
+	User      *users.User
+	Title     string
+	NavItems  []navItem
+	CsrfToken string
 }
 
 func (h handlers) baseCtx(c echo.Context, title, selected string) baseCtx {
+	var csrfToken string
+	if cookie, err := c.Cookie(auth.CsrfCookieName); err == nil {
+		csrfToken = cookie.Value
+	}
 	return baseCtx{
-		User:     CtxGetSession(c.Request().Context()).User,
-		Title:    title,
-		NavItems: h.genNavItems(selected),
+		User:      CtxGetSession(c.Request().Context()).User,
+		Title:     title,
+		NavItems:  h.genNavItems(selected),
+		CsrfToken: csrfToken,
 	}
 }
 

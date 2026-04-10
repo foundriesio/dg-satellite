@@ -169,6 +169,7 @@ func (p *localProvider) handleLogin(c echo.Context) error {
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 	})
+	SetCsrfCookie(c, expires)
 
 	return c.Redirect(http.StatusSeeOther, "/")
 }
@@ -180,14 +181,20 @@ func (p localProvider) renderLoginPage(c echo.Context, reason string) error {
 			"error": "authentication required",
 		})
 	}
+	var csrfToken string
+	if cookie, err := c.Cookie(CsrfCookieName); err == nil {
+		csrfToken = cookie.Value
+	}
 	context := struct {
-		Title    string
-		Reason   string
-		User     *users.User
-		NavItems []string
+		Title     string
+		Reason    string
+		User      *users.User
+		NavItems  []string
+		CsrfToken string
 	}{
-		Title:  "Login",
-		Reason: reason,
+		Title:     "Login",
+		Reason:    reason,
+		CsrfToken: csrfToken,
 	}
 	return templates.Templates.ExecuteTemplate(c.Response(), localLoginTemplate, context)
 }
@@ -222,15 +229,21 @@ func (p localProvider) GetSession(c echo.Context) (*Session, error) {
 }
 
 func (p *localProvider) handlePasswordPage(c echo.Context, session *Session) error {
+	var csrfToken string
+	if cookie, err := c.Cookie(CsrfCookieName); err == nil {
+		csrfToken = cookie.Value
+	}
 	context := struct {
-		Title    string
-		Message  string
-		User     *users.User
-		NavItems []string
+		Title     string
+		Message   string
+		User      *users.User
+		NavItems  []string
+		CsrfToken string
 	}{
-		Title:   "Change Password",
-		Message: "Your password has expired. Please choose a new password.",
-		User:    session.User,
+		Title:     "Change Password",
+		Message:   "Your password has expired. Please choose a new password.",
+		User:      session.User,
+		CsrfToken: csrfToken,
 	}
 	return templates.Templates.ExecuteTemplate(c.Response(), localPasswordChangeTemplate, context)
 }

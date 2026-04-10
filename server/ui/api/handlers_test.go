@@ -144,6 +144,7 @@ func (c testClient) PUT(resource string, status int, data any, headers ...string
 
 func (c testClient) marshalHeaders(headers []string, req *http.Request) {
 	require.Zero(c.t, len(headers)%2, "Headers must be a sequence of names and values - even number")
+	req.Header.Set("Authorization", "unit-test") // needed for csrfCheck middleware to work in tests
 	for i := 0; i < len(headers)/2; i++ {
 		req.Header.Add(headers[i*2], headers[i*2+1])
 	}

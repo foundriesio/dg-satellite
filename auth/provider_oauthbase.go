@@ -73,18 +73,24 @@ func (p oauth2BaseProvider) renderLoginPage(c echo.Context, reason string) error
 			"error": "authentication required",
 		})
 	}
+	var csrfToken string
+	if cookie, err := c.Cookie(CsrfCookieName); err == nil {
+		csrfToken = cookie.Value
+	}
 	context := struct {
-		Title    string
-		LoginTip string
-		Name     string
-		Reason   string
-		User     *users.User
-		NavItems []string
+		Title     string
+		LoginTip  string
+		Name      string
+		Reason    string
+		User      *users.User
+		NavItems  []string
+		CsrfToken string
 	}{
-		Title:    "Login",
-		LoginTip: p.loginTip,
-		Name:     p.displayName,
-		Reason:   reason,
+		Title:     "Login",
+		LoginTip:  p.loginTip,
+		Name:      p.displayName,
+		Reason:    reason,
+		CsrfToken: csrfToken,
 	}
 	return templates.Templates.ExecuteTemplate(c.Response(), "oauth2-login.html", context)
 }
@@ -135,6 +141,7 @@ func (p oauth2BaseProvider) handleOauthCallback(c echo.Context) error {
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 	})
+	SetCsrfCookie(c, expires)
 
 	return c.Redirect(http.StatusTemporaryRedirect, "/")
 }

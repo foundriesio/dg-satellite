@@ -144,7 +144,7 @@
           groups: selectedGroups
         };
 
-        fetch('/updates/{{.Prod}}/{{.Tag}}/{{.Name}}/rollouts/' + document.getElementById('name').value, {
+        fetch('/v1/updates/{{.Prod}}/{{.Tag}}/{{.Name}}/rollouts/' + document.getElementById('name').value, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

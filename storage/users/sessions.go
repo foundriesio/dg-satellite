@@ -4,7 +4,9 @@
 package users
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"time"
@@ -12,27 +14,24 @@ import (
 	"github.com/foundriesio/dg-satellite/storage"
 )
 
-func (s Storage) GetBySession(id string) (*User, string, error) {
-	sess, err := s.stmtSessionGet.run(id)
+func (s Storage) hashSessionID(id string) (string, error) {
+	key, err := s.genTokenKey(id)
 	if err != nil {
-		return nil, "", err
-	} else if sess == nil {
-		return nil, "", nil
+		return "", err
 	}
-	if sess.ExpiresAt < time.Now().Unix() {
-		return nil, "", nil
+	hasher := hmac.New(sha256.New, key)
+	if _, err := hasher.Write([]byte(id)); err != nil {
+		return "", fmt.Errorf("unable to hash session id: %w", err)
 	}
-	u, err := s.stmtUserGetById.run(sess.UserID)
-	if u != nil {
-		u.h = s
-		u.AllowedScopes = sess.Scopes & u.AllowedScopes
-	}
-
-	return u, sess.InternalToken, err
+	return fmt.Sprintf("%x", hasher.Sum(nil)), nil
 }
 
-func (s Storage) GetByInternalToken(token string) (*User, error) {
-	sess, err := s.stmtUserGetByInternalToken.run(token)
+func (s Storage) GetBySession(id string) (*User, error) {
+	hashed, err := s.hashSessionID(id)
+	if err != nil {
+		return nil, err
+	}
+	sess, err := s.stmtSessionGet.run(hashed)
 	if err != nil {
 		return nil, err
 	} else if sess == nil {
@@ -55,8 +54,11 @@ func (u User) CreateSession(remoteIP string, expires int64, scopes Scopes) (stri
 		return "", fmt.Errorf("requested scopes %s exceed allowed scopes %s", scopes.String(), u.AllowedScopes.String())
 	}
 	idStr := rand.Text()
-	internalToken := rand.Text()
-	if err := u.h.stmtSessionCreate.run(u, idStr, internalToken, remoteIP, time.Now().Unix(), expires, scopes); err != nil {
+	hashed, err := u.h.hashSessionID(idStr)
+	if err != nil {
+		return "", fmt.Errorf("unable to hash session id: %w", err)
+	}
+	if err := u.h.stmtSessionCreate.run(u, hashed, remoteIP, time.Now().Unix(), expires, scopes); err != nil {
 		return "", fmt.Errorf("unable to create session: %w", err)
 	}
 
@@ -66,7 +68,11 @@ func (u User) CreateSession(remoteIP string, expires int64, scopes Scopes) (stri
 }
 
 func (u User) DeleteSession(id string) error {
-	if err := u.h.stmtSessionDelete.run(id); err != nil {
+	hashed, err := u.h.hashSessionID(id)
+	if err != nil {
+		return fmt.Errorf("unable to hash session id: %w", err)
+	}
+	if err := u.h.stmtSessionDelete.run(hashed); err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
 	msg := fmt.Sprintf("Session deleted id=%s", id)
@@ -75,28 +81,26 @@ func (u User) DeleteSession(id string) error {
 }
 
 type session struct {
-	UserID        int64
-	RemoteIP      string
-	ExpiresAt     int64
-	Scopes        Scopes
-	InternalToken string
+	UserID    int64
+	RemoteIP  string
+	ExpiresAt int64
+	Scopes    Scopes
 }
 
 type stmtSessionCreate storage.DbStmt
 
 func (s *stmtSessionCreate) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("sessionCreate", `
-		INSERT INTO session (id, user_id, internal_token, remote_ip, created_at, expires_at, scopes)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO session (id, user_id, remote_ip, created_at, expires_at, scopes)
+		VALUES (?, ?, ?, ?, ?, ?)`,
 	)
 	return
 }
 
-func (s *stmtSessionCreate) run(u User, id, internalToken, remoteIP string, created, expires int64, scopes Scopes) error {
+func (s *stmtSessionCreate) run(u User, id, remoteIP string, created, expires int64, scopes Scopes) error {
 	_, err := s.Stmt.Exec(
 		id,
 		u.id,
-		internalToken,
 		remoteIP,
 		created,
 		expires,
@@ -139,7 +143,7 @@ type stmtSessionGet storage.DbStmt
 
 func (s *stmtSessionGet) Init(db storage.DbHandle) (err error) {
 	s.Stmt, err = db.Prepare("sessionGet", `
-		SELECT user_id, internal_token, remote_ip, expires_at, scopes
+		SELECT user_id, expires_at, scopes
 		FROM session
 		WHERE id = ?`,
 	)
@@ -151,41 +155,6 @@ func (s *stmtSessionGet) run(id string) (*session, error) {
 	var scopesStr string
 	err := s.Stmt.QueryRow(id).Scan(
 		&sess.UserID,
-		&sess.InternalToken,
-		&sess.RemoteIP,
-		&sess.ExpiresAt,
-		&scopesStr,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	} else {
-		sess.Scopes, err = ScopesFromString(scopesStr)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse scopes: %w", err)
-		}
-	}
-	return &sess, nil
-}
-
-type stmtUserGetByInternalToken storage.DbStmt
-
-func (s *stmtUserGetByInternalToken) Init(db storage.DbHandle) (err error) {
-	s.Stmt, err = db.Prepare("sessionGetByInternalToken", `
-		SELECT user_id, remote_ip, expires_at, scopes
-		FROM session
-		WHERE internal_token = ?`,
-	)
-	return
-}
-
-func (s *stmtUserGetByInternalToken) run(token string) (*session, error) {
-	var sess session
-	var scopesStr string
-	err := s.Stmt.QueryRow(token).Scan(
-		&sess.UserID,
-		&sess.RemoteIP,
 		&sess.ExpiresAt,
 		&scopesStr,
 	)

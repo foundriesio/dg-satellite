@@ -18,7 +18,7 @@ import (
 // @Router  /app-proxy-url [post]
 func (h handlers) appsProxyUrl(c echo.Context) error {
 	d := CtxGetDevice(c.Request().Context())
-	token := rand.Text()[:10] // 10 chars, 5 bits of entropy per char = A big number
+	token := rand.Text()[:16] // 16 chars, 5 bits of entropy per char = A big number
 	h.tokenCache.Set(token, d.Uuid, 0)
 	url := h.url + "/registry?token=" + token
 	return c.String(http.StatusCreated, url)

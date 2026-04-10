@@ -5,6 +5,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
+	"golang.org/x/term"
 
 	"github.com/foundriesio/dg-satellite/auth"
 	"github.com/foundriesio/dg-satellite/storage"
@@ -13,11 +17,24 @@ import (
 
 type UserAddCmd struct {
 	Username      string   `arg:"required" help:"Username for the new user"`
-	Password      string   `arg:"required" help:"Password for the new user"`
+	Password      string   `arg:"" help:"Password for the new user (read from stdin if not provided)"`
 	AllowedScopes []string `arg:"" help:"Roles to assign to the new user"`
 }
 
 func (c UserAddCmd) Run(args CommonArgs) error {
+	if c.Password == "" {
+		fmt.Print("Enter password: ")
+		pw, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			return fmt.Errorf("failed to read password: %w", err)
+		}
+		c.Password = strings.TrimSpace(string(pw))
+		if c.Password == "" {
+			return fmt.Errorf("password cannot be empty")
+		}
+	}
+
 	fs, err := storage.NewFs(args.DataDir)
 	if err != nil {
 		return err

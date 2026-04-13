@@ -66,9 +66,36 @@ jobs:
           name: cli-binaries
           path: bin/satcli-*
 
+  build-swagger:
+    name: Build Swagger docs
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+      - name: Set up golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Install swag
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+      - name: Generate Swagger docs
+        run: make swagger
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: swagger-docs
+          path: |
+            docs/swagger/api/swagger.json
+            docs/swagger/api/swagger.yaml
+            docs/swagger/gateway/swagger.json
+            docs/swagger/gateway/swagger.yaml
+
   publish-release:
     name: Publish release
-    needs: [build-server, build-cli]
+    needs: [build-server, build-cli, build-swagger]
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -76,12 +103,21 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v5
         with:
-          path: bin/
+          path: artifacts/
           merge-multiple: true
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          cp artifacts/dg-sat-* artifacts/satcli-* release/
+          cp artifacts/swagger/api/swagger.json release/api-swagger.json
+          cp artifacts/swagger/api/swagger.yaml release/api-swagger.yaml
+          cp artifacts/swagger/gateway/swagger.json release/gateway-swagger.json
+          cp artifacts/swagger/gateway/swagger.yaml release/gateway-swagger.yaml
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.version }}
           files: |
-            bin/*
+            release/*

@@ -59,7 +59,7 @@ func (h *handlers) deviceList(c echo.Context) error {
 
 // @Summary Get a device by its UUID
 // @Produce json
-// @Success 200 Device
+// @Success 200 {object} Device
 // @Router  /devices/:uuid [get]
 func (h *handlers) deviceGet(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
@@ -82,7 +82,7 @@ func (h *handlers) deviceDelete(c echo.Context) error {
 
 // @Summary Get a list of updates for a device
 // @Produce json
-// @Success 200 []string
+// @Success 200 {array} string
 // @Router  /devices/:uuid/updates [get]
 func (h *handlers) deviceUpdatesList(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
@@ -96,7 +96,7 @@ func (h *handlers) deviceUpdatesList(c echo.Context) error {
 
 // @Summary Get details of update events for a devices
 // @Produce json
-// @Success 200 []DeviceUpdateEvent
+// @Success 200 {array} DeviceUpdateEvent
 // @Router  /devices/:uuid/updates/:id [get]
 func (h *handlers) deviceUpdatesGet(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
@@ -117,7 +117,7 @@ func (h *handlers) deviceUpdatesGet(c echo.Context) error {
 
 // @Summary Get a list of Apps states reported by the device
 // @Produce json
-// @Success 200 AppsStatesResp
+// @Success 200 {object} AppsStatesResp
 // @Router  /devices/:uuid/apps-states [get]
 func (h *handlers) deviceAppsStatesGet(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
@@ -131,7 +131,7 @@ func (h *handlers) deviceAppsStatesGet(c echo.Context) error {
 
 // @Summary Get known device group names
 // @Produce json
-// @Success 200 []string
+// @Success 200 {array} string
 // @Router  /known-labels/device-groups [get]
 func (h *handlers) deviceKnownGroupsGet(c echo.Context) error {
 	if groups, err := h.storage.GetKnownDeviceGroupNames(); err != nil {
@@ -145,7 +145,7 @@ var standardLabels = []string{"name", "group"}
 
 // @Summary Get known device label names
 // @Produce json
-// @Success 200 []string
+// @Success 200 {array} string
 // @Router  /known-labels/devices [get]
 func (h *handlers) deviceKnownLabelsGet(c echo.Context) error {
 	if labels, err := h.storage.GetKnownDeviceLabelNames(); err != nil {

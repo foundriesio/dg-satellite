@@ -14,7 +14,7 @@ import (
 
 // @Summary Get access to apps proxy URL
 // @Produce json
-// @Success 201 {string}
+// @Success 201 {object} string
 // @Router  /app-proxy-url [post]
 func (h handlers) appsProxyUrl(c echo.Context) error {
 	d := CtxGetDevice(c.Request().Context())

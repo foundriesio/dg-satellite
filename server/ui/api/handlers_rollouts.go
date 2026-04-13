@@ -44,7 +44,7 @@ func (h *handlers) updateList(c echo.Context) error {
 }
 
 // @Summary Tail update logs
-// @Produce text
+// @Produce text/plain
 // @Success 200
 // @Router  /updates/{prod}/{tag}/{update}/tail [get]
 func (h *handlers) updateTail(c echo.Context) error {
@@ -154,7 +154,7 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 }
 
 // @Summary Tail rollout logs
-// @Produce text
+// @Produce text/plain
 // @Success 200
 // @Router  /updates/{prod}/{tag}/rollouts/{rollout}/tail [get]
 func (h *handlers) rolloutTail(c echo.Context) error {

@@ -19,7 +19,7 @@ type TargetTest = storage.TargetTest
 
 // @Summary Get device tests
 // @Produce json
-// @Success 200 []TargetTest
+// @Success 200 {array} TargetTest
 // @Param   uuid path string true "Device UUID"
 // @Router  /devices/{uuid}/tests [get]
 func (h *handlers) deviceTestsList(c echo.Context) error {

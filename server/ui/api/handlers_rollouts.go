@@ -28,6 +28,8 @@ type Rollout = storage.Rollout
 // @Tags    Updates
 // @Produce json
 // @Success 200 {object} map[string][]string
+// @Param   prod path bool true "Whether the update is for production devices"
+// @Param   tag path string true "Update tag"
 // @Router  /updates/{prod}/{tag} [get]
 func (h *handlers) updateList(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -48,6 +50,9 @@ func (h *handlers) updateList(c echo.Context) error {
 // @Tags    Updates
 // @Produce text/plain
 // @Success 200
+// @Param   prod path bool true "Whether the update is for production devices"
+// @Param   tag path string true "Update tag"
+// @Param   update path string true "Update name"
 // @Router  /updates/{prod}/{tag}/{update}/tail [get]
 func (h *handlers) updateTail(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -63,6 +68,9 @@ func (h *handlers) updateTail(c echo.Context) error {
 // @Tags    Updates
 // @Produce json
 // @Success 200 {array} string
+// @Param   prod path bool true "Whether the update is for production devices"
+// @Param   tag path string true "Update tag"
+// @Param   update path string true "Update name"
 // @Router  /updates/{prod}/{tag}/{update}/rollouts [get]
 func (h *handlers) rolloutList(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -84,6 +92,10 @@ func (h *handlers) rolloutList(c echo.Context) error {
 // @Tags    Updates
 // @Produce json
 // @Success 200 {object} Rollout
+// @Param   prod path bool true "Whether the update is for production devices"
+// @Param   tag path string true "Update tag"
+// @Param   update path string true "Update name"
+// @Param   rollout path string true "Rollout name"
 // @Router  /updates/{prod}/{tag}/{update}/rollouts/{rollout} [get]
 func (h *handlers) rolloutGet(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -109,6 +121,10 @@ func (h *handlers) rolloutGet(c echo.Context) error {
 // @Param data body Rollout true "Rollout data"
 // @Produce json
 // @Success 202
+// @Param   prod path bool true "Whether the update is for production devices"
+// @Param   tag path string true "Update tag"
+// @Param   update path string true "Update name"
+// @Param   rollout path string true "Rollout name"
 // @Router  /updates/{prod}/{tag}/{update}/rollouts/{rollout} [put]
 func (h *handlers) rolloutPut(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -162,7 +178,11 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 // @Tags    Updates
 // @Produce text/plain
 // @Success 200
-// @Router  /updates/{prod}/{tag}/rollouts/{rollout}/tail [get]
+// @Param   prod path bool true "Whether the update is for production devices"
+// @Param   tag path string true "Update tag"
+// @Param   update path string true "Update name"
+// @Param   rollout path string true "Rollout name"
+// @Router  /updates/{prod}/{tag}/{update}/rollouts/{rollout}/tail [get]
 func (h *handlers) rolloutTail(c echo.Context) error {
 	ctx := c.Request().Context()
 	isProd := CtxGetIsProd(ctx)

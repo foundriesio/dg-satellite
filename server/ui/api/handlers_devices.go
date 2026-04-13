@@ -62,7 +62,8 @@ func (h *handlers) deviceList(c echo.Context) error {
 // @Tags    Devices
 // @Produce json
 // @Success 200 {object} Device
-// @Router  /devices/:uuid [get]
+// @Param   uuid path string true "Device UUID"
+// @Router  /devices/{uuid} [get]
 func (h *handlers) deviceGet(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
 		return c.JSON(http.StatusOK, device)
@@ -73,7 +74,8 @@ func (h *handlers) deviceGet(c echo.Context) error {
 // @Tags    Devices
 // @Produce json
 // @Success 204
-// @Router  /devices/:uuid [delete]
+// @Param   uuid path string true "Device UUID"
+// @Router  /devices/{uuid} [delete]
 func (h *handlers) deviceDelete(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
 		if err := device.Delete(); err != nil {
@@ -87,7 +89,8 @@ func (h *handlers) deviceDelete(c echo.Context) error {
 // @Tags    Devices
 // @Produce json
 // @Success 200 {array} string
-// @Router  /devices/:uuid/updates [get]
+// @Param   uuid path string true "Device UUID"
+// @Router  /devices/{uuid}/updates [get]
 func (h *handlers) deviceUpdatesList(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
 		updates, err := device.Updates()
@@ -102,7 +105,9 @@ func (h *handlers) deviceUpdatesList(c echo.Context) error {
 // @Tags    Devices
 // @Produce json
 // @Success 200 {array} DeviceUpdateEvent
-// @Router  /devices/:uuid/updates/:id [get]
+// @Param   uuid path string true "Device UUID"
+// @Param   id path string true "Update ID"
+// @Router  /devices/{uuid}/updates/{id} [get]
 func (h *handlers) deviceUpdatesGet(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
 		updateId := c.Param("id")
@@ -124,7 +129,8 @@ func (h *handlers) deviceUpdatesGet(c echo.Context) error {
 // @Tags    Devices
 // @Produce json
 // @Success 200 {object} AppsStatesResp
-// @Router  /devices/:uuid/apps-states [get]
+// @Param   uuid path string true "Device UUID"
+// @Router  /devices/{uuid}/apps-states [get]
 func (h *handlers) deviceAppsStatesGet(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
 		appsStates, err := device.AppsStates()
@@ -173,7 +179,8 @@ func (h *handlers) deviceKnownLabelsGet(c echo.Context) error {
 // @Accept json
 // @Param data body LabelsReq true "Labels to upsert or delete"
 // @Success 200
-// @Router  /devices/:uuid/labels [patch]
+// @Param   uuid path string true "Device UUID"
+// @Router  /devices/{uuid}/labels [patch]
 func (h *handlers) deviceLabelsPatch(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
 		var labelsReq LabelsReq
@@ -197,7 +204,8 @@ func (h *handlers) deviceLabelsPatch(c echo.Context) error {
 // @Accept json
 // @Param data body LabelsPutReq true "Labels to set"
 // @Success 200
-// @Router  /devices/:uuid/labels [put]
+// @Param   uuid path string true "Device UUID"
+// @Router  /devices/{uuid}/labels [put]
 func (h *handlers) deviceLabelsPut(c echo.Context) error {
 	return h.handleDevice(c, func(device *Device) error {
 		var labels LabelsPutReq

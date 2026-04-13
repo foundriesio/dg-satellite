@@ -15,6 +15,7 @@ import (
 type UpdateTufResp map[string]map[string]any
 
 // @Summary Create an update from a tar or tar+gz stream
+// @Tags    Updates
 // @Accept  application/x-tar,application/gzip
 // @Success 201
 // @Router  /updates/{prod}/{tag}/{update} [post]
@@ -37,6 +38,7 @@ func (h handlers) updateCreate(c echo.Context) error {
 }
 
 // @Summary Returns the TUF metadata for the update
+// @Tags    Updates
 // @Produce json
 // @Success 200 {object} UpdateTufResp
 // @Router  /updates/{prod}/{tag}/{update}/rollouts [get]

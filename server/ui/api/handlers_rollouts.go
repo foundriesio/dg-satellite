@@ -25,6 +25,7 @@ import (
 type Rollout = storage.Rollout
 
 // @Summary List updates
+// @Tags    Updates
 // @Produce json
 // @Success 200 {object} map[string][]string
 // @Router  /updates/{prod}/{tag} [get]
@@ -44,6 +45,7 @@ func (h *handlers) updateList(c echo.Context) error {
 }
 
 // @Summary Tail update logs
+// @Tags    Updates
 // @Produce text/plain
 // @Success 200
 // @Router  /updates/{prod}/{tag}/{update}/tail [get]
@@ -58,6 +60,7 @@ func (h *handlers) updateTail(c echo.Context) error {
 }
 
 // @Summary List update rollouts
+// @Tags    Updates
 // @Produce json
 // @Success 200 {array} string
 // @Router  /updates/{prod}/{tag}/{update}/rollouts [get]
@@ -78,6 +81,7 @@ func (h *handlers) rolloutList(c echo.Context) error {
 }
 
 // @Summary Get update rollout
+// @Tags    Updates
 // @Produce json
 // @Success 200 {object} Rollout
 // @Router  /updates/{prod}/{tag}/{update}/rollouts/{rollout} [get]
@@ -100,6 +104,7 @@ func (h *handlers) rolloutGet(c echo.Context) error {
 }
 
 // @Summary Create update rollout
+// @Tags    Updates
 // @Accept json
 // @Param data body Rollout true "Rollout data"
 // @Produce json
@@ -154,6 +159,7 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 }
 
 // @Summary Tail rollout logs
+// @Tags    Updates
 // @Produce text/plain
 // @Success 200
 // @Router  /updates/{prod}/{tag}/rollouts/{rollout}/tail [get]

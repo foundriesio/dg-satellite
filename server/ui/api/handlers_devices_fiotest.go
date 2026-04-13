@@ -18,6 +18,7 @@ import (
 type TargetTest = storage.TargetTest
 
 // @Summary Get device tests
+// @Tags    Devices
 // @Produce json
 // @Success 200 {array} TargetTest
 // @Param   uuid path string true "Device UUID"
@@ -34,6 +35,7 @@ func (h *handlers) deviceTestsList(c echo.Context) error {
 }
 
 // @Summary Get device test
+// @Tags    Devices
 // @Produce json
 // @Success 200 {object} TargetTest
 // @Param   uuid path string true "Device UUID"
@@ -58,6 +60,7 @@ func (h *handlers) deviceTestGet(c echo.Context) error {
 }
 
 // @Summary Get device test artifact
+// @Tags    Devices
 // @Produce octet-stream
 // @Success 200 {file} binary
 // @Failure 404 "Test or artifact not found"

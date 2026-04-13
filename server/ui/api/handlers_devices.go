@@ -33,6 +33,7 @@ type LabelsReq struct {
 type LabelsPutReq map[string]*string
 
 // @Summary List devices
+// @Tags    Devices
 // @Param _ query DeviceListOpts false "Sorting options"
 // @Accept  json
 // @Produce json
@@ -58,6 +59,7 @@ func (h *handlers) deviceList(c echo.Context) error {
 }
 
 // @Summary Get a device by its UUID
+// @Tags    Devices
 // @Produce json
 // @Success 200 {object} Device
 // @Router  /devices/:uuid [get]
@@ -68,6 +70,7 @@ func (h *handlers) deviceGet(c echo.Context) error {
 }
 
 // @Summary Delete a device
+// @Tags    Devices
 // @Produce json
 // @Success 204
 // @Router  /devices/:uuid [delete]
@@ -81,6 +84,7 @@ func (h *handlers) deviceDelete(c echo.Context) error {
 }
 
 // @Summary Get a list of updates for a device
+// @Tags    Devices
 // @Produce json
 // @Success 200 {array} string
 // @Router  /devices/:uuid/updates [get]
@@ -95,6 +99,7 @@ func (h *handlers) deviceUpdatesList(c echo.Context) error {
 }
 
 // @Summary Get details of update events for a devices
+// @Tags    Devices
 // @Produce json
 // @Success 200 {array} DeviceUpdateEvent
 // @Router  /devices/:uuid/updates/:id [get]
@@ -116,6 +121,7 @@ func (h *handlers) deviceUpdatesGet(c echo.Context) error {
 }
 
 // @Summary Get a list of Apps states reported by the device
+// @Tags    Devices
 // @Produce json
 // @Success 200 {object} AppsStatesResp
 // @Router  /devices/:uuid/apps-states [get]
@@ -130,6 +136,7 @@ func (h *handlers) deviceAppsStatesGet(c echo.Context) error {
 }
 
 // @Summary Get known device group names
+// @Tags    Devices
 // @Produce json
 // @Success 200 {array} string
 // @Router  /known-labels/device-groups [get]
@@ -144,6 +151,7 @@ func (h *handlers) deviceKnownGroupsGet(c echo.Context) error {
 var standardLabels = []string{"name", "group"}
 
 // @Summary Get known device label names
+// @Tags    Devices
 // @Produce json
 // @Success 200 {array} string
 // @Router  /known-labels/devices [get]
@@ -161,6 +169,7 @@ func (h *handlers) deviceKnownLabelsGet(c echo.Context) error {
 }
 
 // @Summary Patch device labels
+// @Tags    Devices
 // @Accept json
 // @Param data body LabelsReq true "Labels to upsert or delete"
 // @Success 200
@@ -184,6 +193,7 @@ func (h *handlers) deviceLabelsPatch(c echo.Context) error {
 }
 
 // @Summary Put device labels
+// @Tags    Devices
 // @Accept json
 // @Param data body LabelsPutReq true "Labels to set"
 // @Success 200

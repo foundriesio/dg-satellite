@@ -14,6 +14,7 @@ import (
 )
 
 // @Summary Upload factory/group/device configs from an archive
+// @Tags    Config
 // @Accept  application/x-tar
 // @Success 200
 // @Router  /configs [put]

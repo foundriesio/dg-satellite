@@ -5,11 +5,12 @@ Devices authenticate using mTLS and your FoundriesFactory PKI. You'll
 need access to your [Factory CA](https://docs.foundries.io/latest/reference-manual/security/device-gateway.html) in order to create a TLS certificate for
 device-facing APIs.
 
-## Building
-First build the service with:
-```
- go build -o dg-sat github.com/foundriesio/dg-satellite/cmd/server
-```
+## Installing
+Download the latest satellite server from:
+
+ https://github.com/foundriesio/dg-satellite/releases
+
+as `dg-sat`. For Linux and Mac, make sure to `chmod +x dg-sat`.
 
 ## Configure Mutual TLS
 ### Create certificate signing requests for TLS

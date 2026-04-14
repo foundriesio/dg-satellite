@@ -40,23 +40,26 @@ func (h handlers) devicesList(c echo.Context) error {
 	}
 
 	hasNext := linkHasRel(headers.Get("Link"), "next")
+	totalPages := linkTotalPages(headers.Get("Link"), pageSize)
 
 	ctx := struct {
 		baseCtx
-		Devices   []api.DeviceListItem
-		CanDelete bool
-		Page      int
-		HasNext   bool
-		HasPrev   bool
-		Sort      string
+		Devices    []api.DeviceListItem
+		CanDelete  bool
+		Page       int
+		TotalPages int
+		HasNext    bool
+		HasPrev    bool
+		Sort       string
 	}{
-		baseCtx:   h.baseCtx(c, "Devices", "devices"),
-		Devices:   devices,
-		CanDelete: CtxGetSession(c.Request().Context()).User.AllowedScopes.Has(users.ScopeDevicesD),
-		Page:      page,
-		HasNext:   hasNext,
-		HasPrev:   page > 0,
-		Sort:      sort,
+		baseCtx:    h.baseCtx(c, "Devices", "devices"),
+		Devices:    devices,
+		CanDelete:  CtxGetSession(c.Request().Context()).User.AllowedScopes.Has(users.ScopeDevicesD),
+		Page:       page,
+		TotalPages: totalPages,
+		HasNext:    hasNext,
+		HasPrev:    page > 0,
+		Sort:       sort,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "devices_list.html", ctx)
 }
@@ -70,6 +73,32 @@ func linkHasRel(linkHeader, rel string) bool {
 		}
 	}
 	return false
+}
+
+// linkTotalPages extracts the last page's offset from the Link header to compute total pages.
+func linkTotalPages(linkHeader string, pageSize int) int {
+	for part := range strings.SplitSeq(linkHeader, ",") {
+		part = strings.TrimSpace(part)
+		if !strings.Contains(part, `rel="last"`) {
+			continue
+		}
+		// Extract URL between < and >
+		start := strings.Index(part, "<")
+		end := strings.Index(part, ">")
+		if start < 0 || end < 0 || end <= start {
+			return 1
+		}
+		url := part[start+1 : end]
+		// Find offset parameter
+		for param := range strings.SplitSeq(url[strings.Index(url, "?")+1:], "&") {
+			if strings.HasPrefix(param, "offset=") {
+				if offset, err := strconv.Atoi(param[len("offset="):]); err == nil && pageSize > 0 {
+					return offset/pageSize + 1
+				}
+			}
+		}
+	}
+	return 1
 }
 
 type ipInfo struct {

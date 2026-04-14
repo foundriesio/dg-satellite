@@ -15,8 +15,13 @@ import (
 type UpdateTufResp map[string]map[string]any
 
 // @Summary Create an update from a tar or tar+gz stream
+// @Description Requires scope: updates:read-update
+// @Tags    Updates
 // @Accept  application/x-tar,application/gzip
 // @Success 201
+// @Param   prod path bool true "Whether the update is for production devices"
+// @Param   tag path string true "Update tag"
+// @Param   update path string true "Update name"
 // @Router  /updates/{prod}/{tag}/{update} [post]
 func (h handlers) updateCreate(c echo.Context) error {
 	tag := c.Param("tag")
@@ -37,8 +42,13 @@ func (h handlers) updateCreate(c echo.Context) error {
 }
 
 // @Summary Returns the TUF metadata for the update
+// @Description Requires scope: updates:read or updates:read-update
+// @Tags    Updates
 // @Produce json
 // @Success 200 {object} UpdateTufResp
+// @Param   prod path bool true "Whether the update is for production devices"
+// @Param   tag path string true "Update tag"
+// @Param   update path string true "Update name"
 // @Router  /updates/{prod}/{tag}/{update}/rollouts [get]
 func (h handlers) updateGetTuf(c echo.Context) error {
 	tag := c.Param("tag")

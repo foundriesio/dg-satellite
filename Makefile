@@ -20,3 +20,19 @@ satcli-%:
 	GOARCH=$(shell echo $* | cut -f2 -d\- | cut -f1 -d. ) \
 		go build $(LDFLAGS) -tags nodb -o bin/$@ github.com/foundriesio/dg-satellite/cmd/cli
 
+swagger: swagger-api swagger-gateway
+
+swagger-api:
+	swag init --parseDependency --parseInternal \
+		-d ./server/ui/api \
+		-g doc.go \
+		-o ./docs/swagger/api \
+		--instanceName api
+
+swagger-gateway:
+	swag init --parseDependency --parseInternal \
+		-d ./server/gateway \
+		-g doc.go \
+		-o ./docs/swagger/gateway \
+		--instanceName gateway
+

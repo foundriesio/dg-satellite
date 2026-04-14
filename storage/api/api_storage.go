@@ -70,9 +70,9 @@ var (
 // DeviceListOpts lets you set the order devices will be returned
 // by the `List` api
 type DeviceListOpts struct {
-	OrderBy OrderBy `query:"order-by" example:"1"    default:"1"`
-	Limit   int     `query:"limit"    example:"100"  default:"1000"`
-	Offset  int     `query:"offset"   example:"1"    default:"0"`
+	OrderBy OrderBy `query:"order-by" default:"last-seen-desc"`
+	Limit   int     `query:"limit"    default:"1000"`
+	Offset  int     `query:"offset"   default:"0"`
 }
 
 type DeviceListItem struct {

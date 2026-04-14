@@ -43,6 +43,7 @@ func (h handlers) metaTargets(c echo.Context) error {
 
 // @Summary Get the current TUF root metadata
 // @Produce json
+// @Param   version path int true "Root metadata version"
 // @Success 200
 // @Router  /repo/{version}.root.json [get]
 func (h handlers) metaRoot(c echo.Context) error {

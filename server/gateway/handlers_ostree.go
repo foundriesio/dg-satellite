@@ -23,6 +23,7 @@ func (h handlers) ostreeUrls(c echo.Context) error {
 
 // @Summary Get the Ostree file contents
 // @Produce octet-stream,plain,json
+// @Param   path path string true "OSTree file path"
 // @Success 200
 // @Router  /ostree/{path} [get]
 func (handlers) ostreeFileStream(c echo.Context) error {

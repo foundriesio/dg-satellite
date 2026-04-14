@@ -131,6 +131,42 @@ func (h handlers) devicesAppsStates(c echo.Context) error {
 	return h.templates.ExecuteTemplate(c.Response(), "device_apps_states.html", ctx)
 }
 
+func (h handlers) devicesTests(c echo.Context) error {
+	var tests []storage.TargetTest
+	if err := getJson(c.Request().Context(), "/v1/devices/"+c.Param("uuid")+"/tests", &tests); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+
+	ctx := struct {
+		baseCtx
+		DeviceUuid string
+		Tests      []storage.TargetTest
+	}{
+		baseCtx:    h.baseCtx(c, "Device - "+c.Param("uuid")+" Tests", "devices"),
+		DeviceUuid: c.Param("uuid"),
+		Tests:      tests,
+	}
+	return h.templates.ExecuteTemplate(c.Response(), "device_tests.html", ctx)
+}
+
+func (h handlers) devicesTestGet(c echo.Context) error {
+	var test storage.TargetTest
+	if err := getJson(c.Request().Context(), "/v1/devices/"+c.Param("uuid")+"/tests/"+c.Param("testid"), &test); err != nil {
+		return h.handleUnexpected(c, err)
+	}
+
+	ctx := struct {
+		baseCtx
+		DeviceUuid string
+		Test       storage.TargetTest
+	}{
+		baseCtx:    h.baseCtx(c, "Device - "+c.Param("uuid")+" Test - "+test.Name, "devices"),
+		DeviceUuid: c.Param("uuid"),
+		Test:       test,
+	}
+	return h.templates.ExecuteTemplate(c.Response(), "device_test.html", ctx)
+}
+
 func (h handlers) devicesLabelsGet(c echo.Context) error {
 	var device api.Device
 	if err := getJson(c.Request().Context(), "/v1/devices/"+c.Param("uuid"), &device); err != nil {

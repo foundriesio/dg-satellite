@@ -1,0 +1,33 @@
+{{ template "header" .}}
+    <section class="content-section">
+      <h2>{{.Title}}</h2>
+
+      <table class="striped">
+        <thead>
+          <tr>
+            <th>Test ID</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Completed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Tests }}
+          <tr>
+            <td><a href="/devices/{{$.DeviceUuid}}/tests/{{.Uuid}}">{{.Uuid}}</a></td>
+            <td>{{.Name}}</td>
+            <td>{{.Status}}</td>
+            <td>{{tsToString .CreatedOn}}</td>
+            <td>{{ if .CompletedOn }}{{tsToString .CompletedOn}}{{ else }}-{{ end }}</td>
+          </tr>
+          {{ else }}
+          <tr>
+            <td colspan="6"><i>No tests found</i></td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </section>
+
+{{ template "footer"}}

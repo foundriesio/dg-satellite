@@ -60,6 +60,7 @@ var (
 	DbFile = storage.DbFile
 
 	ValidCorrelationId = storage.ValidCorrelationId
+	TestIdRegex        = storage.TestIdRegex
 
 	IsDbError             = storage.IsDbError
 	ErrDbConstraintUnique = storage.ErrDbConstraintUnique

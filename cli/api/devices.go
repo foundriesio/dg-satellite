@@ -5,13 +5,16 @@ package api
 
 import (
 	"fmt"
+	"io"
 
+	"github.com/foundriesio/dg-satellite/storage"
 	models "github.com/foundriesio/dg-satellite/storage/api"
 )
 
 type DeviceListItem = models.DeviceListItem
 type Device = models.Device
 type DeviceUpdateEvent = models.DeviceUpdateEvent
+type TargetTest = storage.TargetTest
 
 type DeviceApi struct {
 	api *Api
@@ -48,4 +51,21 @@ func (d DeviceApi) UpdateEvents(uuid, updateId string) ([]DeviceUpdateEvent, err
 
 func (d DeviceApi) Delete(uuid string) error {
 	return d.api.Delete(fmt.Sprintf("/v1/devices/%s", uuid))
+}
+
+func (d *DeviceApi) Tests(uuid string) ([]TargetTest, error) {
+	var tests []TargetTest
+	return tests, d.api.Get(fmt.Sprintf("/v1/devices/%s/tests", uuid), &tests)
+}
+
+func (d *DeviceApi) Test(uuid, testId string) (*TargetTest, error) {
+	var test TargetTest
+	if err := d.api.Get(fmt.Sprintf("/v1/devices/%s/tests/%s", uuid, testId), &test); err != nil {
+		return nil, err
+	}
+	return &test, nil
+}
+
+func (d *DeviceApi) TestArtifact(uuid, testId, artifact string) (io.ReadCloser, error) {
+	return d.api.GetStream(fmt.Sprintf("/v1/devices/%s/tests/%s/%s", uuid, testId, artifact))
 }

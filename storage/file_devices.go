@@ -6,6 +6,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -25,6 +26,12 @@ func (s DevicesFsHandle) Delete(uuid string) error {
 	return nil
 }
 
+func (s DevicesFsHandle) ReadFileStream(uuid string, name string) (io.ReadCloser, error) {
+	h, _ := s.deviceLocalHandle(uuid, false)
+	path := filepath.Join(h.root, name)
+	return os.Open(path)
+}
+
 func (s DevicesFsHandle) ReadFile(uuid, name string) (string, error) {
 	h, _ := s.deviceLocalHandle(uuid, false)
 	content, err := h.readFile(name, true)
@@ -39,6 +46,17 @@ func (s DevicesFsHandle) WriteFile(uuid, name, content string) error {
 		return err
 	} else if err = h.writeFile(name, content, defaultFileAccess); err != nil {
 		return fmt.Errorf("error writing file %s for device %s: %w", name, uuid, err)
+	}
+	return nil
+}
+
+func (s DevicesFsHandle) WriteFileStream(uuid, name string, src io.Reader) error {
+	if h, err := s.deviceLocalHandle(uuid, true); err != nil {
+		return err
+	} else {
+		if err := h.writeFileStream(name, src, 0o644); err != nil {
+			return fmt.Errorf("error writing file stream %s for device %s: %w", name, uuid, err)
+		}
 	}
 	return nil
 }

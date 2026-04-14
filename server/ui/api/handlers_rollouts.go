@@ -25,6 +25,7 @@ import (
 type Rollout = storage.Rollout
 
 // @Summary List updates
+// @Description Requires scope: updates:read or updates:read-update
 // @Tags    Updates
 // @Produce json
 // @Success 200 {object} map[string][]string
@@ -47,6 +48,7 @@ func (h *handlers) updateList(c echo.Context) error {
 }
 
 // @Summary Tail update logs
+// @Description Requires scope: updates:read or updates:read-update
 // @Tags    Updates
 // @Produce text/plain
 // @Success 200
@@ -65,6 +67,7 @@ func (h *handlers) updateTail(c echo.Context) error {
 }
 
 // @Summary List update rollouts
+// @Description Requires scope: updates:read or updates:read-update
 // @Tags    Updates
 // @Produce json
 // @Success 200 {array} string
@@ -89,6 +92,7 @@ func (h *handlers) rolloutList(c echo.Context) error {
 }
 
 // @Summary Get update rollout
+// @Description Requires scope: updates:read or updates:read-update
 // @Tags    Updates
 // @Produce json
 // @Success 200 {object} Rollout
@@ -116,6 +120,7 @@ func (h *handlers) rolloutGet(c echo.Context) error {
 }
 
 // @Summary Create update rollout
+// @Description Requires scope: updates:read-update
 // @Tags    Updates
 // @Accept json
 // @Param data body Rollout true "Rollout data"
@@ -175,6 +180,7 @@ func (h *handlers) rolloutPut(c echo.Context) error {
 }
 
 // @Summary Tail rollout logs
+// @Description Requires scope: updates:read or updates:read-update
 // @Tags    Updates
 // @Produce text/plain
 // @Success 200

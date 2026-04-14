@@ -14,6 +14,7 @@ import (
 )
 
 // @Summary Upload factory/group/device configs from an archive
+// @Description Requires scopes: devices:read-update, updates:read-update
 // @Tags    Config
 // @Accept  application/x-tar
 // @Success 200

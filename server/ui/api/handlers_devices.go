@@ -33,6 +33,7 @@ type LabelsReq struct {
 type LabelsPutReq map[string]*string
 
 // @Summary List devices
+// @Description Requires scope: devices:read or devices:read-update
 // @Tags    Devices
 // @Param _ query DeviceListOpts false "Sorting options"
 // @Accept  json
@@ -59,6 +60,7 @@ func (h *handlers) deviceList(c echo.Context) error {
 }
 
 // @Summary Get a device by its UUID
+// @Description Requires scope: devices:read or devices:read-update
 // @Tags    Devices
 // @Produce json
 // @Success 200 {object} Device
@@ -71,6 +73,7 @@ func (h *handlers) deviceGet(c echo.Context) error {
 }
 
 // @Summary Delete a device
+// @Description Requires scope: devices:delete
 // @Tags    Devices
 // @Produce json
 // @Success 204
@@ -86,6 +89,7 @@ func (h *handlers) deviceDelete(c echo.Context) error {
 }
 
 // @Summary Get a list of updates for a device
+// @Description Requires scope: devices:read or devices:read-update
 // @Tags    Devices
 // @Produce json
 // @Success 200 {array} string
@@ -102,6 +106,7 @@ func (h *handlers) deviceUpdatesList(c echo.Context) error {
 }
 
 // @Summary Get details of update events for a devices
+// @Description Requires scope: devices:read or devices:read-update
 // @Tags    Devices
 // @Produce json
 // @Success 200 {array} DeviceUpdateEvent
@@ -126,6 +131,7 @@ func (h *handlers) deviceUpdatesGet(c echo.Context) error {
 }
 
 // @Summary Get a list of Apps states reported by the device
+// @Description Requires scope: devices:read or devices:read-update
 // @Tags    Devices
 // @Produce json
 // @Success 200 {object} AppsStatesResp
@@ -142,6 +148,7 @@ func (h *handlers) deviceAppsStatesGet(c echo.Context) error {
 }
 
 // @Summary Get known device group names
+// @Description Requires scope: devices:read or devices:read-update
 // @Tags    Devices
 // @Produce json
 // @Success 200 {array} string
@@ -157,6 +164,7 @@ func (h *handlers) deviceKnownGroupsGet(c echo.Context) error {
 var standardLabels = []string{"name", "group"}
 
 // @Summary Get known device label names
+// @Description Requires scope: devices:read or devices:read-update
 // @Tags    Devices
 // @Produce json
 // @Success 200 {array} string
@@ -175,6 +183,7 @@ func (h *handlers) deviceKnownLabelsGet(c echo.Context) error {
 }
 
 // @Summary Patch device labels
+// @Description Requires scope: devices:read-update
 // @Tags    Devices
 // @Accept json
 // @Param data body LabelsReq true "Labels to upsert or delete"
@@ -200,6 +209,7 @@ func (h *handlers) deviceLabelsPatch(c echo.Context) error {
 }
 
 // @Summary Put device labels
+// @Description Requires scope: devices:read-update
 // @Tags    Devices
 // @Accept json
 // @Param data body LabelsPutReq true "Labels to set"

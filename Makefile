@@ -27,6 +27,7 @@ swagger-api:
 		-d ./server/ui/api \
 		-g doc.go \
 		-o ./docs/swagger/api \
+		--outputTypes json,yaml \
 		--instanceName api
 
 swagger-gateway:
@@ -34,5 +35,6 @@ swagger-gateway:
 		-d ./server/gateway \
 		-g doc.go \
 		-o ./docs/swagger/gateway \
+		--outputTypes json,yaml \
 		--instanceName gateway
 

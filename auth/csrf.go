@@ -15,9 +15,7 @@ import (
 const CsrfCookieName = "dg-satellite-csrf"
 const CsrfHeaderName = "X-CSRF-Token"
 
-// SetCsrfCookie sets a CSRF cookie on the response. It should be called
-// when a new session is created. The cookie is NOT HttpOnly so that
-// JavaScript can read the value to include in request headers.
+// SetCsrfCookie sets a CSRF cookie on the response. It should be called when a new session is created.
 func SetCsrfCookie(c echo.Context, expires time.Time) {
 	c.SetCookie(&http.Cookie{
 		Name:     CsrfCookieName,

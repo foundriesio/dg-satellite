@@ -18,8 +18,9 @@ import (
 )
 
 type CsrSignCmd struct {
-	CaKey  string `arg:"required" help:"Factory rook PKI key"`
-	CaCert string `arg:"required" help:"Factory rook PKY cert"`
+	CaKey      string `arg:"required" help:"Factory rook PKI key"`
+	CaCert     string `arg:"required" help:"Factory rook PKI cert"`
+	ExpiryDays int    `default:"365" help:"TLS certificate validity in days"`
 }
 
 func (c CsrSignCmd) Run(args CommonArgs) error {
@@ -58,7 +59,7 @@ func (c CsrSignCmd) Run(args CommonArgs) error {
 		Issuer:       caCrt.Subject,
 		SerialNumber: serial,
 		NotBefore:    time.Now(),
-		NotAfter:     time.Now().AddDate(10, 0, 0),
+		NotAfter:     time.Now().AddDate(0, 0, c.ExpiryDays),
 
 		IsCA:        false,
 		KeyUsage:    x509.KeyUsageDigitalSignature,

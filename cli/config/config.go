@@ -36,7 +36,7 @@ func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("config file not found at %s", path)
+			return nil, err
 		}
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -80,11 +80,6 @@ func SaveConfig(configPath string, cfg *Config) error {
 		if err != nil {
 			return fmt.Errorf("failed to get config path: %w", err)
 		}
-	}
-
-	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	data, err := yaml.Marshal(cfg)

@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"time"
 
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
@@ -43,6 +44,14 @@ func loadTlsConfig(fs *storage.FsHandle) (*tls.Config, error) {
 	kp, err := loadTlsKeyPair(fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load gateway key: %w", err)
+	}
+
+	leaf, err := x509.ParseCertificate(kp.Certificate[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse TLS certificate: %w", err)
+	}
+	if time.Now().After(leaf.NotAfter) {
+		return nil, fmt.Errorf("TLS certificate expired on %s", leaf.NotAfter)
 	}
 
 	cfg := &tls.Config{

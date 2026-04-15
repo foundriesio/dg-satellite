@@ -47,7 +47,7 @@ func (h handlers) authDevice(next echo.HandlerFunc) echo.HandlerFunc {
 			device, err = h.storage.DeviceCreate(cert.Subject.CommonName, pub, isProd)
 			if err != nil {
 				log.Error("Unable to create device", "error", err)
-				return c.String(http.StatusBadGateway, err.Error())
+				return c.String(http.StatusBadGateway, "Unable to create device")
 			}
 			log.Info("Created device")
 		} else if device.Deleted {
@@ -84,7 +84,7 @@ func (h handlers) authToken(next echo.HandlerFunc) echo.HandlerFunc {
 		device, err := h.storage.DeviceGet(uuid)
 		if err != nil {
 			log.Error("Unable to query for device", "error", err)
-			return c.String(http.StatusBadGateway, err.Error())
+			return c.String(http.StatusBadGateway, "Unable to look up device")
 		} else if device == nil || device.Deleted {
 			return c.String(http.StatusUnauthorized, "invalid device")
 		}

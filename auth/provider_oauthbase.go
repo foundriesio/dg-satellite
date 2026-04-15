@@ -5,6 +5,7 @@ package auth
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -107,7 +108,7 @@ func (p oauth2BaseProvider) handleOauthCallback(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "Could not read oauth cookie")
 	}
 
-	if c.FormValue("state") != oauthState.Value {
+	if subtle.ConstantTimeCompare([]byte(c.FormValue("state")), []byte(oauthState.Value)) != 1 {
 		return c.String(http.StatusBadRequest, "Invalid oauth state")
 	}
 

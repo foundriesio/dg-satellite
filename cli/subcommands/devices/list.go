@@ -61,7 +61,7 @@ func init() {
 	DevicesCmd.AddCommand(listCmd)
 	listCmd.Flags().StringP("columns", "", "uuid,target,last-seen",
 		"Comma-separated list of columns to display (available: "+colmnsStr+")")
-	listCmd.Flags().IntP("page", "p", 0, "Page number to display (0-indexed)")
+	listCmd.Flags().IntP("page", "p", 1, "Page number to display")
 	listCmd.Flags().StringP("sort", "s", "", "Sort order for devices ("+sortStr+")")
 }
 

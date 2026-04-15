@@ -77,15 +77,15 @@
       <nav>
         <div>
           {{ if .HasPrev }}
-            <a href="/devices?page=0{{if .Sort}}&amp;sort={{.Sort}}{{end}}" role="button">&laquo; First</a>
+            <a href="/devices?page=1{{if .Sort}}&amp;sort={{.Sort}}{{end}}" role="button">&laquo; First</a>
             <a href="/devices?page={{sub .Page 1}}{{if .Sort}}&amp;sort={{.Sort}}{{end}}" role="button">&larr; Previous</a>
           {{ end }}
         </div>
-        <span>Showing page {{add .Page 1}} of {{.TotalPages}} pages.</span>
+        <span>Showing page {{.Page}} of {{.TotalPages}} pages.</span>
         <div>
           {{ if .HasNext }}
             <a href="/devices?page={{add .Page 1}}{{if .Sort}}&amp;sort={{.Sort}}{{end}}" role="button">Next &rarr;</a>
-            <a href="/devices?page={{sub .TotalPages 1}}{{if .Sort}}&amp;sort={{.Sort}}{{end}}" role="button">Last &raquo;</a>
+            <a href="/devices?page={{.TotalPages}}{{if .Sort}}&amp;sort={{.Sort}}{{end}}" role="button">Last &raquo;</a>
           {{ end }}
         </div>
       </nav>

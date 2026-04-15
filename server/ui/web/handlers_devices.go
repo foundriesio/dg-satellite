@@ -18,15 +18,15 @@ import (
 
 func (h handlers) devicesList(c echo.Context) error {
 	page, _ := strconv.Atoi(c.QueryParam("page"))
-	if page < 0 {
-		page = 0
+	if page < 1 {
+		page = 1
 	}
 	sort := c.QueryParam("sort")
 	if sort == "" {
 		sort = "created-at-desc"
 	}
 	const pageSize = 50
-	offset := page * pageSize
+	offset := (page - 1) * pageSize
 
 	resource := fmt.Sprintf("/v1/devices?limit=%d&offset=%d", pageSize, offset)
 	if sort != "" {
@@ -58,7 +58,7 @@ func (h handlers) devicesList(c echo.Context) error {
 		Page:       page,
 		TotalPages: totalPages,
 		HasNext:    hasNext,
-		HasPrev:    page > 0,
+		HasPrev:    page > 1,
 		Sort:       sort,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "devices_list.html", ctx)

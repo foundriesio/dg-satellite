@@ -88,10 +88,7 @@ jobs:
         with:
           name: swagger-docs
           path: |
-            docs/swagger/api/swagger.json
-            docs/swagger/api/swagger.yaml
-            docs/swagger/gateway/swagger.json
-            docs/swagger/gateway/swagger.yaml
+            docs/swagger/
 
   publish-release:
     name: Publish release
@@ -109,11 +106,10 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
+
           cp artifacts/dg-sat-* artifacts/satcli-* release/
-          cp artifacts/swagger/api/swagger.json release/api-swagger.json
-          cp artifacts/swagger/api/swagger.yaml release/api-swagger.yaml
-          cp artifacts/swagger/gateway/swagger.json release/gateway-swagger.json
-          cp artifacts/swagger/gateway/swagger.yaml release/gateway-swagger.yaml
+          cp artifacts/api/* release/
+          cp artifacts/gateway/* release/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

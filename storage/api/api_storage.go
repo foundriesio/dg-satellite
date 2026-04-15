@@ -111,6 +111,7 @@ type Storage struct {
 	db *storage.DbHandle
 	fs *storage.FsHandle
 
+	stmtDeviceCount     stmtDeviceCount
 	stmtDeviceDelete    stmtDeviceDelete
 	stmtDeviceGet       stmtDeviceGet
 	stmtDeviceGetGroups stmtDeviceGetGroups
@@ -184,6 +185,7 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	handle := Storage{db: db, fs: fs}
 
 	if err := db.InitStmt(
+		&handle.stmtDeviceCount,
 		&handle.stmtDeviceDelete,
 		&handle.stmtDeviceGet,
 		&handle.stmtDeviceGetGroups,
@@ -206,21 +208,27 @@ func NewStorage(db *storage.DbHandle, fs *storage.FsHandle) (*Storage, error) {
 	return &handle, nil
 }
 
-func (s Storage) DevicesList(opts DeviceListOpts) ([]DeviceListItem, error) {
+func (s Storage) DevicesList(opts DeviceListOpts) ([]DeviceListItem, int, error) {
 	orderBy := opts.OrderBy
 	if orderBy == "" {
 		orderBy = OrderByDeviceLastSeenDsc
 	}
 	stmt, ok := s.stmtDeviceList[orderBy]
 	if !ok {
-		return nil, fmt.Errorf("invalid order by arg: %s", opts.OrderBy)
+		return nil, 0, fmt.Errorf("invalid order by arg: %s", opts.OrderBy)
+	}
+
+	total, err := s.stmtDeviceCount.run()
+	if err != nil {
+		return nil, 0, err
 	}
 
 	devices := make([]DeviceListItem, 0, opts.Limit)
 	if err := stmt.run(opts.Limit, opts.Offset, &devices); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return devices, nil
+
+	return devices, total, nil
 }
 
 func (s Storage) DeviceGet(uuid string) (*Device, error) {
@@ -483,6 +491,20 @@ func (s *stmtDeviceList) run(limit, offset int, dl *[]DeviceListItem) error {
 		}
 	}
 	return nil
+}
+
+type stmtDeviceCount storage.DbStmt
+
+func (s *stmtDeviceCount) Init(db storage.DbHandle) (err error) {
+	s.Stmt, err = db.Prepare("apiDeviceCount", `
+		SELECT COUNT(*) FROM devices WHERE deleted=false`,
+	)
+	return
+}
+
+func (s *stmtDeviceCount) run() (count int, err error) {
+	err = s.Stmt.QueryRow().Scan(&count)
+	return
 }
 
 type stmtDeviceSetLabels storage.DbStmt

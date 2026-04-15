@@ -79,6 +79,24 @@ nav#subnav a.selected {
     border-bottom: 2px solid rgb(2, 11, 64);
 }
 
+th.sortable a {
+    color: inherit;
+    text-decoration: none;
+}
+
+th.sortable a:hover {
+    text-decoration: underline;
+}
+
+.sort-idle {
+    opacity: 0.3;
+    font-size: 0.8em;
+}
+
+.sort-active {
+    opacity: 1;
+}
+
 div.device-details dt {
     font-weight: bold;
 }

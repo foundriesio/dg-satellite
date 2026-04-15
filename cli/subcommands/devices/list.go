@@ -26,40 +26,67 @@ var allColumns = []string{
 	"labels",
 }
 
+const defaultPageLimit = 50 // the number of devices to fetch per page when listing.
+
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all devices",
-	Long:  `List all devices known to the server`,
+	Short: "List devices",
+	Long:  `List devices known to the server. By default shows the first page of results.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		columns, err := validateColumns(cmd.Flag("columns").Value.String())
 		if err != nil {
 			return err
 		}
+		sortBy, _ := cmd.Flags().GetString("sort")
+		if err := validateSortBy(sortBy); err != nil {
+			return err
+		}
+		page, _ := cmd.Flags().GetInt("page")
 		api := api.CtxGetApi(cmd.Context())
-		listDevices(api.Devices(), columns)
+		listDevices(api.Devices(), columns, page, sortBy)
 		return nil
 	},
 }
 
+var validSortValues = []string{
+	"name-asc", "name-desc",
+	"created-at-asc", "created-at-desc",
+	"last-seen-asc", "last-seen-desc",
+	"uuid-asc", "uuid-desc",
+}
+
 func init() {
 	colmnsStr := strings.Join(allColumns, ",")
+	sortStr := strings.Join(validSortValues, ", ")
 	DevicesCmd.AddCommand(listCmd)
 	listCmd.Flags().StringP("columns", "", "uuid,target,last-seen",
 		"Comma-separated list of columns to display (available: "+colmnsStr+")")
+	listCmd.Flags().IntP("page", "p", 1, "Page number to display")
+	listCmd.Flags().StringP("sort", "s", "", "Sort order for devices ("+sortStr+")")
+}
+
+func validateSortBy(sortBy string) error {
+	if sortBy == "" {
+		return nil
+	}
+	if !slices.Contains(validSortValues, sortBy) {
+		return fmt.Errorf("invalid sort value: %s (valid: %s)", sortBy, strings.Join(validSortValues, ", "))
+	}
+	return nil
 }
 
 func validateColumns(columnsStr string) ([]string, error) {
 	columns := strings.Split(columnsStr, ",")
 	for _, col := range columns {
-		if slices.Index(allColumns, col) < 0 {
+		if !slices.Contains(allColumns, col) {
 			return nil, fmt.Errorf("invalid column: %s", col)
 		}
 	}
 	return columns, nil
 }
 
-func listDevices(dapi api.DeviceApi, columns []string) {
-	devices, err := dapi.List()
+func listDevices(dapi api.DeviceApi, columns []string, page int, sortBy string) {
+	devices, hasMore, totalPages, err := dapi.ListPage(page, defaultPageLimit, sortBy)
 	cobra.CheckErr(err)
 
 	headers := make([]string, 0, len(columns))
@@ -77,6 +104,9 @@ func listDevices(dapi api.DeviceApi, columns []string) {
 	}
 
 	table.Render()
+	if hasMore {
+		fmt.Printf("\nA total of %d pages of devices available. Use '--page %d' for the next page.\n", totalPages, page+1)
+	}
 }
 
 func getColumnValue(device *api.DeviceListItem, column string) string {

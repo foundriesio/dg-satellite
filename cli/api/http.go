@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 type HttpOption func(opts *httpOptions)
@@ -22,36 +23,73 @@ func HttpHeader(name, value string) HttpOption {
 	}
 }
 
-func (a Api) Get(resource string, result any, opts ...HttpOption) error {
-	if body, err := a.GetStream(resource, opts...); err != nil {
-		return err
-	} else {
-		defer a.closeHttpBody(body)
-		return json.NewDecoder(body).Decode(result)
+func ParseNextLink(linkHeader string) (string, bool) {
+	return parseLinkRel(linkHeader, "next")
+}
+
+func ParseLastLink(linkHeader string) (string, bool) {
+	return parseLinkRel(linkHeader, "last")
+}
+
+func parseLinkRel(linkHeader, rel string) (string, bool) {
+	target := `rel="` + rel + `"`
+	for _, part := range strings.Split(linkHeader, ",") {
+		part = strings.TrimSpace(part)
+		if !strings.Contains(part, target) {
+			continue
+		}
+		start := strings.Index(part, "<")
+		end := strings.Index(part, ">")
+		if start >= 0 && end > start {
+			return part[start+1 : end], true
+		}
 	}
+	return "", false
+}
+
+func (a Api) GetWithHeaders(resource string, result any, opts ...HttpOption) (http.Header, error) {
+	body, headers, err := a.getStreamHeaders(resource, opts...)
+	if err != nil {
+		return nil, err
+	}
+	defer a.closeHttpBody(body)
+	if err := json.NewDecoder(body).Decode(result); err != nil {
+		return nil, err
+	}
+	return headers, nil
+}
+
+func (a Api) Get(resource string, result any, opts ...HttpOption) error {
+	_, err := a.GetWithHeaders(resource, result, opts...)
+	return err
 }
 
 func (a Api) GetStream(resource string, opts ...HttpOption) (io.ReadCloser, error) {
+	body, _, err := a.getStreamHeaders(resource, opts...)
+	return body, err
+}
+
+func (a Api) getStreamHeaders(resource string, opts ...HttpOption) (io.ReadCloser, http.Header, error) {
 	var options httpOptions
 	options.apply(opts)
 	url := a.URL + resource
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header = options.header
 
 	resp, err := a.Client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer a.closeHttpBody(resp.Body)
-		return nil, a.handleHttpError(resp)
+		return nil, nil, a.handleHttpError(resp)
 	}
 	// Return the response without closing the body - caller must close it
-	return resp.Body, nil
+	return resp.Body, resp.Header, nil
 }
 
 func (a Api) Delete(resource string, opts ...HttpOption) error {

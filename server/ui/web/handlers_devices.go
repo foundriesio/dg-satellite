@@ -5,6 +5,9 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server/ui/api"
@@ -14,21 +17,88 @@ import (
 )
 
 func (h handlers) devicesList(c echo.Context) error {
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	if page < 1 {
+		page = 1
+	}
+	sort := c.QueryParam("sort")
+	if sort == "" {
+		sort = "created-at-desc"
+	}
+	const pageSize = 50
+	offset := (page - 1) * pageSize
+
+	resource := fmt.Sprintf("/v1/devices?limit=%d&offset=%d", pageSize, offset)
+	if sort != "" {
+		resource += "&order-by=" + sort
+	}
+
 	var devices []api.DeviceListItem
-	if err := getJson(c.Request().Context(), "/v1/devices", &devices); err != nil {
+	headers, err := getJsonWithHeaders(c.Request().Context(), resource, &devices)
+	if err != nil {
 		return h.handleUnexpected(c, err)
 	}
 
+	hasNext := linkHasRel(headers.Get("Link"), "next")
+	totalPages := linkTotalPages(headers.Get("Link"), pageSize)
+
 	ctx := struct {
 		baseCtx
-		Devices   []api.DeviceListItem
-		CanDelete bool
+		Devices    []api.DeviceListItem
+		CanDelete  bool
+		Page       int
+		TotalPages int
+		HasNext    bool
+		HasPrev    bool
+		Sort       string
 	}{
-		baseCtx:   h.baseCtx(c, "Devices", "devices"),
-		Devices:   devices,
-		CanDelete: CtxGetSession(c.Request().Context()).User.AllowedScopes.Has(users.ScopeDevicesD),
+		baseCtx:    h.baseCtx(c, "Devices", "devices"),
+		Devices:    devices,
+		CanDelete:  CtxGetSession(c.Request().Context()).User.AllowedScopes.Has(users.ScopeDevicesD),
+		Page:       page,
+		TotalPages: totalPages,
+		HasNext:    hasNext,
+		HasPrev:    page > 1,
+		Sort:       sort,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "devices_list.html", ctx)
+}
+
+// linkHasRel checks if a Link header contains a given rel value.
+func linkHasRel(linkHeader, rel string) bool {
+	target := fmt.Sprintf(`rel="%s"`, rel)
+	for part := range strings.SplitSeq(linkHeader, ",") {
+		if strings.Contains(strings.TrimSpace(part), target) {
+			return true
+		}
+	}
+	return false
+}
+
+// linkTotalPages extracts the last page's offset from the Link header to compute total pages.
+func linkTotalPages(linkHeader string, pageSize int) int {
+	for part := range strings.SplitSeq(linkHeader, ",") {
+		part = strings.TrimSpace(part)
+		if !strings.Contains(part, `rel="last"`) {
+			continue
+		}
+		// Extract URL between < and >
+		start := strings.Index(part, "<")
+		end := strings.Index(part, ">")
+		if start < 0 || end < 0 || end <= start {
+			return 1
+		}
+		url := part[start+1 : end]
+		// Find offset parameter
+		for param := range strings.SplitSeq(url[strings.Index(url, "?")+1:], "&") {
+			if strings.HasPrefix(param, "offset=") {
+				if offset, err := strconv.Atoi(param[len("offset="):]); err == nil && pageSize > 0 {
+					return offset/pageSize + 1
+				}
+			}
+		}
+	}
+	return 1
 }
 
 type ipInfo struct {

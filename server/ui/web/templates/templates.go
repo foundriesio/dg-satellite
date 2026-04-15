@@ -18,6 +18,12 @@ func init() {
 		"tsToString": func(ts int64) string {
 			return time.Unix(ts, 0).Format(time.RFC3339)
 		},
+		"add": func(a, b int) int {
+			return a + b
+		},
+		"sub": func(a, b int) int {
+			return a - b
+		},
 	}
 
 	Templates = template.Must(template.New("").Funcs(funcMap).ParseFS(Assets, "*.html", "*.css"))

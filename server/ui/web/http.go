@@ -13,16 +13,21 @@ import (
 )
 
 func getJson(ctx context.Context, resource string, result any) error {
+	_, err := getJsonWithHeaders(ctx, resource, result)
+	return err
+}
+
+func getJsonWithHeaders(ctx context.Context, resource string, result any) (http.Header, error) {
 	s := CtxGetSession(ctx)
 
 	req, err := http.NewRequest("GET", s.BaseUrl+resource, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	resp, err := s.Client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -32,8 +37,8 @@ func getJson(ctx context.Context, resource string, result any) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status code: HTTP_%d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("unexpected status code: HTTP_%d: %s", resp.StatusCode, string(body))
 	}
 
-	return json.NewDecoder(resp.Body).Decode(result)
+	return resp.Header, json.NewDecoder(resp.Body).Decode(result)
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -39,6 +40,7 @@ type LabelsPutReq map[string]*string
 // @Accept  json
 // @Produce json
 // @Success 200 {array} DeviceListItem
+// @Header  200 {string} Link "Pagination links (first, next, last)"
 // @Router  /devices [get]
 func (h *handlers) deviceList(c echo.Context) error {
 	opts := storage.DeviceListOpts{
@@ -50,13 +52,46 @@ func (h *handlers) deviceList(c echo.Context) error {
 		return EchoError(c, err, http.StatusBadRequest, "Failed to parse list options")
 	}
 
-	devices, err := h.storage.DevicesList(opts)
+	devices, total, err := h.storage.DevicesList(opts)
 	if err != nil {
 		return EchoError(c, err, http.StatusInternalServerError, "Unexpected error listing devices")
 	}
 
-	// TODO handle pagination in response
+	setPaginationHeaders(c, opts, total)
 	return c.JSON(http.StatusOK, devices)
+}
+
+func setPaginationHeaders(c echo.Context, opts storage.DeviceListOpts, total int) {
+	if opts.Limit <= 0 {
+		return
+	}
+
+	basePath := c.Request().URL.Path
+	orderBy := string(opts.OrderBy)
+
+	buildURL := func(offset int) string {
+		return fmt.Sprintf("%s?offset=%d&limit=%d&order-by=%s", basePath, offset, opts.Limit, orderBy)
+	}
+
+	var links []string
+
+	// first
+	links = append(links, fmt.Sprintf("<%s>; rel=\"first\"", buildURL(0)))
+
+	// next (only if there are more results)
+	nextOffset := opts.Offset + opts.Limit
+	if nextOffset < total {
+		links = append(links, fmt.Sprintf("<%s>; rel=\"next\"", buildURL(nextOffset)))
+	}
+
+	// last
+	lastOffset := 0
+	if total > opts.Limit {
+		lastOffset = ((total - 1) / opts.Limit) * opts.Limit
+	}
+	links = append(links, fmt.Sprintf("<%s>; rel=\"last\"", buildURL(lastOffset)))
+
+	c.Response().Header().Set("Link", strings.Join(links, ", "))
 }
 
 // @Summary Get a device by its UUID

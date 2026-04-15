@@ -6,6 +6,8 @@ package api
 import (
 	"fmt"
 	"io"
+	"net/url"
+	"strconv"
 
 	"github.com/foundriesio/dg-satellite/storage"
 	models "github.com/foundriesio/dg-satellite/storage/api"
@@ -26,9 +28,44 @@ func (a *Api) Devices() DeviceApi {
 	}
 }
 
-func (d DeviceApi) List() ([]DeviceListItem, error) {
+// ListPage fetches a single page of devices. It returns the devices,
+// whether more pages are available, and the total number of pages.
+func (d DeviceApi) ListPage(page int, limit int, sortBy string) ([]DeviceListItem, bool, int, error) {
+	offset := (page - 1) * limit
+	resource := fmt.Sprintf("/v1/devices?limit=%d&offset=%d", limit, offset)
+	if sortBy != "" {
+		resource += "&order-by=" + sortBy
+	}
 	var devices []DeviceListItem
-	return devices, d.api.Get("/v1/devices", &devices)
+	headers, err := d.api.GetWithHeaders(resource, &devices)
+	if err != nil {
+		return nil, false, 0, err
+	}
+	linkHeader := headers.Get("Link")
+	_, hasNext := ParseNextLink(linkHeader)
+	totalPages := totalPagesFromLink(linkHeader, limit)
+	return devices, hasNext, totalPages, nil
+}
+
+// totalPagesFromLink computes total pages from the rel="last" Link offset.
+func totalPagesFromLink(linkHeader string, limit int) int {
+	lastURL, ok := ParseLastLink(linkHeader)
+	if !ok || limit <= 0 {
+		return 0
+	}
+	parsed, err := url.Parse(lastURL)
+	if err != nil {
+		return 0
+	}
+	offsetStr := parsed.Query().Get("offset")
+	if offsetStr == "" {
+		return 0
+	}
+	lastOffset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		return 0
+	}
+	return (lastOffset / limit) + 1
 }
 
 func (d DeviceApi) Get(uuid string) (*Device, error) {

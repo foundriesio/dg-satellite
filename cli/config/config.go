@@ -36,7 +36,7 @@ func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("config file not found at %s", path)
+			return nil, err
 		}
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}

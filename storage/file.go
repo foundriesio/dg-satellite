@@ -204,6 +204,7 @@ func (s baseFsHandle) readFileLines(name string, ignoreNotExist bool, infinitySt
 			}
 			if err = scanner.Err(); err != nil {
 				yield("", err)
+				return
 			}
 			if infinityStop != nil {
 				// Tail functionality - simply re-create the scanner with the same fd after some time.

@@ -250,10 +250,16 @@
         const url = '/v1/updates/' + encodeURIComponent(updateType) + '/' +
                     encodeURIComponent(tag) + '/' + encodeURIComponent(updateName);
 
+        // Get CSRF token from meta tag
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
         await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.open('POST', url);
           xhr.setRequestHeader('Content-Type', 'application/x-tar');
+          if (csrfToken) {
+            xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+          }
 
           xhr.upload.onprogress = function(e) {
             if (e.lengthComputable) {

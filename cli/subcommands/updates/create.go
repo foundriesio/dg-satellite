@@ -40,7 +40,7 @@ func createUpdate(updates api.UpdatesApi, tag, updateName, path string) error {
 		return fmt.Errorf("a '%s' is neither a directory nor a symlink to a directory", path)
 	}
 
-	progress, sourcer := subcommands.TarProgress(subcommands.ArchiveSourcer(path, nil))
+	progress, sourcer := subcommands.TarProgress(subcommands.ArchiveSourcer(path))
 	reader := subcommands.GzipStream(progress.StreamWriter(subcommands.TarStream(sourcer)))
 	defer reader.Close() //nolint:errcheck
 

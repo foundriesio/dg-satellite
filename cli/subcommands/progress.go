@@ -156,7 +156,7 @@ func (p *progress) Report(task string, stop, done chan bool) {
 			if complete {
 				// If task is complete, percent done is always 100%.
 				count := formatBytes(p.Count())
-				fmt.Print(AnsiClearLine, task, count, "/", count, " (100%%)")
+				fmt.Print(AnsiClearLine, task, count, "/", count, " (100%)")
 			}
 			fmt.Println() // We no longer need an AnsiClearLine, end progress with a newline.
 			return

@@ -16,9 +16,6 @@ type HttpOption func(opts *httpOptions)
 
 func HttpHeader(name, value string) HttpOption {
 	return func(opts *httpOptions) {
-		if opts.header == nil {
-			opts.header = make(http.Header)
-		}
 		opts.header.Set(name, value)
 	}
 }
@@ -206,6 +203,10 @@ type httpOptions struct {
 }
 
 func (o *httpOptions) apply(opts []HttpOption) {
+	if o.header == nil {
+		o.header = make(http.Header)
+	}
+
 	for _, f := range opts {
 		f(o)
 	}

@@ -123,8 +123,9 @@ func (h handlers) updatesGet(c echo.Context) error {
 
 	url = fmt.Sprintf("/v1/updates/%s/%s/%s/tuf", c.Param("prod"), c.Param("tag"), c.Param("name"))
 	var tuf api.UpdateTufResp
+	tufErr := ""
 	if err := getJson(c.Request().Context(), url, &tuf); err != nil {
-		return h.handleUnexpected(c, err)
+		tufErr = "Unable to look up the TUF metadata"
 	}
 	tufJson, err := json.MarshalIndent(tuf, "", "  ")
 	if err != nil {
@@ -141,6 +142,7 @@ func (h handlers) updatesGet(c echo.Context) error {
 		Tuf          api.UpdateTufResp
 		TufJson      string
 		LatestTarget *latestTarget
+		TufError     string
 	}{
 		baseCtx:      h.baseCtx(c, "Update Details", "updates"),
 		Tag:          c.Param("tag"),
@@ -151,6 +153,7 @@ func (h handlers) updatesGet(c echo.Context) error {
 		Tuf:          tuf,
 		TufJson:      string(tufJson),
 		LatestTarget: findLatestTarget(tuf),
+		TufError:     tufErr,
 	}
 	return h.templates.ExecuteTemplate(c.Response(), "update.html", ctx)
 }

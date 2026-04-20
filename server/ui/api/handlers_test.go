@@ -1002,9 +1002,11 @@ func TestApiUploadConfigs(t *testing.T) {
 func TestApiUpdateCreate(t *testing.T) {
 	tc := NewTestClient(t)
 
+	validTargets := `{"signed": {"targets": {"foo": {"custom": {"tags": ["main"]}}}}}`
+
 	validTar := tarBuffer(t, map[string]string{
 		"tuf/root.json":              `{"signed":{}}`,
-		"tuf/targets.json":           `{"signed":{}}`,
+		"tuf/targets.json":           validTargets,
 		"ostree_repo/config":         "[core]\nrepo_version=1\n",
 		"ostree_repo/refs/heads/foo": "abc123",
 	})
@@ -1031,7 +1033,7 @@ func TestApiUpdateCreate(t *testing.T) {
 	// Valid tar with tuf + apps (no ostree_repo)
 	appsTar := tarBuffer(t, map[string]string{
 		"tuf/root.json":    `{"signed":{}}`,
-		"tuf/targets.json": `{"signed":{}}`,
+		"tuf/targets.json": validTargets,
 		"apps/myapp.json":  `{"name":"myapp"}`,
 	})
 	tc.POST("/updates/prod/main/v2.0", 201, bytes.NewReader(appsTar.Bytes()),
@@ -1044,10 +1046,23 @@ func TestApiUpdateCreate(t *testing.T) {
 	// Valid tar with tuf + ostree_repo + apps (both present)
 	bothTar := tarBuffer(t, map[string]string{
 		"tuf/root.json":      `{"signed":{}}`,
+		"tuf/targets.json":   validTargets,
 		"ostree_repo/config": "[core]\n",
 		"apps/myapp.json":    `{}`,
 	})
 	tc.POST("/updates/ci/main/v3.0", 201, bytes.NewReader(bothTar.Bytes()),
+		"Content-Type", "application/x-tar")
+
+	// Valid tar with tuf + ostree_repo + apps (both present)
+	// BUT - targets.json has invalid tag. An update for "main" isn't going to work if the update
+	// doesn't have a target with tagged with "main"
+	bothTar = tarBuffer(t, map[string]string{
+		"tuf/root.json":      `{"signed":{}}`,
+		"tuf/targets.json":   `{"signed": {"targets": {"foo": {"custom": {"tags": ["invalid"]}}}}}`,
+		"ostree_repo/config": "[core]\n",
+		"apps/myapp.json":    `{}`,
+	})
+	tc.POST("/updates/ci/main/v3.1", 400, bytes.NewReader(bothTar.Bytes()),
 		"Content-Type", "application/x-tar")
 
 	// Missing tuf directory
@@ -1069,6 +1084,7 @@ func TestApiUpdateCreate(t *testing.T) {
 	// Gzip-compressed tar via Content-Type
 	gzTar := gzipBuffer(t, tarBuffer(t, map[string]string{
 		"tuf/root.json":      `{"signed":{}}`,
+		"tuf/targets.json":   validTargets,
 		"ostree_repo/config": "[core]\n",
 	}))
 	tc.POST("/updates/ci/main/v4.0", 201, bytes.NewReader(gzTar.Bytes()),
@@ -1079,6 +1095,7 @@ func TestApiUpdateCreate(t *testing.T) {
 	// Gzip-compressed tar via Content-Encoding header
 	gzTar2 := gzipBuffer(t, tarBuffer(t, map[string]string{
 		"tuf/root.json":      `{"signed":{}}`,
+		"tuf/targets.json":   validTargets,
 		"ostree_repo/config": "[core]\n",
 	}))
 	tc.POST("/updates/ci/main/v5.0", 201, bytes.NewReader(gzTar2.Bytes()),

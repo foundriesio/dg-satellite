@@ -5,6 +5,7 @@ package storage
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -40,6 +41,40 @@ func (s *updatesFsHandleWrap) init(root string) {
 	s.Logs.category = UpdatesLogsDir
 }
 
+// checkUpdateTargets ensures that the update contains a valid targets.json file by looking for:
+//   - is it valid JSON?
+//   - does it have a target with the given tag
+func checkUpdateTargets(targetsPath, tag string) error {
+	content, err := os.ReadFile(targetsPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("missing required targets.json file in tuf directory")
+		}
+		return fmt.Errorf("error reading targets.json: %w", err)
+	}
+
+	var targets struct {
+		Signed struct {
+			Targets map[string]struct {
+				Custom struct {
+					Tags []string `json:"tags"`
+				} `json:"custom"`
+			} `json:"targets"`
+		} `json:"signed"`
+	}
+
+	if err = json.Unmarshal(content, &targets); err != nil {
+		return fmt.Errorf("error parsing targets.json: %w", err)
+	}
+
+	for _, t := range targets.Signed.Targets {
+		if slices.Contains(t.Custom.Tags, tag) {
+			return nil
+		}
+	}
+	return fmt.Errorf("no target with tag '%s' found in targets.json", tag)
+}
+
 func (s updatesFsHandleWrap) SaveUpload(tag, update string, payload io.Reader, onCleanupFailure func(error)) error {
 	const (
 		appsDir   = UpdatesAppsDir + string(filepath.Separator)
@@ -72,6 +107,11 @@ func (s updatesFsHandleWrap) SaveUpload(tag, update string, payload io.Reader, o
 				if !sawOstree && !sawApps {
 					return fmt.Errorf("%w: must contain %q and/or %q directory",
 						ErrInvalidUpdate, UpdatesOstreeDir, UpdatesAppsDir)
+				}
+
+				path := filepath.Join(root, txDir, "unpacked/tuf/targets.json")
+				if err := checkUpdateTargets(path, tag); err != nil {
+					return fmt.Errorf("%w: %v", ErrInvalidUpdate, err)
 				}
 				return nil
 			},

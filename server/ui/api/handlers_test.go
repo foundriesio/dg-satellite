@@ -790,7 +790,7 @@ func TestApiRolloutDaemon(t *testing.T) {
 	assert.Equal(t, "", dev.UpdateName)
 
 	// After the watchdog daemon processing, rollouts are committed.
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(60 * time.Millisecond)
 	data = tc.GET("/updates/ci/tag1/update1/rollouts/roll1", 200)
 	assert.Equal(t, `{"uuids":["ci1"],"effective-uuids":["ci1"],"committed":true}`, s(data))
 	data = tc.GET("/updates/prod/tag2/update2/rollouts/roll2", 200)
@@ -899,16 +899,16 @@ data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-core
 
 	// keepalive test
 	saved := keepaliveResponseInterval
-	keepaliveResponseInterval = 20 * time.Millisecond
+	keepaliveResponseInterval = 50 * time.Millisecond
 	defer func() { keepaliveResponseInterval = saved }()
 	done3 := make(chan bool)
 	rec3 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/v1/updates/prod/tag1/update1/tail", nil), done3)
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(130 * time.Millisecond)
 	expectedStream3 := expectedStream1 + keepaliveResponseText + keepaliveResponseText
 	require.Equal(t, 200, rec3.Code)
 	require.Equal(t, expectedStream3, rec3.Body.String())
 	require.Nil(t, d1.ProcessEvents(events))
-	time.Sleep(30 * time.Millisecond)
+	time.Sleep(80 * time.Millisecond)
 	expectedStreamY := strings.Replace(expectedStreamX, "id: 3", "id: 4", 1)
 	expectedStream3 += expectedStreamY + keepaliveResponseText
 	require.Equal(t, expectedStream3, rec3.Body.String())

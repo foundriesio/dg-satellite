@@ -38,6 +38,12 @@ type DeviceStatus struct {
 	DeviceTime    string `json:"deviceTime"`
 }
 
+type ConfigFile struct {
+	Value       string   `json:"Value"`
+	Unencrypted *bool    `json:"Unencrypted,omitempty"`
+	OnChanged   []string `json:"OnChanged,omitempty"`
+}
+
 func (e DeviceUpdateEvent) ParseStatus() *DeviceStatus {
 	var status string
 	switch e.EventType.Id {

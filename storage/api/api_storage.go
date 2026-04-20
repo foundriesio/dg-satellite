@@ -328,7 +328,7 @@ func (s Storage) SaveRollout(tag, updateName, rolloutName string, isProd bool, r
 
 func (s Storage) CreateRollout(tag, updateName, rolloutName string, isProd bool, rollout Rollout) error {
 	h := s.getRolloutsFsHandle(isProd)
-	log := strings.Join([]string{tag, updateName, rolloutName}, "|")
+	log := fmt.Sprintf("%s|%s|%s\n", tag, updateName, rolloutName)
 	if data, err := json.Marshal(rollout); err != nil {
 		return err
 	} else if err := h.AppendJournal(log); err != nil {

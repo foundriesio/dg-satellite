@@ -7,3 +7,7 @@
 // @BasePath /v1
 
 package api
+
+import (
+	_ "github.com/swaggo/swag"
+)

@@ -7,3 +7,7 @@
 // @BasePath /
 
 package gateway
+
+import (
+	_ "github.com/swaggo/swag"
+)

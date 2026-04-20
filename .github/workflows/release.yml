@@ -80,7 +80,7 @@ jobs:
         with:
           go-version: "1.24"
       - name: Install swag
-        run: go install github.com/swaggo/swag/cmd/swag@latest
+        run: go install github.com/swaggo/swag/cmd/swag
       - name: Generate Swagger docs
         run: make swagger
       - name: Upload Artifacts

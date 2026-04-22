@@ -33,13 +33,16 @@ func NewRateLimiter(cfg storage.RateLimitConfig) *authRateLimiter {
 		cfg.BadAuthBlockDurationSec = 300
 	}
 
+	badAuthSweepAge := 2 * time.Duration(cfg.BadAuthBlockDurationSec) * time.Second
+	rateLimitSweepAge := 2 * time.Duration(cfg.AttemptsBlockDurationSec) * time.Second
+
 	rl := &authRateLimiter{
 		attemptsPerSecond:     cfg.AttemptsPerSecond,
 		attemptsBlockDuration: time.Duration(cfg.AttemptsBlockDurationSec) * time.Second,
 		badAuthLimit:          cfg.BadAuthLimit,
 		badAuthBlockDuration:  time.Duration(cfg.BadAuthBlockDurationSec) * time.Second,
-		badAuths:              make(map[string]*authLimiter),
-		rateLimits:            make(map[string]*rateLimiter),
+		badAuths:              newGenerationMap[*authLimiter](badAuthSweepAge),
+		rateLimits:            newGenerationMap[*rateLimiter](rateLimitSweepAge),
 	}
 	rl.Middleware = func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -61,10 +64,8 @@ type authRateLimiter struct {
 
 	mutex sync.Mutex
 
-	badAuths   map[string]*authLimiter
-	rateLimits map[string]*rateLimiter
-
-	lastGc time.Time
+	badAuths   generationMap[*authLimiter]
+	rateLimits generationMap[*rateLimiter]
 
 	attemptsPerSecond     int
 	attemptsBlockDuration time.Duration
@@ -88,7 +89,7 @@ func (rl *authRateLimiter) FlagBadOperation(c echo.Context) {
 	defer rl.mutex.Unlock()
 
 	identifier := c.RealIP()
-	v, exists := rl.badAuths[identifier]
+	v, exists := rl.badAuths.get(identifier)
 	if !exists {
 		// Allow badAuthLimit bad auth operations per minute before blocking,
 		// rate-limiter does requests/second, this converts to requests/minute
@@ -98,7 +99,7 @@ func (rl *authRateLimiter) FlagBadOperation(c echo.Context) {
 				Limiter: rate.NewLimiter(rate.Limit(r), rl.badAuthLimit),
 			},
 		}
-		rl.badAuths[identifier] = v
+		rl.badAuths.put(identifier, v)
 	}
 	v.lastSeen = time.Now()
 	allow := v.AllowN(v.lastSeen, 1)
@@ -114,33 +115,22 @@ func (rl *authRateLimiter) allow(identifier string) error {
 	defer rl.mutex.Unlock()
 
 	now := time.Now()
-	if time.Since(rl.lastGc) > 5*time.Minute {
-		for id, v := range rl.badAuths {
-			if time.Since(v.lastSeen) > 2*time.Minute && now.After(v.blockUntil) {
-				delete(rl.badAuths, id)
-			}
-		}
-		for id, v := range rl.rateLimits {
-			if time.Since(v.lastSeen) > 2*time.Minute {
-				delete(rl.rateLimits, id)
-			}
-		}
-		rl.lastGc = now
-	}
+	rl.badAuths.sweep(now)
+	rl.rateLimits.sweep(now)
 
 	// Check if this IP is already blocked due to bad auth operations
-	v, exists := rl.badAuths[identifier]
+	v, exists := rl.badAuths.get(identifier)
 	if exists && (now.Before(v.blockUntil) || v.Tokens() <= 0) {
 		return v.blockReason
 	}
 
 	// Check the per-second rate limit; if exceeded, block the IP
-	rv, rvExists := rl.rateLimits[identifier]
+	rv, rvExists := rl.rateLimits.get(identifier)
 	if !rvExists {
 		rv = &rateLimiter{
 			Limiter: rate.NewLimiter(rate.Limit(rl.attemptsPerSecond), rl.attemptsPerSecond),
 		}
-		rl.rateLimits[identifier] = rv
+		rl.rateLimits.put(identifier, rv)
 	}
 	rv.lastSeen = now
 	if !rv.Allow() {
@@ -151,7 +141,7 @@ func (rl *authRateLimiter) allow(identifier string) error {
 					Limiter: rate.NewLimiter(rate.Limit(r), rl.badAuthLimit),
 				},
 			}
-			rl.badAuths[identifier] = v
+			rl.badAuths.put(identifier, v)
 		}
 		v.blockUntil = now.Add(rl.attemptsBlockDuration)
 		isoTime := v.blockUntil.UTC().Format(time.RFC3339)

@@ -181,10 +181,9 @@ func (p localProvider) renderLoginPage(c echo.Context, reason string) error {
 			"error": "authentication required",
 		})
 	}
-	var csrfToken string
-	if cookie, err := c.Cookie(CsrfCookieName); err == nil {
-		csrfToken = cookie.Value
-	}
+
+	csrfToken := SetCsrfCookie(c, time.Now().Add(10*time.Minute))
+
 	context := struct {
 		Title     string
 		Reason    string

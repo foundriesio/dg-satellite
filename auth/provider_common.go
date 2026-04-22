@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/foundriesio/dg-satellite/server"
 	"github.com/foundriesio/dg-satellite/storage/users"
 	"github.com/labstack/echo/v4"
 )
@@ -37,15 +38,20 @@ func (p *commonProvider) DropSession(c echo.Context, session *Session) {
 func (p *commonProvider) GetUser(c echo.Context) (*users.User, error) {
 	authHeader := c.Request().Header.Get("Authorization")
 	if len(authHeader) > 0 {
+		if err := p.rateLimiter.allow(c.RealIP()); err != nil {
+			return nil, server.EchoError(c, err, http.StatusTooManyRequests, err.Error())
+		}
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 			return nil, fmt.Errorf("invalid authorization header")
 		}
 		user, err := p.users.GetByToken(parts[1])
 		if err != nil {
+			p.rateLimiter.FlagBadOperation(c)
 			slog.Warn("unable to get user by token", "error", err)
 			return nil, c.String(http.StatusInternalServerError, "Could not get user by token")
 		} else if user == nil {
+			p.rateLimiter.FlagBadOperation(c)
 			return nil, c.String(http.StatusUnauthorized, "Invalid token")
 		}
 		return user, nil

@@ -18,8 +18,9 @@ type loginPageRenderer interface {
 }
 
 type commonProvider struct {
-	users    *users.Storage
-	renderer loginPageRenderer
+	users       *users.Storage
+	rateLimiter *authRateLimiter
+	renderer    loginPageRenderer
 }
 
 func (p *commonProvider) DropSession(c echo.Context, session *Session) {

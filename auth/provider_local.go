@@ -12,11 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/labstack/echo/v4"
+
 	"github.com/foundriesio/dg-satellite/server"
 	"github.com/foundriesio/dg-satellite/server/ui/web/templates"
 	"github.com/foundriesio/dg-satellite/storage"
 	"github.com/foundriesio/dg-satellite/storage/users"
-	"github.com/labstack/echo/v4"
 )
 
 const localLoginTemplate = "local-login.html"
@@ -30,10 +31,14 @@ type PasswordComplexityRules struct {
 }
 
 type authConfigLocal struct {
-	MinPasswordLength       int
-	PasswordHistory         int
-	PasswordAgeDays         int
-	PasswordComplexityRules PasswordComplexityRules
+	MinPasswordLength        int
+	PasswordHistory          int
+	PasswordAgeDays          int
+	PasswordComplexityRules  PasswordComplexityRules
+	AttemptsPerSecond        int
+	AttemptsBlockDurationSec int
+	BadAuthLimit             int
+	BadAuthBlockDurationSec  int
 }
 
 type localProvider struct {
@@ -58,6 +63,7 @@ func (p *localProvider) Configure(e *echo.Echo, userStorage *users.Storage, cfg 
 	}
 	var err error
 	p.users = userStorage
+	p.rateLimiter = NewRateLimiter(cfg.RateLimits)
 	p.renderer = p
 	p.sessionTimeout = time.Duration(cfg.SessionTimeoutHours) * time.Hour
 	p.newUserScopes, err = users.ScopesFromSlice(cfg.NewUserDefaultScopes)
@@ -65,10 +71,10 @@ func (p *localProvider) Configure(e *echo.Echo, userStorage *users.Storage, cfg 
 		return fmt.Errorf("unable to parse new user default scopes: %w", err)
 	}
 
-	e.POST("/auth/login", p.handleLogin)
-	e.POST("/users", p.handleUserCreate)
-	e.POST("/users/:username/password", p.handlePasswordChange)
-	e.POST("/users/:username/reset-password", p.handlePasswordReset)
+	e.POST("/auth/login", p.handleLogin, p.rateLimiter.Middleware)
+	e.POST("/users", p.handleUserCreate, p.rateLimiter.Middleware)
+	e.POST("/users/:username/password", p.handlePasswordChange, p.rateLimiter.Middleware)
+	e.POST("/users/:username/reset-password", p.handlePasswordReset, p.rateLimiter.Middleware)
 	return nil
 }
 
@@ -146,12 +152,14 @@ func (p *localProvider) handleLogin(c echo.Context) error {
 	if err != nil {
 		return server.EchoError(c, err, http.StatusInternalServerError, "Unable to look up user")
 	} else if user == nil {
+		p.rateLimiter.FlagBadOperation(c)
 		return p.renderLoginPage(c, "Invalid username or password")
 	}
 
 	if ok, err := PasswordVerify(password, user.Password); err != nil {
 		return server.EchoError(c, err, http.StatusInternalServerError, "Internal error verifying password")
 	} else if !ok {
+		p.rateLimiter.FlagBadOperation(c)
 		return p.renderLoginPage(c, "Invalid username or password")
 	}
 
@@ -274,6 +282,7 @@ func (p *localProvider) handlePasswordChange(c echo.Context) error {
 	if ok, err := PasswordVerify(curPassword, u.Password); err != nil {
 		return server.EchoError(c, err, http.StatusInternalServerError, "Internal error verifying password")
 	} else if !ok {
+		p.rateLimiter.FlagBadOperation(c)
 		return server.EchoError(c, errors.New("current password is incorrect"), http.StatusBadRequest, "Current password is incorrect")
 	}
 

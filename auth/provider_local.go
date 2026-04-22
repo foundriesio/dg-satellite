@@ -71,8 +71,8 @@ func (p *localProvider) Configure(e *echo.Echo, userStorage *users.Storage, cfg 
 		return fmt.Errorf("unable to parse new user default scopes: %w", err)
 	}
 
-	rl, rlMiddleware := p.authConfig.NewRateLimiter()
-	p.rateLimiter = rl
+	p.rateLimiter = p.authConfig.NewRateLimiter()
+	rlMiddleware := p.rateLimiter.Middleware()
 
 	e.POST("/auth/login", p.handleLogin, rlMiddleware)
 	e.POST("/users", p.handleUserCreate, rlMiddleware)

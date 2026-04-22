@@ -10,16 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/foundriesio/dg-satellite/context"
 	"github.com/foundriesio/dg-satellite/server"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"golang.org/x/time/rate"
 )
 
-var errTooManyBadAuthOps = errors.New("too many bad authentication operations")
+var errTooManyRequests = errors.New("rate-limit exceeded. Try again later")
+var errTooManyBadAuthOps = errors.New("too many bad authentication operations. Try again later")
 
-func (cfg authConfigLocal) NewRateLimiter() (*localAuthRateLimiter, echo.MiddlewareFunc) {
+func (cfg authConfigLocal) NewRateLimiter() *localAuthRateLimiter {
 	if cfg.AttemptsPerSecond <= 0 {
 		cfg.AttemptsPerSecond = 2
 	}
@@ -33,63 +32,69 @@ func (cfg authConfigLocal) NewRateLimiter() (*localAuthRateLimiter, echo.Middlew
 		cfg.BadAuthBlockDurationSec = 300
 	}
 
-	rl := &localAuthRateLimiter{
+	return &localAuthRateLimiter{
+		attemptsPerSecond:     cfg.AttemptsPerSecond,
 		attemptsBlockDuration: time.Duration(cfg.AttemptsBlockDurationSec) * time.Second,
 		badAuthLimit:          cfg.BadAuthLimit,
 		badAuthBlockDuration:  time.Duration(cfg.BadAuthBlockDurationSec) * time.Second,
-		badAuths:              make(map[string]*visitor),
-		store: middleware.NewRateLimiterMemoryStoreWithConfig(
-			middleware.RateLimiterMemoryStoreConfig{
-				Rate:      rate.Limit(cfg.AttemptsPerSecond),
-				ExpiresIn: 2 * time.Minute,
-			},
-		),
+		badAuths:              make(map[string]*authLimiter),
+		rateLimits:            make(map[string]*rateLimiter),
 	}
-
-	rlConfig := middleware.RateLimiterConfig{
-		DenyHandler: func(context echo.Context, identifier string, err error) error {
-			if errors.Is(err, errTooManyBadAuthOps) {
-				return server.EchoError(context, err, http.StatusTooManyRequests, "Too many bad authentication attempts. Please try again later.")
-			}
-			return middleware.DefaultRateLimiterConfig.DenyHandler(context, identifier, err)
-		},
-		Store: rl,
-	}
-	return rl, middleware.RateLimiterWithConfig(rlConfig)
 }
 
 // This implementation is similar to the echo rate limiter but done in a way that
 // allows us to block IPs that have too many bad auth operations for a given amount of time
 type localAuthRateLimiter struct {
-	badAuths      map[string]*visitor
-	badAuthsMutex sync.Mutex
+	mutex sync.Mutex
+
+	badAuths   map[string]*authLimiter
+	rateLimits map[string]*rateLimiter
 
 	lastGc time.Time
-	store  middleware.RateLimiterStore
 
+	attemptsPerSecond     int
 	attemptsBlockDuration time.Duration
 	badAuthLimit          int
 	badAuthBlockDuration  time.Duration
 }
 
-type visitor struct {
+type rateLimiter struct {
 	*rate.Limiter
-	lastSeen   time.Time
+	lastSeen time.Time
+}
+
+type authLimiter struct {
+	*rateLimiter
 	blockUntil time.Time
 }
 
+func (rl *localAuthRateLimiter) Middleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			identifier := c.RealIP()
+			if err := rl.allow(identifier); err != nil {
+				slog.Warn("Blocking IP", "ip", identifier, "err", err)
+				return server.EchoError(c, err, http.StatusTooManyRequests, err.Error())
+			}
+			return next(c)
+		}
+	}
+}
+
 func (rl *localAuthRateLimiter) FlagBadOperation(c echo.Context) {
-	rl.badAuthsMutex.Lock()
-	defer rl.badAuthsMutex.Unlock()
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
 
 	identifier := c.RealIP()
 	v, exists := rl.badAuths[identifier]
 	if !exists {
-		// Allow 5 bad auth operations per minute before blocking,
-		// rate-limiter doesn requests/second, this converts to requests/minute
+		// Allow badAuthLimit bad auth operations per minute before blocking,
+		// rate-limiter does requests/second, this converts to requests/minute
 		r := float64(1) / 60
-		v = &visitor{
-			Limiter: rate.NewLimiter(rate.Limit(r), rl.badAuthLimit),
+		v = &authLimiter{
+			rateLimiter: &rateLimiter{
+				Limiter: rate.NewLimiter(rate.Limit(r), rl.badAuthLimit),
+			},
 		}
 		rl.badAuths[identifier] = v
 	}
@@ -97,45 +102,56 @@ func (rl *localAuthRateLimiter) FlagBadOperation(c echo.Context) {
 	allow := v.AllowN(v.lastSeen, 1)
 	if !allow {
 		v.blockUntil = time.Now().Add(rl.badAuthBlockDuration)
-		context.CtxGetLog(c.Request().Context()).Warn("Too many bad auth operations. Blocking IP", "ip", identifier, "until", v.blockUntil)
 	}
 }
 
-func (rl *localAuthRateLimiter) Allow(identifier string) (bool, error) {
-	rl.badAuthsMutex.Lock()
-	defer rl.badAuthsMutex.Unlock()
+func (rl *localAuthRateLimiter) allow(identifier string) error {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
 
 	now := time.Now()
 	if time.Since(rl.lastGc) > 5*time.Minute {
 		for id, v := range rl.badAuths {
-			// we flag operations by the minute, so 2 minutes is plenty
 			if time.Since(v.lastSeen) > 2*time.Minute && now.After(v.blockUntil) {
 				delete(rl.badAuths, id)
+			}
+		}
+		for id, v := range rl.rateLimits {
+			if time.Since(v.lastSeen) > 2*time.Minute {
+				delete(rl.rateLimits, id)
 			}
 		}
 		rl.lastGc = now
 	}
 
-	// Check if this IP is already blocked
+	// Check if this IP is already blocked due to bad auth operations
 	v, exists := rl.badAuths[identifier]
 	if exists && (now.Before(v.blockUntil) || v.Tokens() <= 0) {
-		return false, errTooManyBadAuthOps
+		return errTooManyBadAuthOps
 	}
 
-	// Check the per-second rate limit; if exceeded, block the IP for 1 minute
-	if allow, err := rl.store.Allow(identifier); !allow {
+	// Check the per-second rate limit; if exceeded, block the IP
+	rv, rvExists := rl.rateLimits[identifier]
+	if !rvExists {
+		rv = &rateLimiter{
+			Limiter: rate.NewLimiter(rate.Limit(rl.attemptsPerSecond), rl.attemptsPerSecond),
+		}
+		rl.rateLimits[identifier] = rv
+	}
+	rv.lastSeen = now
+	if !rv.Allow() {
 		if !exists {
 			r := float64(1) / 60
-			v = &visitor{
-				Limiter:  rate.NewLimiter(rate.Limit(r), rl.badAuthLimit),
-				lastSeen: now,
+			v = &authLimiter{
+				rateLimiter: &rateLimiter{
+					Limiter: rate.NewLimiter(rate.Limit(r), rl.badAuthLimit),
+				},
 			}
 			rl.badAuths[identifier] = v
 		}
 		v.blockUntil = now.Add(rl.attemptsBlockDuration)
-		slog.Warn("Rate limit exceeded. Blocking IP", "ip", identifier, "until", v.blockUntil, "error", err)
-		return false, errTooManyBadAuthOps
+		return errTooManyRequests
 	}
 
-	return true, nil
+	return nil
 }

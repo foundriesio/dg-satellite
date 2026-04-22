@@ -16,16 +16,18 @@ const CsrfCookieName = "dg-satellite-csrf"
 const CsrfHeaderName = "X-CSRF-Token"
 
 // SetCsrfCookie sets a CSRF cookie on the response. It should be called when a new session is created.
-func SetCsrfCookie(c echo.Context, expires time.Time) {
+func SetCsrfCookie(c echo.Context, expires time.Time) string {
+	token := rand.Text()
 	c.SetCookie(&http.Cookie{
 		Name:     CsrfCookieName,
-		Value:    rand.Text(),
+		Value:    token,
 		Path:     "/",
 		Expires:  expires,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 	})
+	return token
 }
 
 // CsrfCheck is a middleware that validates the CSRF token for non-safe HTTP

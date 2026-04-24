@@ -46,7 +46,7 @@ func RegisterHandlers(e *echo.Echo, ca *DeviceCa, storage *storage.Storage, user
 	g.GET("/devices", h.deviceList, requireScope(users.ScopeDevicesR))
 	if ca != nil {
 		slog.Info("Device CA is configured, enabling device registration endpoint")
-		g.POST("/devices/", h.deviceCreate, requireScope(users.ScopeDevicesC))
+		g.POST("/devices/", h.deviceCreate, requireScope(users.ScopeDevicesC), middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(rate.Limit(2))))
 	}
 	g.GET("/devices/:uuid", h.deviceGet, requireScope(users.ScopeDevicesR))
 	g.DELETE("/devices/:uuid", h.deviceDelete, requireScope(users.ScopeDevicesD))

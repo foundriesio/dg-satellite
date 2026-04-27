@@ -4,8 +4,8 @@ The server supports a few different user authentication options. This document
 helps you choose and configure the option that best fits your needs:
 
  * **Google Single Sign On** - Configure server to authenticate accounts from
-   a GSuite domain. This option is best for a server with a connection to the
-   internet (Google) when your team uses GSuite identities.
+   a Google Workspace domain. This option is best for a server with a connection to the
+   internet (Google) when your team uses Google Workspace identities.
 
  * **GitHub Sign On** - Configure server to authenticate accounts from
    one or more GitHub organizations. This option is best for a
@@ -23,12 +23,12 @@ helps you choose and configure the option that best fits your needs:
 
 ## Configuring Google SSO
 Assuming your satellite server will be hosted at `dg.example.com`. First go
-to the [GCP Oauth2 Clients](https://console.cloud.google.com/auth/clients) 
+to the [GCP OAuth2 Clients](https://console.cloud.google.com/auth/clients)
 page. From here, you'll click on "Create client". You'll be prompted for
 the "Application type". Select `Web application` from the drop-down menu.
 Next, give it a name like "Foundries Satellite Server".
 
-Set the "Authorized JavaScript Origins" to a single entry. For our example, 
+Set the "Authorized JavaScript Origins" to a single entry. For our example,
 `https://dg.example.com`.
 
 Set the "Authorized redirect URIs" to a single entry. For our example,
@@ -87,3 +87,27 @@ You'll need to define the initial user by running:
 ```
   ./dg-sat user-add --username <initial user name> --password <password>
 ```
+
+## Configuring authentication rate limits
+The server employs configurable rate limits for authentication-related
+operations such as:
+ * Login
+ * Password change/reset
+ * Invalid API tokens
+
+There are two layers to the logic. The first layer is plain rate limiting
+by IP address. By default, the server will allow 2 requests per second per
+IP before returning HTTP 429 "Too many requests" responses. The IP will
+then be blocked from making authentication operations for 30 seconds.
+
+The second layer is for blocking IPs that have made more than 5 bad
+authentication-related operations in a minute. The IP will be blocked
+from making any authentication operations for 5 minutes when the limit
+has been reached.
+
+
+These values can be configured via `Config.RateLimitConfig`:
+ * `AttemptsPerSecond` - Set this to globally rate-limit how many authentication operations (login, password change/reset) are allowed per IP per second. The default is 2. Requests will then be blocked for `AttemptsBlockDurationSec` for the given IP.
+ * `AttemptsBlockDurationSec` - Set how long to block an IP that has been rate-limited by `AttemptsPerSecond`. The defaults will reject an IP for 30 seconds if it exceeds 2 authentication attempts per second.
+ * `BadAuthLimit` - Track how many bad password operations are made from a given account. The default is 5. If this value is exceeded, the given IP will be blocked for `BadAuthBlockDurationSec` from performing password related operations.
+ * `BadAuthBlockDurationSec` - Set how long to block an IP from performing authentication operations after exceeding `BadAuthLimit`. The default is 300 (5 minutes).

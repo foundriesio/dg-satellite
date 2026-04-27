@@ -59,11 +59,12 @@ func (p *oauth2BaseProvider) configure(e *echo.Echo, usersStorage *users.Storage
 		return fmt.Errorf("unable to parse new user default scopes: %w", err)
 	}
 	p.users = usersStorage
+	p.rateLimiter = NewRateLimiter(cfg.RateLimits)
 	p.renderer = p
 	p.sessionTimeout = time.Duration(cfg.SessionTimeoutHours) * time.Hour
 
-	e.GET(AuthLoginPath, p.handleLogin)
-	e.GET(AuthCallbackPath, p.handleOauthCallback)
+	e.GET(AuthLoginPath, p.handleLogin, p.rateLimiter.Middleware)
+	e.GET(AuthCallbackPath, p.handleOauthCallback, p.rateLimiter.Middleware)
 	return nil
 }
 

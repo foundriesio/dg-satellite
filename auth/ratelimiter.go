@@ -19,6 +19,10 @@ import (
 var errTooManyRequests = errors.New("rate-limit exceeded")
 var errTooManyBadAuthOps = errors.New("too many bad authentication operations")
 
+// badAuthRate is the token-bucket refill rate for bad-auth tracking,
+// set to 1 token per 60 seconds (i.e. 1 per minute).
+const badAuthRate = rate.Limit(1.0 / 60)
+
 func NewRateLimiter(cfg storage.RateLimitConfig) *authRateLimiter {
 	if cfg.AttemptsPerSecond <= 0 {
 		cfg.AttemptsPerSecond = 2
@@ -33,16 +37,17 @@ func NewRateLimiter(cfg storage.RateLimitConfig) *authRateLimiter {
 		cfg.BadAuthBlockDurationSec = 300
 	}
 
-	badAuthSweepAge := 2 * time.Duration(cfg.BadAuthBlockDurationSec) * time.Second
-	rateLimitSweepAge := 2 * time.Duration(cfg.AttemptsBlockDurationSec) * time.Second
+	sweepAge := 2 * time.Duration(cfg.BadAuthBlockDurationSec) * time.Second
+	if alt := 2 * time.Duration(cfg.AttemptsBlockDurationSec) * time.Second; alt > sweepAge {
+		sweepAge = alt
+	}
 
 	rl := &authRateLimiter{
 		attemptsPerSecond:     cfg.AttemptsPerSecond,
 		attemptsBlockDuration: time.Duration(cfg.AttemptsBlockDurationSec) * time.Second,
 		badAuthLimit:          cfg.BadAuthLimit,
 		badAuthBlockDuration:  time.Duration(cfg.BadAuthBlockDurationSec) * time.Second,
-		badAuths:              newGenerationMap[*authLimiter](badAuthSweepAge),
-		rateLimits:            newGenerationMap[*rateLimiter](rateLimitSweepAge),
+		entries:               newGenerationMap[*ipLimiter](sweepAge),
 	}
 	rl.Middleware = func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -64,8 +69,7 @@ type authRateLimiter struct {
 
 	mutex sync.Mutex
 
-	badAuths   generationMap[*authLimiter]
-	rateLimits generationMap[*rateLimiter]
+	entries generationMap[*ipLimiter]
 
 	attemptsPerSecond     int
 	attemptsBlockDuration time.Duration
@@ -73,15 +77,23 @@ type authRateLimiter struct {
 	badAuthBlockDuration  time.Duration
 }
 
-type rateLimiter struct {
-	*rate.Limiter
-	lastSeen time.Time
-}
-
-type authLimiter struct {
-	*rateLimiter
+type ipLimiter struct {
+	rateLimit   *rate.Limiter
+	authLimit   *rate.Limiter
 	blockUntil  time.Time
 	blockReason error
+}
+
+func (rl *authRateLimiter) getOrCreate(identifier string) *ipLimiter {
+	v, exists := rl.entries.get(identifier)
+	if !exists {
+		v = &ipLimiter{
+			rateLimit: rate.NewLimiter(rate.Limit(rl.attemptsPerSecond), rl.attemptsPerSecond),
+			authLimit: rate.NewLimiter(badAuthRate, rl.badAuthLimit),
+		}
+		rl.entries.put(identifier, v)
+	}
+	return v
 }
 
 func (rl *authRateLimiter) FlagBadOperation(c echo.Context) {
@@ -89,22 +101,10 @@ func (rl *authRateLimiter) FlagBadOperation(c echo.Context) {
 	defer rl.mutex.Unlock()
 
 	identifier := c.RealIP()
-	v, exists := rl.badAuths.get(identifier)
-	if !exists {
-		// Allow badAuthLimit bad auth operations per minute before blocking,
-		// rate-limiter does requests/second, this converts to requests/minute
-		r := float64(1) / 60
-		v = &authLimiter{
-			rateLimiter: &rateLimiter{
-				Limiter: rate.NewLimiter(rate.Limit(r), rl.badAuthLimit),
-			},
-		}
-		rl.badAuths.put(identifier, v)
-	}
-	v.lastSeen = time.Now()
-	allow := v.AllowN(v.lastSeen, 1)
-	if !allow {
-		v.blockUntil = time.Now().Add(rl.badAuthBlockDuration)
+	v := rl.getOrCreate(identifier)
+	now := time.Now()
+	if !v.authLimit.AllowN(now, 1) {
+		v.blockUntil = now.Add(rl.badAuthBlockDuration)
 		isoTime := v.blockUntil.UTC().Format(time.RFC3339)
 		v.blockReason = fmt.Errorf("%w: You are blocked until %s", errTooManyBadAuthOps, isoTime)
 	}
@@ -115,34 +115,17 @@ func (rl *authRateLimiter) allow(identifier string) error {
 	defer rl.mutex.Unlock()
 
 	now := time.Now()
-	rl.badAuths.sweep(now)
-	rl.rateLimits.sweep(now)
+	rl.entries.sweep(now)
+
+	v := rl.getOrCreate(identifier)
 
 	// Check if this IP is already blocked due to bad auth operations
-	v, exists := rl.badAuths.get(identifier)
-	if exists && (now.Before(v.blockUntil) || v.Tokens() <= 0) {
+	if now.Before(v.blockUntil) || v.authLimit.Tokens() <= 0 {
 		return v.blockReason
 	}
 
 	// Check the per-second rate limit; if exceeded, block the IP
-	rv, rvExists := rl.rateLimits.get(identifier)
-	if !rvExists {
-		rv = &rateLimiter{
-			Limiter: rate.NewLimiter(rate.Limit(rl.attemptsPerSecond), rl.attemptsPerSecond),
-		}
-		rl.rateLimits.put(identifier, rv)
-	}
-	rv.lastSeen = now
-	if !rv.Allow() {
-		if !exists {
-			r := float64(1) / 60 // Convert attempts per second to attempts per minute for bad auth limiter
-			v = &authLimiter{
-				rateLimiter: &rateLimiter{
-					Limiter: rate.NewLimiter(rate.Limit(r), rl.badAuthLimit),
-				},
-			}
-			rl.badAuths.put(identifier, v)
-		}
+	if !v.rateLimit.Allow() {
 		v.blockUntil = now.Add(rl.attemptsBlockDuration)
 		isoTime := v.blockUntil.UTC().Format(time.RFC3339)
 		v.blockReason = fmt.Errorf("%w: You are blocked until %s", errTooManyRequests, isoTime)

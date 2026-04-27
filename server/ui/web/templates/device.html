@@ -45,7 +45,13 @@
         <div>
           <dl>
             <dt>Configured update</dt>
-            <dd><a href="/updates/{{ if .Device.IsProd}}prod{{else}}ci{{end}}/{{.Device.Tag}}/{{.Device.UpdateName}}">{{.Device.UpdateName}}</a></dd>
+            <dd>
+              {{ if .Device.UpdateName }}
+                <a href="/updates/{{ if .Device.IsProd}}prod{{else}}ci{{end}}/{{.Device.Tag}}/{{.Device.UpdateName}}">{{.Device.UpdateName}}</a>
+              {{ else }}
+                <em>Device needs to be added to a <a href="/updates">rollout</a></em>
+              {{ end }}
+            </dd>
           </dl>
         </div>
         <div>

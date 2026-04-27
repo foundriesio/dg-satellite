@@ -24,6 +24,13 @@ func init() {
 		"sub": func(a, b int) int {
 			return a - b
 		},
+		"labelParams": func(labels []string) template.URL {
+			var s string
+			for _, l := range labels {
+				s += "&label=" + template.URLQueryEscaper(l)
+			}
+			return template.URL(s)
+		},
 	}
 
 	Templates = template.Must(template.New("").Funcs(funcMap).ParseFS(Assets, "*.html", "*.css"))

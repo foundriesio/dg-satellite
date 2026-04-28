@@ -44,6 +44,23 @@
         </div>
         <div>
           <dl>
+            <dt>Status</dt>
+            <dd>
+              {{ if .Device.Status }}
+                <a href="/devices/{{.Device.Uuid}}/update/{{.Device.Status.CorrelationId}}"
+                   title="Target: {{.Device.Status.TargetName}}&#10;Time: {{.Device.Status.DeviceTime}}">
+                {{ if contains .Device.Status.Status "failed" }}
+                  <span style="color: red">{{.Device.Status.Status}}</span>
+                {{ else }}
+                  {{.Device.Status.Status}}
+                {{ end }}
+                </a>
+              {{ end }}
+            </dd>
+          </dl>
+        </div>
+        <div>
+          <dl>
             <dt>Configured update</dt>
             <dd>
               {{ if .Device.UpdateName }}
@@ -53,8 +70,6 @@
               {{ end }}
             </dd>
           </dl>
-        </div>
-        <div>
         </div>
       </div>
 

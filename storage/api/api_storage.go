@@ -97,6 +97,8 @@ type Device struct {
 	HwInfo  string `json:"hardware-info"`
 	NetInfo string `json:"network-info"`
 
+	Status *DeviceStatus `json:"status,omitempty"`
+
 	storage Storage
 }
 
@@ -268,8 +270,39 @@ func (s Storage) DeviceGet(uuid string) (*Device, error) {
 		return nil, err
 	}
 
+	// Find the most recent update event and derive device status
+	eventFiles, err := s.fs.Devices.ListFiles(d.Uuid, storage.EventsPrefix, true)
+	if err != nil {
+		return nil, err
+	}
+	if len(eventFiles) > 0 {
+		content, err := s.fs.Devices.ReadFile(d.Uuid, eventFiles[len(eventFiles)-1])
+		if err != nil {
+			return nil, err
+		}
+		lines := strings.Split(content, "\n")
+		for i := len(lines) - 1; i >= 0; i-- {
+			if len(lines[i]) == 0 {
+				continue
+			}
+			var evt DeviceUpdateEvent
+			if err := json.Unmarshal([]byte(lines[i]), &evt); err != nil {
+				return nil, fmt.Errorf("unexpected error unmarshalling event json: %w", err)
+			}
+
+			if !slices.Contains(clearingEventTypes, evt.EventType.Id) || evt.Event.Success == nil || !*evt.Event.Success {
+				// only share status if its interesting (ie not a successful update)
+				status := evt.ParseStatus()
+				d.Status = &status
+			}
+			break
+		}
+	}
+
 	return &d, nil
 }
+
+var clearingEventTypes = []string{"EcuInstallationCompleted", "CertRotationCompleted", "MetadataUpdateCompleted"}
 
 func (s Storage) ListUpdates(tag string, isProd bool) (map[string][]string, error) {
 	return s.getRolloutsFsHandle(isProd).ListUpdates(tag)

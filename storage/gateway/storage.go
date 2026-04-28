@@ -117,7 +117,7 @@ func (d Device) ProcessEvents(events []storage.DeviceUpdateEvent) error {
 		if err := d.storage.fs.Devices.AppendFile(d.Uuid, name, string(bytes)+"\n"); err != nil {
 			return err
 		}
-		if status := evt.ParseStatus(); status != nil && len(d.UpdateName) > 0 && len(d.Tag) > 0 {
+		if status := evt.ParseStatus(); len(d.UpdateName) > 0 && len(d.Tag) > 0 {
 			status.Uuid = d.Uuid
 			bytes, err = json.Marshal(status)
 			if err != nil {

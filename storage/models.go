@@ -3,7 +3,9 @@
 
 package storage
 
-import "regexp"
+import (
+	"regexp"
+)
 
 // DeviceUpdateEvent represents update events that devices send the
 // device-gateway.
@@ -38,43 +40,46 @@ type DeviceStatus struct {
 	DeviceTime    string `json:"deviceTime"`
 }
 
-func (e DeviceUpdateEvent) ParseStatus() *DeviceStatus {
+var evtIdToStatus = map[string]string{
+	"MetadataUpdateCompleted":  "Metadata update completed",
+	"EcuDownloadStarted":       "Download started",
+	"EcuDownloadCompleted":     "Download completed",
+	"EcuInstallationStarted":   "Installation started",
+	"EcuInstallationApplied":   "Installation applied",
+	"EcuInstallationCompleted": "Installation completed",
+	"CertRotationStarted":      "Certificate rotation started",
+	"CertRotationCompleted":    "Certificate rotation completed",
+}
+
+func (e DeviceUpdateEvent) ParseStatus() DeviceStatus {
 	var status string
+
+	if _, ok := evtIdToStatus[e.EventType.Id]; ok {
+		status = evtIdToStatus[e.EventType.Id]
+	} else {
+		status = "Unknown event type: " + e.EventType.Id
+	}
+
 	switch e.EventType.Id {
-	case "MetadataUpdateCompleted":
-		if e.Event.Success != nil && !*e.Event.Success {
-			status = "Metadata update failed"
-		} else {
-			status = "Metadata update completed"
-		}
-	case "EcuDownloadStarted":
-		status = "Download started"
-	case "EcuDownloadCompleted":
-		if e.Event.Success != nil && !*e.Event.Success {
-			status = "Download failed"
-		} else {
-			status = "Download completed"
-		}
-	case "EcuInstallationStarted":
-		status = "Install started"
 	case "EcuInstallationApplied":
-		status = "Install applied, awaiting update finalization"
-	case "EcuInstallationCompleted":
-		if e.Event.Success != nil && !*e.Event.Success {
-			status = "Install failed"
+		status += "; awaiting update finalization"
+	case "EcuDownloadCompleted", "EcuInstallationCompleted", "CertRotationCompleted", "MetadataUpdateCompleted":
+		if e.Event.Success != nil {
+			if !*e.Event.Success {
+				status += "; failed"
+			} else {
+				status += "; succeeded"
+			}
 		} else {
-			status = "Install completed"
+			status += "; unknown result"
 		}
 	}
-	if len(status) > 0 {
-		return &DeviceStatus{
-			CorrelationId: e.Event.CorrelationId,
-			TargetName:    e.Event.TargetName,
-			Status:        status,
-			DeviceTime:    e.DeviceTime,
-		}
-	} else {
-		return nil
+
+	return DeviceStatus{
+		CorrelationId: e.Event.CorrelationId,
+		TargetName:    e.Event.TargetName,
+		Status:        status,
+		DeviceTime:    e.DeviceTime,
 	}
 }
 

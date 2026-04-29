@@ -6,6 +6,7 @@ package templates
 import (
 	"embed"
 	"html/template"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,7 @@ func init() {
 		"sub": func(a, b int) int {
 			return a - b
 		},
+		"contains": strings.Contains,
 	}
 
 	Templates = template.Must(template.New("").Funcs(funcMap).ParseFS(Assets, "*.html", "*.css"))

@@ -41,6 +41,13 @@ func showDevice(devices api.DeviceApi, uuid string, aktoml, hwinfo bool) {
 	fmt.Printf("Tag:          %s\n", device.Tag)
 	fmt.Printf("Is Prod:      %v\n", device.IsProd)
 
+	if device.Status != nil {
+		status := device.Status.Status + "; " + device.Status.DeviceTime
+		if len(device.Status.TargetName) > 0 {
+			status = status + "; " + device.Status.TargetName
+		}
+		fmt.Printf("Status:       %s\n", status)
+	}
 	if device.CreatedAt > 0 {
 		fmt.Printf("Created At:   %s\n", time.Unix(device.CreatedAt, 0).Format("2006-01-02 15:04:05"))
 	}

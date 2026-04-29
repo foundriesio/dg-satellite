@@ -3,13 +3,13 @@ module github.com/foundriesio/dg-satellite
 go 1.24.4
 
 require (
-	github.com/BurntSushi/toml v1.6.0
 	github.com/alexflint/go-arg v1.6.0
 	github.com/go-pkgz/expirable-cache/v3 v3.1.0
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.14.0
 	github.com/labstack/gommon v0.4.2
 	github.com/mattn/go-sqlite3 v1.14.32
+	github.com/pelletier/go-toml v1.9.5
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.46.0

@@ -7,19 +7,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/labstack/echo/v4"
+	toml "github.com/pelletier/go-toml"
+
+	storage "github.com/foundriesio/dg-satellite/storage/gateway"
 )
 
 const sotaOverride = "z-50-fioctl.toml"
 
-type ConfigFile struct {
-	Value       string
-	Unencrypted *bool    `json:"Unencrypted,omitempty"`
-	OnChanged   []string `json:"OnChanged,omitempty"`
-}
+type ConfigFile = storage.ConfigFile
 
 // @Summary Get device's current configuration
 // @Produce json
@@ -85,17 +84,19 @@ func (p pacmanConfig) empty() bool {
 
 func (p pacmanConfig) encode() (string, error) {
 	buf := new(bytes.Buffer)
-	encoder := toml.NewEncoder(buf)
-	encoder.Indent = ""
+	encoder := toml.NewEncoder(buf).Indentation("")
 	if err := encoder.Encode(p); err != nil {
 		return "", err
 	}
-	return buf.String(), nil
+	// pelletier/go-toml always adds a leading newline - trim it
+	return strings.TrimLeft(buf.String(), "\n"), nil
 }
 
 func (p pacmanConfig) merge(tomlString string) error {
 	var data pacmanConfig
-	err := toml.Unmarshal([]byte(tomlString), &data)
+	buf := bytes.NewReader([]byte(tomlString))
+	decoder := toml.NewDecoder(buf)
+	err := decoder.Decode(&data)
 	if err != nil {
 		return err
 	}

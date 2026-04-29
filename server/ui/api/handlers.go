@@ -26,6 +26,15 @@ func RegisterHandlers(e *echo.Echo, storage *storage.Storage, a auth.Provider) {
 
 	g.PUT("/configs", h.configsUpload, requireScope(users.ScopeDevicesRU|users.ScopeUpdatesRU),
 		gzipContentTypeAsContentEncoding, middleware.Decompress())
+	g.GET("/configs/factory", h.factoryConfigsGet, requireScope(users.ScopeDevicesR))
+	g.PUT("/configs/factory", h.factoryConfigsPut, requireScope(users.ScopeDevicesRU|users.ScopeUpdatesRU))
+	g.GET("/configs/factory/history", h.factoryConfigsHistory, requireScope(users.ScopeDevicesR))
+	g.GET("/configs/group/:name", h.groupConfigsGet, requireScope(users.ScopeDevicesR))
+	g.PUT("/configs/group/:name", h.groupConfigsPut, requireScope(users.ScopeDevicesRU|users.ScopeUpdatesRU))
+	g.GET("/configs/group/:name/history", h.groupConfigsHistory, requireScope(users.ScopeDevicesR))
+	g.GET("/configs/device/:uuid", h.deviceConfigsGet, requireScope(users.ScopeDevicesR))
+	g.PUT("/configs/device/:uuid", h.deviceConfigsPut, requireScope(users.ScopeDevicesRU|users.ScopeUpdatesRU))
+	g.GET("/configs/device/:uuid/history", h.deviceConfigsHistory, requireScope(users.ScopeDevicesR))
 	g.GET("/devices", h.deviceList, requireScope(users.ScopeDevicesR))
 	g.GET("/devices/:uuid", h.deviceGet, requireScope(users.ScopeDevicesR))
 	g.DELETE("/devices/:uuid", h.deviceDelete, requireScope(users.ScopeDevicesD))

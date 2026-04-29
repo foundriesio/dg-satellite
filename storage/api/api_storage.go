@@ -24,6 +24,7 @@ type (
 	FsHandle = storage.FsHandle
 
 	AppsStates        = storage.AppsStates
+	ConfigFile        = storage.ConfigFile
 	DeviceStatus      = storage.DeviceStatus
 	DeviceUpdateEvent = storage.DeviceUpdateEvent
 
@@ -39,6 +40,8 @@ const (
 	OrderByDeviceNameDesc    OrderBy = "name-desc"
 	OrderByDeviceUuidAsc     OrderBy = "uuid-asc"
 	OrderByDeviceUuidDesc    OrderBy = "uuid-desc"
+
+	ConfigHistoryLimit int = 10
 )
 
 var orderByDeviceMap = map[OrderBy]string{
@@ -374,7 +377,20 @@ func (s Storage) RolloverRolloutJournal(isProd bool) error {
 }
 
 func (s Storage) GetKnownDeviceGroupNames() ([]string, error) {
-	return s.stmtDeviceGetGroups.run()
+	if dbNames, err := s.stmtDeviceGetGroups.run(); err != nil {
+		return nil, err
+	} else if fsNames, err := s.fs.Configs.ReadGroupNames(); err != nil {
+		return nil, err
+	} else {
+		// Reuse fsNames for the final result, using search-and-sort-in-place technique.
+		// Golang warrants that dir entry names are sorted alphabetically.
+		for _, name := range dbNames {
+			if idx, has := slices.BinarySearch(fsNames, name); !has {
+				fsNames = slices.Insert(fsNames, idx, name)
+			}
+		}
+		return fsNames, nil
+	}
 }
 
 func (s Storage) GetKnownDeviceLabelNames() ([]string, error) {
@@ -398,6 +414,45 @@ func (s Storage) TailRolloutsLog(tag, updateName string, isProd bool, stop stora
 		fs = s.fs.Updates.Prod.Logs
 	}
 	return fs.TailFileLines(tag, updateName, storage.LogRolloutsFile, stop)
+}
+
+func (s Storage) ReadFactoryConfigHistory(latest int) ([]string, error) {
+	return s.fs.Configs.ReadFactoryConfigHistory(latest)
+}
+
+func (s Storage) SaveFactoryConfig(content string) error {
+	if err := s.fs.Configs.WriteFactoryConfig(content); err != nil {
+		return err
+	} else if err = s.fs.Configs.PurgeFactoryConfigHistory(ConfigHistoryLimit); err != nil {
+		slog.Error("Failed to clean factory config history", "error", err)
+	}
+	return nil
+}
+
+func (s Storage) ReadGroupConfigHistory(name string, latest int) ([]string, error) {
+	return s.fs.Configs.ReadGroupConfigHistory(name, latest)
+}
+
+func (s Storage) SaveGroupConfig(name, content string) error {
+	if err := s.fs.Configs.WriteGroupConfig(name, content); err != nil {
+		return err
+	} else if err = s.fs.Configs.PurgeGroupConfigHistory(name, ConfigHistoryLimit); err != nil {
+		slog.Error("Failed to clean group config history", "group", name, "error", err)
+	}
+	return nil
+}
+
+func (s Storage) ReadDeviceConfigHistory(uuid string, latest int) ([]string, error) {
+	return s.fs.Configs.ReadDeviceConfigHistory(uuid, latest)
+}
+
+func (s Storage) SaveDeviceConfig(uuid, content string) error {
+	if err := s.fs.Configs.WriteDeviceConfig(uuid, content); err != nil {
+		return err
+	} else if err = s.fs.Configs.PurgeDeviceConfigHistory(uuid, ConfigHistoryLimit); err != nil {
+		slog.Error("Failed to clean device config history", "uuid", uuid, "error", err)
+	}
+	return nil
 }
 
 func (s Storage) UploadConfigs(payload io.Reader) (err error) {

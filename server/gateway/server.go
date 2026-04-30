@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/foundriesio/dg-satellite/context"
@@ -16,7 +17,7 @@ import (
 
 const serverName = "gateway-api"
 
-func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, port uint16) (server.Server, error) {
+func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, bindAddr string) (server.Server, error) {
 	tlsCfg, err := loadTlsConfig(fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load %s TLS config: %w", serverName, err)
@@ -27,10 +28,13 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 	}
 
 	e := server.NewEchoServer()
-	srv := server.NewServer(ctx, e, serverName, port, tlsCfg)
+	srv := server.NewServer(ctx, e, serverName, bindAddr, tlsCfg)
 
-	dnsName := srv.GetDnsName()
-	url := fmt.Sprintf("https://%s:%d", dnsName, port)
+	_, port, err := net.SplitHostPort(bindAddr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid bind address %q: %w", bindAddr, err)
+	}
+	url := "https://" + net.JoinHostPort(srv.GetDnsName(), port)
 
 	RegisterHandlers(e, strg, url)
 	return srv, nil

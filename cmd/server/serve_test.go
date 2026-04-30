@@ -34,6 +34,8 @@ func TestServe(t *testing.T) {
 			gatewayAddress = gwAddr
 			wait <- true
 		},
+		UiAddr:      "127.0.0.1:0",
+		GatewayAddr: "127.0.0.1:0",
 	}
 
 	log, err := context.InitLogger("debug")

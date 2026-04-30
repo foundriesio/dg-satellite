@@ -26,7 +26,7 @@ type daemon interface {
 	Shutdown()
 }
 
-func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, port uint16) (server.Server, error) {
+func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, bindAddr string) (server.Server, error) {
 	strg, err := api.NewStorage(db, fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load %s storage: %w", serverName, err)
@@ -45,7 +45,7 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 
 	daemons := daemons.New(ctx, strg, users)
 
-	srv := server.NewServer(ctx, e, serverName, port, nil)
+	srv := server.NewServer(ctx, e, serverName, bindAddr, nil)
 	e.Use(auth.CsrfCheck)
 	apiHandlers.RegisterHandlers(e, strg, provider)
 	webHandlers.RegisterHandlers(e, users, provider)

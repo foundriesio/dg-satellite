@@ -31,11 +31,11 @@ type server struct {
 	server  *http.Server
 }
 
-func NewServer(ctx context.Context, echo *echo.Echo, name string, port uint16, tlsConfig *tls.Config) Server {
+func NewServer(ctx context.Context, echo *echo.Echo, name string, bindAddr string, tlsConfig *tls.Config) Server {
 	log := context.CtxGetLog(ctx).With("server", name)
 	ctx = context.CtxWithLog(ctx, log)
 	srv := &http.Server{
-		Addr:        fmt.Sprintf(":%d", port),
+		Addr:        bindAddr,
 		BaseContext: func(net.Listener) context.Context { return ctx },
 		ConnContext: adjustConnContext,
 		TLSConfig:   tlsConfig,

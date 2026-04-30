@@ -20,8 +20,8 @@ import (
 type ServeCmd struct {
 	startedCb func(uiAddress, gatewayAddress string)
 
-	UiPort      uint16 `default:"8080"`
-	GatewayPort uint16 `default:"8443"`
+	UiAddr      string `default:":8080"`
+	GatewayAddr string `default:":8443"`
 }
 
 func (c *ServeCmd) Run(args CommonArgs) error {
@@ -33,11 +33,11 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	if err != nil {
 		return fmt.Errorf("failed to load database: %w", err)
 	}
-	uiServer, err := ui.NewServer(args.ctx, db, fs, c.UiPort)
+	uiServer, err := ui.NewServer(args.ctx, db, fs, c.UiAddr)
 	if err != nil {
 		return err
 	}
-	gtwServer, err := gateway.NewServer(args.ctx, db, fs, c.GatewayPort)
+	gtwServer, err := gateway.NewServer(args.ctx, db, fs, c.GatewayAddr)
 	if err != nil {
 		return err
 	}

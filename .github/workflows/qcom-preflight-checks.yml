@@ -1,7 +1,6 @@
 name: Qualcomm Preflight Checks
 on:
-  pull_request_target:
-    branches: [ main ]
+  pull_request:
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -9,7 +8,7 @@ on:
 
 jobs:
   qcom-preflight-checks:
-    uses: qualcomm/qcom-reusable-workflows/.github/workflows/reusable-qcom-preflight-checks-orchestrator.yml@v2.0.1
+    uses: qualcomm/qcom-reusable-workflows/.github/workflows/reusable-qcom-preflight-checks-orchestrator.yml@v2
     with:
       enable-semgrep-scan: true
       enable-dependency-review: true

@@ -106,7 +106,7 @@ from making any authentication operations for 5 minutes when the limit
 has been reached.
 
 
-These values can be configured via `Config.RateLimitConfig`:
+These values can be configured via `Config.RateLimits`:
  * `AttemptsPerSecond` - Set this to globally rate-limit how many authentication operations (login, password change/reset) are allowed per IP per second. The default is 2. Requests will then be blocked for `AttemptsBlockDurationSec` for the given IP.
  * `AttemptsBlockDurationSec` - Set how long to block an IP that has been rate-limited by `AttemptsPerSecond`. The defaults will reject an IP for 30 seconds if it exceeds 2 authentication attempts per second.
  * `BadAuthLimit` - Track how many bad password operations are made from a given account. The default is 5. If this value is exceeded, the given IP will be blocked for `BadAuthBlockDurationSec` from performing password related operations.

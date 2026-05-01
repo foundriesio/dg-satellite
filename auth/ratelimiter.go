@@ -6,6 +6,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -36,6 +37,13 @@ func NewRateLimiter(cfg storage.RateLimitConfig) *authRateLimiter {
 	if cfg.BadAuthBlockDurationSec <= 0 {
 		cfg.BadAuthBlockDurationSec = 300
 	}
+
+	slog.Info("RateLimiter initialized",
+		"attemptsPerSecond", cfg.AttemptsPerSecond,
+		"attemptsBlockDurationSec", cfg.AttemptsBlockDurationSec,
+		"badAuthLimit", cfg.BadAuthLimit,
+		"badAuthBlockDurationSec", cfg.BadAuthBlockDurationSec,
+	)
 
 	sweepAge := 2 * time.Duration(cfg.BadAuthBlockDurationSec) * time.Second
 	if alt := 2 * time.Duration(cfg.AttemptsBlockDurationSec) * time.Second; alt > sweepAge {

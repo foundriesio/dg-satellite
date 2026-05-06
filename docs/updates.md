@@ -1,8 +1,10 @@
 # Updates
 
-## Producing and serving update content
+## Producing and Serving Update Content
+
 The satellite server uses a specific file hierarchy for serving update
 content:
+
 ```
  <datadir>/updates/
                    <ci or prod>/
@@ -15,6 +17,7 @@ of what `fioctl targets offline-update` produces. Let's say we want to
 deploy a CI build to some devices connected to our satellite server.
 The Target is tagged with `main` and is named `intel-corei7-64-lmp-148`.
 The content can be staged on the satellite server by running:
+
 ```
   cd <datadir>
   mkdir -p updates/ci/main/148
@@ -23,12 +26,15 @@ The content can be staged on the satellite server by running:
 
 This update will now show up under the "updates" view in your UI.
 
-## Updating your devices
-With an update in place, you'll need to create a "rollout" for your
-device(s) to see it. This can be done from API, CLI, or Web UI.
+## Updating Your Devices
+
+With an update in place, you will need to create a "rollout" for your
+device(s) to see it. This can be done via API, CLI, or Web UI.
 
 ### API
+
 Create a rollout named "first-try"
+
 ```
   curl \
     -H 'Authorization: Bearer <your token>' \
@@ -39,25 +45,30 @@ Create a rollout named "first-try"
 ```
 
 ### CLI
+
 Use the `satcli updates create-rollout` command.
 
 ### Web
-Drill down to the specific update and click "Create rollout".
 
-## Tracking the progress of an update/rollout
+Scroll down to the specific update and click "Create rollout".
+
+## Tracking the Progress of an Update/Rollout
 
 You can track the progress of an update through the API, CLI, or Web.
 
-### API
+### Tracking via API
+
 There are two API resources for tailing updates. Both resources emit
 [Server Sent Events](https://en.wikipedia.org/wiki/Server-sent_events).
 
- * **rollout** - /v1/updates/<ci|prod>/<tag>/<update>/rollouts/<rollout>/tail
- * **the whole update** - /v1/updates/<ci|prod>/<tag>/<update>/tail
+* **rollout** – `/v1/updates/<ci|prod>/<tag>/<update>/rollouts/<rollout>/tail`
+* **the whole update** — `/v1/updates/<ci|prod>/<tag>/<update>/tail`
 
-### CLI
+### Tracking via CLI
+
 The CLI has an `updates tail` subcommand that allows you to tail the update
 or a specific rollout.
 
-### Web
+### Tracking via Web
+
 Click "Follow progress" on either the Update or Rollout to see details.

@@ -56,6 +56,9 @@ module "server" {
   data_volume_size = var.data_volume_size
   ssh_key_name     = var.ssh_key_name
 
+  enable_cloudwatch_logs        = var.enable_cloudwatch_logs
+  cloudwatch_log_retention_days = var.cloudwatch_log_retention_days
+
   snapshot_retention_days = var.snapshot_retention_days
   tags                    = var.tags
 }

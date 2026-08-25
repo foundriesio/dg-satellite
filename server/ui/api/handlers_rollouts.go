@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -389,8 +390,20 @@ func filterUpdateLogs(uuids []string, reader iter.Seq2[string, error]) iter.Seq2
 
 var (
 	keepaliveResponseText     = ": idle\n\n"
-	keepaliveResponseInterval = 30 * time.Second
+	keepaliveResponseInterval = newAtomicDuration(30 * time.Second)
 )
+
+// atomicDuration is atomic so tests can override the value while stream handlers are reading it.
+type atomicDuration struct{ atomic.Int64 }
+
+func (d *atomicDuration) Store(v time.Duration) { d.Int64.Store(int64(v)) }
+func (d *atomicDuration) Load() time.Duration   { return time.Duration(d.Int64.Load()) }
+
+func newAtomicDuration(d time.Duration) *atomicDuration {
+	v := new(atomicDuration)
+	v.Store(d)
+	return v
+}
 
 func keepaliveReader(reader iter.Seq2[string, error]) iter.Seq2[string, error] {
 	// An HTTP client will disconnect after an idle time while server does not write annything (usually 5 minutes).
@@ -427,7 +440,7 @@ func keepaliveReader(reader iter.Seq2[string, error]) iter.Seq2[string, error] {
 					// Caller signals to stop reading.
 					break LOOP
 				}
-			case <-time.After(keepaliveResponseInterval):
+			case <-time.After(keepaliveResponseInterval.Load()):
 				if !yield(keepaliveResponseText, nil) {
 					break LOOP
 				}

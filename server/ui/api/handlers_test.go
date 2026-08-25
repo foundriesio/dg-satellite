@@ -1062,9 +1062,9 @@ data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-core
 	tc.assertNotDone(done2)
 
 	// keepalive test
-	saved := keepaliveResponseInterval
-	keepaliveResponseInterval = 50 * time.Millisecond
-	defer func() { keepaliveResponseInterval = saved }()
+	saved := keepaliveResponseInterval.Load()
+	keepaliveResponseInterval.Store(50 * time.Millisecond)
+	defer keepaliveResponseInterval.Store(saved)
 	done3 := make(chan bool)
 	rec3 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/v1/updates/tag1/update1/tail", nil), done3)
 	time.Sleep(130 * time.Millisecond)

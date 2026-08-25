@@ -4,6 +4,7 @@
 package templates
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,22 @@ var Assets embed.FS
 var Templates *template.Template
 
 func init() {
+	// go:embed bakes in whatever bytes the checkout had; a clone without
+	// git-lfs leaves pointer stubs and an unstyled UI
+	entries, err := Assets.ReadDir(".")
+	if err != nil {
+		panic(err)
+	}
+	for _, e := range entries {
+		data, err := Assets.ReadFile(e.Name())
+		if err != nil {
+			panic(err)
+		}
+		if bytes.HasPrefix(data, []byte("version https://git-lfs.github.com/spec")) {
+			panic(fmt.Sprintf("UI asset %s is a Git-LFS pointer stub; run 'git lfs pull' and rebuild", e.Name()))
+		}
+	}
+
 	funcMap := template.FuncMap{
 		"map": func(kv ...any) (map[string]any, error) {
 			if len(kv)%2 != 0 {

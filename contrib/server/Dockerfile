@@ -11,6 +11,11 @@ COPY go.* ./
 RUN go mod download
 
 COPY . .
+# go:embed silently bakes Git-LFS pointer stubs into the binary
+RUN if grep -q "git-lfs.github.com/spec" server/ui/web/templates/pico_min_211.css; then \
+        echo "ERROR: LFS assets are pointer stubs - the web UI would be unstyled. Run 'git lfs pull' and rebuild." >&2; \
+        exit 1; \
+    fi
 RUN go build \
     --ldflags '-linkmode external -extldflags "-static"' \
     -o fioserver \

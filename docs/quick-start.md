@@ -152,12 +152,29 @@ Options:
 
 You can browse the UI at <http://localhost:8080/>
 
-Devices can now connect to the server.
-The `/var/sota/sota.toml` file has several "server" settings that need to point
-to this new server:
+Devices can now be enrolled.
 
-* `tls.server`
-* `provision.server`
-* `uptane.repo_server`
-* `pacman.ostree_server`
-* `pacman.compose_apps_proxy = "https://<HOSTNAME>:8443/app-proxy-url"`
+## Enroll a Device
+
+Devices authenticate with the server using Mutual TLS. Enrollment uses
+[fio-device-register](https://github.com/foundriesio/lmp-device-register), which
+is part of a Yocto Project build with the
+[meta-foundries](https://github.com/foundriesio/meta-foundries) components
+enabled (see [How to build an Update](./build-an-update.md)). Alternatively,
+[fioup](https://github.com/foundriesio/fioup/releases) can enroll a device. To
+enroll with fio-device-register, run this on the device:
+
+```
+  DEVICE_API=http://<HOSTNAME>:8080/v1/devices \
+  OAUTH_BASE=http://<HOSTNAME>:8080/oauth2 \
+  fio-device-register \
+    --factory <FACTORY> \
+    --name <device-name> \
+    --tags <tag>
+```
+
+`--factory` must match the Factory name given to `pki-init`.
+
+> [!NOTE]
+> The "noauth" provider does not validate tokens or their scopes. See the [API
+> guide](./api.md) for real tokens.

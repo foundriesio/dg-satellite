@@ -50,7 +50,9 @@ instead of `noauth`:
 ```
 
 This seeds an initial user (`admin` / `admin` by default) and prints the login
-URL at startup. **Dev-only — do not use in production.**
+URL at startup. **Dev-only — do not use in production.** The `local` provider
+and its configuration options are documented in
+[configuring authentication](./auth.md).
 
 Override the credentials via environment variables:
 

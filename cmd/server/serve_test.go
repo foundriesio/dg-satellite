@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"syscall"
 	"testing"
 
@@ -60,14 +61,17 @@ func TestServe(t *testing.T) {
 	// create an empty ca file to make the server happy. no client will be able to handshake with it
 	require.Nil(t, fs.Certs.WriteFile(storage.CertsCasPemFile, []byte{}))
 
+	// Use an atomic for serveErr so errors from server.Run() can be saved while the test goroutine is reading it.
+	var serveErr atomic.Value
 	go func() {
-		if err = server.Run(common); err != nil {
+		if err := server.Run(common); err != nil {
+			serveErr.Store(err)
 			// Unblock main thread and check an error over there
 			wait <- false
 		}
 	}()
 	<-wait
-	require.Nil(t, err)
+	require.Nil(t, serveErr.Load())
 
 	r, err := http.Get(fmt.Sprintf("http://%s/doesnotexist", apiAddress))
 	require.Nil(t, err)

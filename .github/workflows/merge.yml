@@ -20,6 +20,9 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # e2e runs fioserver, which panics on LFS pointer stubs
+          lfs: true
 
       - name: Build environment
         run: |

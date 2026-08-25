@@ -18,6 +18,9 @@ jobs:
           go-version: '~1.24'
       - name: Clone the code
         uses: actions/checkout@v4
+        with:
+          # the server binary and its container build fail on LFS pointer stubs
+          lfs: true
 
       - name: Build and test devshell
         run: |

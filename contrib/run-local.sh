@@ -8,12 +8,17 @@ DATADIR="./.local-data"
 USE_AUTH=0
 AUTH_USER="${AUTH_USER:-admin}"
 AUTH_PASS="${AUTH_PASS:-admin}"
+PORT=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --auth)
             USE_AUTH=1
             shift
+            ;;
+        --port)
+            PORT="$2"
+            shift 2
             ;;
         -*)
             echo "Unknown flag: $1" >&2
@@ -50,6 +55,11 @@ else
     ./bin/fioserver --datadir "$DATADIR" auth-init --test
 fi
 
+if [ ! -d "$DATADIR/tuf" ]; then
+    echo "==> Initialising TUF..."
+    ./bin/fioserver --datadir "$DATADIR" tuf-init
+fi
+
 echo "==> Seeding mock devices..."
 go run ./cmd/seed --datadir "$DATADIR"
 
@@ -59,13 +69,13 @@ if [ "$USE_AUTH" -eq 1 ]; then
         || echo "(user already exists, skipping)"
 
     echo ""
-    echo "UI: http://localhost:8080/devices"
+    echo "UI: http://localhost:${PORT:-8080}/devices"
     echo "Login: $AUTH_USER / $AUTH_PASS"
     echo ""
 else
     echo ""
-    echo "UI: http://localhost:8080/devices  (noauth — no login required)"
+    echo "UI: http://localhost:${PORT:-8080}/devices  (noauth — no login required)"
     echo ""
 fi
 
-exec ./bin/fioserver --datadir "$DATADIR" serve
+exec ./bin/fioserver --datadir "$DATADIR" serve ${PORT:+--uiaddr :$PORT}

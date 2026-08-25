@@ -59,6 +59,9 @@ That's the directory referenced as `ostree_repo` throughout the
 
 ### Without FoundriesFactory (meta-foundries + QLI)
 
+In this flow the registration tool is meta-foundries' `fio-device-register`,
+configured with `FIO_DEVICE_API` the same way.
+
 <!-- TODO: document building the platform without a FoundriesFactory.-->
 
 ## Build Apps

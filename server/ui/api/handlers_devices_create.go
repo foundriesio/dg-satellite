@@ -134,7 +134,7 @@ type DeviceCreateResponse struct {
 	SotaToml  string `json:"sota.toml"`
 }
 
-// @Summary Create device. Used by lmp-device-register compliant tooling
+// @Summary Create device. Used by fio-device-register compliant tooling
 // @Accept  json
 // @Produce json
 // @Param data body DeviceCreateRequest true "Device creation request"

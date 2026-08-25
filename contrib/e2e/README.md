@@ -71,7 +71,7 @@ make clean
 
 | Module | What it covers |
 | --- | --- |
-| `test_connection.py` | Sanity: a device checks in and appears in the server; `lmp-device-register`-style registration. |
+| `test_connection.py` | Sanity: a device checks in and appears in the server; `fio-device-register`-style registration. |
 | `test_fiocli.py` | `fiocli devices list/show`; pushing a config and confirming `fioup` applies it on the device. |
 | `test_remote_actions.py` | `fioup run-and-report`; verifying the result via CLI and the web UI, plus artifact download. |
 | `test_updates.py` | Uploading an OTA update artifact and finding it in `updates list`. |

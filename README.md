@@ -13,6 +13,12 @@ Follow the [Quick Start](./docs/quick-start.md) guide to get a server running in
 
 The server runs a complete web interface as well as command line tool, [fiocli](./docs/fiocli.md).
 
+## Migrating from FoundriesFactory
+
+If you have an existing Factory with provisioned devices, the [migration
+guide](./docs/migration.md) covers signing with your Factory PKI, importing your
+fleet's TUF root, and repointing devices at this server.
+
 ## Adding updates
 The update server uses a content format compatible with [Offline Updates](https://docs.foundries.io/96/user-guide/offline-update/offline-update.html)
 to serve devices their TUF, OSTree, and Container data. Before uploading,

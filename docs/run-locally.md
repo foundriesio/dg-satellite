@@ -82,5 +82,7 @@ rm -rf ./.local-data
   See the [updates guide](./updates.md) for adding real update content.
 - **The gateway mTLS port (`:8443`) will not accept real devices.** The
   self-signed certificate is not trusted by actual FoundriesFactory devices.
-  Follow the [Quick Start](./quick-start.md) guide for a production-grade PKI
-  setup.
+  Follow the Quick Start's
+  [Configure Mutual TLS](./quick-start.md#configure-mutual-tls) step to set
+  up a real PKI, or the [migration guide](./migration.md) to sign with an
+  existing Factory PKI.

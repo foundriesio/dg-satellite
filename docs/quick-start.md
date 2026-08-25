@@ -1,11 +1,5 @@
 # Quick Start
 
-## Prerequisites
-
-Devices authenticate using mTLS and your FoundriesFactory® PKI. You will
-need access to your [Factory CA](https://docs.foundries.io/latest/reference-manual/security/device-gateway.html)
-in order to create a TLS certificate for device-facing APIs.
-
 ## Install
 Download the latest update server from:
 
@@ -16,19 +10,8 @@ For Linux and Mac, make sure to `chmod +x fioserver`.
 
 ## Configure Mutual TLS
 
-There are two ways to set up the mutual TLS certificates which are used by 
-devices to authenticate with this server:
-
-* **Bootstrap a new PKI from scratch** with `pki-init` — use this if you do
-  not already have a FoundriesFactory PKI (see below).
-* **Sign a CSR with an existing factory PKI** using `create-csr` and
-  `sign-csr` — use this if you already have a factory root key and device
-  CAs (see [Sign with an existing factory PKI](#sign-with-an-existing-factory-pki)).
-
-### Bootstrap a new PKI from scratch
-
-If you don't have a pre-existing factory PKI, `pki-init` creates everything
-in one step:
+Devices authenticate with the server using mutual TLS. `pki-init` creates
+everything needed in one step:
 
 ```
   ./fioserver --datadir=./datadir pki-init --dnsname <HOSTNAME> --factory <FACTORY>
@@ -42,42 +25,12 @@ This generates, under `datadir/certs`:
 * `cas.pem`, containing the device CA so devices can authenticate.
 
 Import `root.crt` into your devices' trust store so they trust the server's
-TLS certificate. You can then skip ahead to
-[Configure User Authentication](#configure-user-authentication).
+TLS certificate.
 
-### Sign with an existing factory PKI
-
-#### Creat Certificate Signing requests for TLS
-
-Devices need to trust the TLS connection they make to this server. In
-order to do this, you must create a CSR to be signed with the Factory
-root key:
-
-```
-  ./fioserver --datadir=./datadir create-csr --dnsname <HOSTNAME> --factory <FACTORY>
-```
-
-#### Sign the Request
-
-Copy `datadir/certs/tls.csr` to the computer with your factory PKI. This
-file does not contain sensitive information, so it is safe to share as
-needed. From the factory PKI directory run:
-
-```
-  fioctl keys ca sign --pki-dir <path to your factory pki> <path to tls.csr>
-```
-
-This command will print the contents of the certificate. The contents are
-not sensitive. Go back to the update server system and create the
-file `datadir/certs/tls.pem` with this content.
-
-#### Grant Access to Devices
-
-This service needs to know what devices can connect to it. You can allow
-all valid factory devices to connect with:
-```
- fioctl keys ca show --just-device-cas > datadir/certs/cas.pem
-```
+> [!NOTE]
+> If migrating an existing FoundriesFactory fleet, sign the server's TLS
+> certificate with your Factory PKI instead. See [Sign with your Factory
+> PKI](./migration.md#sign-with-your-factory-pki).
 
 ## Configure User Authentication
 
@@ -100,39 +53,6 @@ root metadata must be initialized:
   ./fioserver --datadir=./datadir tuf-init
 ```
 
-### Importing an existing fleet's TUF root
-
-If you already have a fleet of devices provisioned against a Foundries.io
-factory, initializing a brand new TUF root would leave those devices unable
-to validate metadata from this server. Instead, you can import the factory's
-existing root of trust so that already-provisioned devices continue to trust
-updates.
-
-The import reads every version of the factory's `root.json` from a tarball you
-provide, stores them so devices can walk the trust chain, and then generates a
-new root (version N+1) with fresh online keys for the `root`, `targets`,
-`snapshot`, and `timestamp` roles. The new root is signed by both the factory's
-offline root key (proving continuity of trust) and the new root key.
-
-You will need:
-
-* The factory's offline keys tarball (typically `offline-creds.tgz`),
-  which contains the offline root key used to sign the rotation.
-* A gzipped tarball containing all of the factory's `root.json` files (e.g.
-  `1.root.json`, `2.root.json`, ...). See `fioctl keys tuf show-root`.
-```
-  ./fioserver --datadir=./datadir tuf-init \
-    --import-keys ./offline-creds.tgz \
-    --import-roots ./roots.tgz
-```
-
-Options:
-
-* `--import-keys` — path to the fioctl offline keys tarball. Providing this
-  (or `--import-roots`) enables import mode.
-* `--import-roots` — path to a gzipped tarball containing all of the factory's
-  `root.json` files. See `fioctl keys tuf download-roots`.
-
 > [!NOTE]
 > `tuf-init` requires `auth-init` to have been run first — the TUF role keys are
 > encrypted at rest with the HMAC secret it creates.
@@ -145,6 +65,11 @@ Options:
 > copies of both somewhere safe immediately. If either file is lost it CANNOT be
 > recovered, and you will permanently lose the ability to rotate or manage your
 > TUF root of trust.
+
+> [!NOTE]
+> If you already have a fleet provisioned against a Foundries.io Factory, import
+> its existing TUF root instead of creating a new one. See [Importing the
+> fleet's TUF root](./migration.md#importing-the-fleets-tuf-root).
 
 ## Run the Server
 

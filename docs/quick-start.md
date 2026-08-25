@@ -106,3 +106,6 @@ enroll with fio-device-register, run this on the device:
 > [!NOTE]
 > The "noauth" provider does not validate tokens or their scopes. See the [API
 > guide](./api.md) for real tokens.
+
+To enroll a device without fio-device-register, see
+[Device Registration](./advanced.md#device-registration).

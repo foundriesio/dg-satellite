@@ -45,6 +45,11 @@ look with your own logo, favicon, and color scheme — no rebuild required.
 The [production guide](./docs/production.md) covers considerations when
 deploying the update server for production use.
 
+## Advanced topics
+
+The [advanced topics guide](./docs/advanced.md) covers custom listen
+addresses, certificate lifetimes, and manual device registration.
+
 ## Developing
 The project is a single Golang binary that can be built with:
 ```

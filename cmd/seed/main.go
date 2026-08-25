@@ -64,7 +64,7 @@ func openUserStorage(datadir string) (*users.Storage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load database: %w", err)
 	}
-	return users.NewStorage(db, fs, nil)
+	return users.NewStorage(db, fs, &storage.AuthConfig{})
 }
 
 // seedDevices creates numDevices mock devices.

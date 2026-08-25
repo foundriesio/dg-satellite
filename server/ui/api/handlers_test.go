@@ -955,17 +955,16 @@ func TestApiRolloutDaemon(t *testing.T) {
 	assert.Equal(t, "", dev.UpdateName)
 
 	// After the watchdog daemon processing, rollouts are committed.
-	time.Sleep(60 * time.Millisecond)
-	data = tc.GET("/updates/tag1/update1/rollouts/roll1", 200)
-	assert.Equal(t, `{"uuids":["ci1"],"effective-uuids":["ci1"],"committed":true}`, s(data))
-	data = tc.GET("/updates/tag2/update2/rollouts/roll2", 200)
-	assert.Equal(t, `{"uuids":["prod1"],"effective-uuids":["prod1"],"committed":true}`, s(data))
-	dev, err = tc.api.DeviceGet("ci1")
-	assert.Nil(t, err)
-	assert.Equal(t, "update1", dev.UpdateName)
-	dev, err = tc.api.DeviceGet("prod1")
-	assert.Nil(t, err)
-	assert.Equal(t, "update2", dev.UpdateName)
+	require.Eventually(t, func() bool {
+		d1 := s(tc.GET("/updates/tag1/update1/rollouts/roll1", 200))
+		d2 := s(tc.GET("/updates/tag2/update2/rollouts/roll2", 200))
+		dev1, err1 := tc.api.DeviceGet("ci1")
+		dev2, err2 := tc.api.DeviceGet("prod1")
+		return d1 == `{"uuids":["ci1"],"effective-uuids":["ci1"],"committed":true}` &&
+			d2 == `{"uuids":["prod1"],"effective-uuids":["prod1"],"committed":true}` &&
+			err1 == nil && dev1.UpdateName == "update1" &&
+			err2 == nil && dev2.UpdateName == "update2"
+	}, 10*time.Second, 20*time.Millisecond)
 }
 
 func TestApiUpdateTail(t *testing.T) {

@@ -77,6 +77,7 @@ make clean
 | `test_updates.py` | Uploading an OTA update artifact and finding it in `updates list`. |
 | `test_webui.py` | Web UI smoke tests and device-table rendering. |
 | `test_webui_settings.py` | Creating an API token via the settings dialog and checking the audit log. |
+| `test_oauth2_login.py` | OAuth2 device-flow login against a dedicated local-auth server: authorize, deny, and scope-mismatch paths (fiocli login and mimic fio-device-register). |
 | `test_e2e_update_flow.py` | Full flow: upload an update, create a rollout, install on the device, and verify events plus the running container. |
 
 ## How the fixtures fit together

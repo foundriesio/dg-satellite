@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -80,9 +81,49 @@ func (c testClient) Do(req *http.Request) *httptest.ResponseRecorder {
 	return rec
 }
 
-func (c testClient) DoAsync(req *http.Request, done chan<- bool) *httptest.ResponseRecorder {
+// safeRecorder guards an httptest.ResponseRecorder that a handler goroutine
+// is still writing to (e.g. an open SSE stream), so tests can read it
+// without racing the writer.
+type safeRecorder struct {
+	mu  sync.Mutex
+	rec *httptest.ResponseRecorder
+}
+
+func (r *safeRecorder) Header() http.Header { return r.rec.Header() }
+
+func (r *safeRecorder) Write(b []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.rec.Write(b)
+}
+
+func (r *safeRecorder) WriteHeader(code int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.rec.WriteHeader(code)
+}
+
+func (r *safeRecorder) Flush() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.rec.Flush()
+}
+
+func (r *safeRecorder) Code() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.rec.Code
+}
+
+func (r *safeRecorder) BodyString() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.rec.Body.String()
+}
+
+func (c testClient) DoAsync(req *http.Request, done chan<- bool) *safeRecorder {
 	req = req.WithContext(c.ctx)
-	rec := httptest.NewRecorder()
+	rec := &safeRecorder{rec: httptest.NewRecorder()}
 	go func() {
 		c.e.ServeHTTP(rec, req)
 		if done != nil {
@@ -93,12 +134,12 @@ func (c testClient) DoAsync(req *http.Request, done chan<- bool) *httptest.Respo
 	return rec
 }
 
-func (c testClient) assertDone(done <-chan bool) {
+// waitDone blocks until the DoAsync handler goroutine finishes.
+func (c testClient) waitDone(done <-chan bool) {
 	select {
 	case <-done:
-		break
-	default:
-		require.Fail(c.t, "Must be done")
+	case <-time.After(5 * time.Second):
+		require.Fail(c.t, "handler did not finish")
 	}
 }
 
@@ -998,16 +1039,16 @@ func TestApiUpdateTail(t *testing.T) {
 	// Before any events appear, check the correct error event is received.
 	done := make(chan bool)
 	rec := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/v1/updates/tag1/update1/tail", nil), done)
-	time.Sleep(10 * time.Millisecond)
 	expectedStream := `event: error
 id: 0
 retry: 1000
 data: No rollout logs for this update yet.
 
 `
-	require.Equal(t, 200, rec.Code)
-	require.Equal(t, expectedStream, rec.Body.String())
-	tc.assertDone(done)
+	// The server closes this stream itself after the error event.
+	tc.waitDone(done)
+	require.Equal(t, 200, rec.Code())
+	require.Equal(t, expectedStream, rec.BodyString())
 
 	events := generateUpdateEvents("uuid-1", "first", 1)
 	require.Nil(t, d1.ProcessEvents(events))
@@ -1017,8 +1058,7 @@ data: No rollout logs for this update yet.
 	require.Nil(t, d3.ProcessEvents(events))
 
 	// Check that the original response did not change, meaning that it was closed by server.
-	time.Sleep(10 * time.Millisecond)
-	require.Equal(t, expectedStream, rec.Body.String())
+	require.Equal(t, expectedStream, rec.BodyString())
 
 	// rec1 is plain request, rec2 is request with resumption.
 	done1 := make(chan bool)
@@ -1027,7 +1067,12 @@ data: No rollout logs for this update yet.
 	req2 := httptest.NewRequest(http.MethodGet, "/v1/updates/tag1/update1/tail", nil)
 	req2.Header.Add("Last-Event-ID", "1")
 	rec2 := tc.DoAsync(req2, done2)
-	time.Sleep(10 * time.Millisecond)
+
+	requireBody := func(r *safeRecorder, expected string) {
+		require.Eventually(t, func() bool { return r.BodyString() == expected },
+			5*time.Second, 5*time.Millisecond)
+	}
+
 	// A previous error line should not appear in the new response.
 	expectedStream1 := `event: log
 id: 1
@@ -1040,15 +1085,14 @@ data: {"uuid":"test-device-2","correlationId":"uuid-2","target-name":"intel-core
 
 `
 	expectedStream1 += expectedStream2
-	require.Equal(t, 200, rec1.Code)
-	require.Equal(t, expectedStream1, rec1.Body.String())
-	require.Equal(t, 200, rec2.Code)
-	require.Equal(t, expectedStream2, rec2.Body.String())
+	requireBody(rec1, expectedStream1)
+	require.Equal(t, 200, rec1.Code())
+	requireBody(rec2, expectedStream2)
+	require.Equal(t, 200, rec2.Code())
 
 	// Write to the file and check the new response bytes within the same connections.
 	events = generateUpdateEvents("uuid-1", "forth", 1)
 	require.Nil(t, d1.ProcessEvents(events))
-	time.Sleep(10 * time.Millisecond)
 	expectedStreamX := `event: log
 id: 3
 data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-corei7-64-lmp-23","status":"Download started","deviceTime":"2023-12-12T12:00:00"}
@@ -1056,8 +1100,8 @@ data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-core
 `
 	expectedStream1 += expectedStreamX
 	expectedStream2 += expectedStreamX
-	require.Equal(t, expectedStream1, rec1.Body.String())
-	require.Equal(t, expectedStream2, rec2.Body.String())
+	requireBody(rec1, expectedStream1)
+	requireBody(rec2, expectedStream2)
 	tc.assertNotDone(done1)
 	tc.assertNotDone(done2)
 
@@ -1067,22 +1111,19 @@ data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-core
 	defer keepaliveResponseInterval.Store(saved)
 	done3 := make(chan bool)
 	rec3 := tc.DoAsync(httptest.NewRequest(http.MethodGet, "/v1/updates/tag1/update1/tail", nil), done3)
-	time.Sleep(130 * time.Millisecond)
 	expectedStream3 := expectedStream1 + keepaliveResponseText + keepaliveResponseText
-	require.Equal(t, 200, rec3.Code)
-	require.Equal(t, expectedStream3, rec3.Body.String())
+	requireBody(rec3, expectedStream3)
+	require.Equal(t, 200, rec3.Code())
 	require.Nil(t, d1.ProcessEvents(events))
-	time.Sleep(80 * time.Millisecond)
 	expectedStreamY := strings.Replace(expectedStreamX, "id: 3", "id: 4", 1)
 	expectedStream3 += expectedStreamY + keepaliveResponseText
-	require.Equal(t, expectedStream3, rec3.Body.String())
+	requireBody(rec3, expectedStream3)
 	tc.assertNotDone(done3)
 
 	cancel() // This is where we disconnect, closing all holding handlers.
-	time.Sleep(10 * time.Millisecond)
-	tc.assertDone(done1)
-	tc.assertDone(done2)
-	tc.assertDone(done3)
+	tc.waitDone(done1)
+	tc.waitDone(done2)
+	tc.waitDone(done3)
 
 	// TODO: Add rollout tail tests
 }

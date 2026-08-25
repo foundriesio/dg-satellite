@@ -81,7 +81,7 @@ all valid factory devices to connect with:
 
 ## Configure User Authentication
 
-The update server includes a few [authentication providers](../auth)
+The update server includes a few [authentication providers](./auth.md)
 for user-facing APIs. The "noauth" provider is handy for starting up a
 quick local environment for testing and evaluation. Running
 `auth-init --test` will setup an HMAC encryption key for API

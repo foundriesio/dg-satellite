@@ -146,7 +146,7 @@ Options:
 
 ## Run the Server
 
-`./fioserv serve --datadir=datadir`
+`./fioserver --datadir=./datadir serve`
 
 You can browse the UI at <http://localhost:8080/>
 

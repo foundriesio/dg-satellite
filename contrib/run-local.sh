@@ -9,6 +9,7 @@ USE_AUTH=0
 AUTH_USER="${AUTH_USER:-admin}"
 AUTH_PASS="${AUTH_PASS:-admin}"
 PORT=""
+GWPORT=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -18,6 +19,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --port)
             PORT="$2"
+            shift 2
+            ;;
+        --gwport)
+            GWPORT="$2"
             shift 2
             ;;
         -*)
@@ -78,4 +83,4 @@ else
     echo ""
 fi
 
-exec ./bin/fioserver --datadir "$DATADIR" serve ${PORT:+--uiaddr :$PORT}
+exec ./bin/fioserver --datadir "$DATADIR" serve ${PORT:+--uiaddr :$PORT} ${GWPORT:+--gatewayaddr :$GWPORT}

@@ -100,6 +100,11 @@ task unless a later instruction in this file or from the user overrides them.
 - If you could not verify something the user will assume is verified, say so
   explicitly in the response — not in a comment in the code.
 
+## Style
+
+Follow [STYLE.md](STYLE.md) for the Markdown docs, code comments, commit
+messages, and trailers.
+
 ## Grounding knowledge base
 
 Read README.md

@@ -52,21 +52,21 @@ if [ ! -f "$DATADIR/certs/tls.pem" ]; then
     cp "$DATADIR/certs/tls.pem" "$DATADIR/certs/cas.pem"
 fi
 
-if [ "$USE_AUTH" -eq 1 ]; then
-    echo "==> Initialising auth (local username/password mode)..."
-    ./bin/fioserver --datadir "$DATADIR" auth-init --local
-else
-    echo "==> Initialising auth (noauth / test mode)..."
-    ./bin/fioserver --datadir "$DATADIR" auth-init --test
-fi
-
 if [ ! -d "$DATADIR/tuf" ]; then
+    if [ "$USE_AUTH" -eq 1 ]; then
+        echo "==> Initialising auth (local username/password mode)..."
+        ./bin/fioserver --datadir "$DATADIR" auth-init --local
+    else
+        echo "==> Initialising auth (noauth / test mode)..."
+        ./bin/fioserver --datadir "$DATADIR" auth-init --test
+    fi
+
     echo "==> Initialising TUF..."
     ./bin/fioserver --datadir "$DATADIR" tuf-init
-fi
 
-echo "==> Seeding mock devices..."
-go run ./cmd/seed --datadir "$DATADIR"
+    echo "==> Seeding mock devices..."
+    go run ./cmd/seed --datadir "$DATADIR"
+fi
 
 if [ "$USE_AUTH" -eq 1 ]; then
     echo "==> Creating initial user: $AUTH_USER"

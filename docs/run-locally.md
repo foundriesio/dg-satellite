@@ -18,6 +18,41 @@ PKI, and no real devices. Intended for local development and UI exploration only
 
 `datadir` defaults to `./.local-data`.
 
+## Live reload for development
+
+Install `air` once:
+
+```
+go install github.com/air-verse/air@latest
+```
+
+Run `run-local.sh` once to initialise the data directory, then use `air` for all
+subsequent development. On any change to `*.go`, `*.html`, or `*.css`, `air`
+rebuilds the binary and restarts the server automatically.
+
+```
+# first time: initialise .local-data
+./contrib/run-local.sh
+
+# all subsequent runs
+air
+```
+
+The same environment variables as `run-local.sh` are accepted:
+
+| Variable  | Default          | Effect                             |
+|-----------|------------------|------------------------------------|
+| `DATADIR` | `./.local-data`  | Path to the data directory         |
+| `PORT`    | *(server default)* | UI listen address (`--uiaddr`)   |
+| `GWPORT`  | *(server default)* | Gateway address (`--gatewayaddr`) |
+
+```
+DATADIR=/tmp/mydata PORT=9090 GWPORT=9091 air
+```
+
+`air` manages the server process only; initialisation (`auth-init`, `tuf-init`,
+seeding) must be done via `run-local.sh`.
+
 ## What it does
 
 - Builds `bin/fioserver` from source.

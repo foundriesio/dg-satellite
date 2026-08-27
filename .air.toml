@@ -1,0 +1,16 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # Reuses Makefile's LDFLAGS (embeds git-describe version string).
+  # Run contrib/run-local.sh once first to initialise the data dir.
+  # Env vars: DATADIR (default: ./.local-data), PORT, GWPORT.
+  cmd      = "make fioserver"
+  bin      = "bin/fioserver"
+  full_bin = "sh -c 'exec bin/fioserver --datadir ${DATADIR:-./.local-data} serve ${PORT:+--uiaddr :$PORT} ${GWPORT:+--gatewayaddr :$GWPORT}'"
+  include_ext = ["go", "html", "css"]
+  exclude_dir = ["tmp", "bin", ".local-data", "docs", "contrib", ".git", ".vscode"]
+  delay = 1000
+
+[screen]
+  clear_on_rebuild = true

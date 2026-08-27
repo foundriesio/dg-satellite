@@ -7,3 +7,4 @@ bin/*
 release/*
 .local-data
 /datadir/
+tmp/

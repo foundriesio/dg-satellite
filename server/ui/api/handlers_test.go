@@ -930,7 +930,14 @@ func TestApiRolloutPut(t *testing.T) {
 	s := func(data []byte) string {
 		return strings.TrimSpace(string(data))
 	}
-	time.Sleep(50 * time.Millisecond) // Allow async database updates to finish
+	// Wait for the async rollout commit to land, then assert the exact state so
+	// a failure pinpoints the differing rollout/device instead of a generic
+	// "condition never satisfied" timeout.
+	committed := func() bool {
+		return strings.Contains(s(tc.GET("/updates/tag1/update1/rollouts/rocks", 200)), `"committed":true`) &&
+			strings.Contains(s(tc.GET("/updates/tag2/update2/rollouts/rocks", 200)), `"committed":true`)
+	}
+	require.Eventually(t, committed, 10*time.Second, 20*time.Millisecond)
 
 	data := tc.GET("/updates/tag1/update1/rollouts/rocks", 200)
 	assert.Equal(t, `{"uuids":["ci1","ci2","ci3"],"effective-uuids":["ci1","ci2"],"committed":true}`, s(data))
@@ -946,7 +953,7 @@ func TestApiRolloutPut(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, "", dev.UpdateName)
 	dev, err = tc.api.DeviceGet("prod2")
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	assert.Equal(t, "update2", dev.UpdateName)
 	dev, err = tc.api.DeviceGet("prod3")
 	require.Nil(t, err)

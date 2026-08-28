@@ -25,7 +25,12 @@ REPO_ROOT = Path(__file__).parent
 CACHE_DIR = REPO_ROOT / ".cache"
 
 CONTAINER_NAME = "fioup-e2e"
+AKLITE_CONTAINER_NAME = "aklite-e2e"
+AKLITE_IMAGE = "aklite-e2e"
 SERVER_UI_PORT = 8080
+
+HARDWARE_ID = "intel-corei7-64"
+OSTREE_BRANCH = "lmp"
 
 APP_IMAGE = (
     "hub.foundries.io/lmp/shellhttpd"
@@ -56,6 +61,8 @@ reset_apps = " "
 reset_apps_root = "/var/sota/reset-apps"
 tags = "main"
 type = "ostree+compose_apps"
+sysroot = "/sysroot"
+os = "lmp"
 
 [storage]
 path = "/var/sota/"
@@ -66,6 +73,9 @@ server = "https://update-server:8443"
 ca_source = "file"
 cert_source = "file"
 pkey_source = "file"
+
+[logger]
+loglevel = 0
 """
 
 
@@ -115,6 +125,25 @@ class DockerClient:
             tmp.write(text)
             tmp.flush()
             self.put(Path(tmp.name), dst)
+
+    def get_dir(self, src: str, dst: Path):
+        """Extract the container directory `src` into host directory `dst`.
+
+        The archived top-level entry (basename of `src`) is unwrapped so its
+        contents land directly under `dst`.
+        """
+        bits, _ = self._container.get_archive(src)
+        buf = io.BytesIO(b"".join(bits))
+        buf.seek(0)
+        dst.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(fileobj=buf, mode="r") as tar:
+            top = os.path.basename(src.rstrip("/"))
+            for member in tar.getmembers():
+                rel = os.path.relpath(member.name, top)
+                if rel == ".":
+                    continue
+                member.name = rel
+                tar.extract(member, path=str(dst))
 
 
 class ContainerDocker:
@@ -443,4 +472,95 @@ def sample_update(composectl_bin) -> Path:
         if e.stderr:
             print(e.stderr, flush=True)
         raise
+    return update_dir
+
+
+# ---------------------------------------------------------------------------
+# aktualizr-lite client fixtures
+#
+# These mirror the fioup fixtures above but drive a real aktualizr-lite client
+# (the `aklite-e2e` image). aklite additionally needs an ostree sysroot (set up
+# by entrypoint.aklite.sh) and an ostree-bearing update to install.
+# ---------------------------------------------------------------------------
+
+# Target version for the uploaded update. Chosen > 1 so it is unambiguously
+# newer than the container's base commit (which has no factory version).
+AKLITE_TARGET_VERSION = 2
+
+
+@pytest.fixture(scope="session")
+def aklite_device(preflight):
+    """Launch the aktualizr-lite client container and yield a docker-exec client."""
+    yield from _launch_client_container(AKLITE_IMAGE, AKLITE_CONTAINER_NAME)
+
+
+@pytest.fixture(scope="session")
+def aklite_docker(aklite_device) -> ContainerDocker:
+    """Wait for the aklite container's dockerd and yield a docker caller."""
+    return _await_dockerd(aklite_device)
+
+
+@pytest.fixture(scope="session")
+def aklite_registered_device(update_server, aklite_device, aklite_docker) -> dict:
+    """Install device creds + sota.toml, run `aktualizr-lite check`, and wait for
+    the device to register (via mTLS) on the server."""
+    print("[setup] Copying device credentials (aklite) ...", flush=True)
+    _install_device_creds(aklite_device, update_server)
+
+    print("\n[setup] Running aktualizr-lite check-in ...", flush=True)
+    stdout, stderr = aklite_device.run("aktualizr-lite check", check=False)
+
+    return _await_registered_device(stdout, stderr)
+
+
+@pytest.fixture(scope="session")
+def aklite_update(aklite_device, aklite_docker, sample_update) -> Path:
+    """Build the ostree(+app) update artifact aklite will install.
+
+    The archive-mode ostree repo is built inside the aklite container (the host
+    has no ostree), committing a fresh rootfs that differs from the container's
+    base commit, then copied out to .cache/aklite-update/. The compose-app
+    payload from `sample_update` is added under apps/apps/.
+    """
+    update_dir = CACHE_DIR / "aklite-update"
+    ostree_repo = update_dir / "ostree_repo"
+    if (ostree_repo / "config").exists():
+        return update_dir
+
+    version = AKLITE_TARGET_VERSION
+    name = f"{HARDWARE_ID}-lmp-{version}"
+
+    # Build the update rootfs + archive ostree repo inside the container.
+    build = f"""
+set -e
+rm -rf /tmp/upd && mkdir -p /tmp/upd
+cd /tmp/upd
+/usr/local/bin/make_sys_rootfs.sh tree {OSTREE_BRANCH} {HARDWARE_ID} lmp
+# Give the server clean values to probe and mark this commit distinct from C0.
+mkdir -p tree/usr/lib/sota/conf.d
+printf '[provision]\\nprimary_ecu_hardware_id = "{HARDWARE_ID}"\\n' \
+    > tree/usr/lib/sota/conf.d/40-hardware-id.toml
+# usr/lib/os-release: provide IMAGE_VERSION for aktualizr's version probing
+# AND the OS identity fields that libostree's deployment requires.
+mkdir -p tree/usr/lib
+printf 'ID="lmp"\\nNAME="Generated OSTree-enabled OS"\\nPRETTY_NAME="LMP {version}"\\nIMAGE_VERSION="{version}"\\n' > tree/usr/lib/os-release
+echo "aklite-e2e update {version}" > tree/usr/share/sota/update-marker
+ostree --repo=ostree_repo init --mode=archive
+ostree --repo=ostree_repo commit --branch={OSTREE_BRANCH} \
+    --generate-sizes --tree=dir=tree
+"""
+    aklite_device.run(build)
+
+    update_dir.mkdir(parents=True, exist_ok=True)
+    aklite_device.get_dir("/tmp/upd/ostree_repo", ostree_repo)
+
+    # Reuse the compose-app payload pulled by sample_update. It uploads its
+    # `apps/` subdir as-is (the server reads <update>/apps/apps), so mirror that
+    # exact layout here.
+    src_apps = sample_update / "apps"
+    dst_apps = update_dir / "apps"
+    if dst_apps.exists():
+        shutil.rmtree(dst_apps)
+    shutil.copytree(src_apps, dst_apps)
+
     return update_dir

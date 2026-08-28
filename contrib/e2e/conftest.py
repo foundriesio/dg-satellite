@@ -150,38 +150,34 @@ def composectl_bin(preflight) -> Path:
     return CACHE_DIR / "composectl"
 
 
-@pytest.fixture(scope="session")
-def fioup_device(preflight):
-    """Launch the fioup target container and yield a docker-exec client.
+def _launch_client_container(image: str, name: str):
+    """Launch a privileged client container and yield a DockerClient once it
+    can accept `docker exec`. Removes any stale container of the same name first.
 
-    The container image has fioup pre-installed. It runs privileged (docker:dind)
-    so fioup can manage compose apps; commands are executed via `docker exec`.
+    Used for both the fioup and aktualizr-lite device containers. The container
+    gets its own network namespace with `update-server -> host-gateway` so the
+    inner dockerd's published ports stay isolated from the host and the
+    `update-server` DNS name resolves back to the server running locally.
     """
     docker_client = docker_sdk.from_env()
 
-    # Remove any stale container left over from a previous run
     try:
-        docker_client.containers.get(CONTAINER_NAME).remove(force=True)
+        docker_client.containers.get(name).remove(force=True)
     except docker_sdk.errors.NotFound:
         pass
 
-    print("\n[setup] Starting fioup container ...", flush=True)
+    print(f"\n[setup] Starting {name} container ...", flush=True)
     container = docker_client.containers.run(
-        CONTAINER_NAME,
+        image,
         detach=True,
         auto_remove=True,
         privileged=True,
-        name=CONTAINER_NAME,
-        # Give the container its own network namespace so the inner dind daemon
-        # binds published ports (e.g. shellhttpd's 8080) in isolation instead of
-        # on the host, avoiding conflicts with update-server. The "update-server"
-        # DNS name still resolves to the host running the server locally.
+        name=name,
         extra_hosts={"update-server": "host-gateway"},
     )
 
     client = DockerClient(container)
     try:
-        # Wait for the container to be ready for `docker exec`
         deadline = time.time() + 30
         while True:
             if container.exec_run("true").exit_code == 0:
@@ -189,16 +185,40 @@ def fioup_device(preflight):
             if time.time() > deadline:
                 raise TimeoutError("Container did not become ready within 30s")
             time.sleep(1)
-
         print("[setup] Container ready", flush=True)
         yield client
-
     finally:
-        print("\n[teardown] Stopping fioup container ...", flush=True)
+        print(f"\n[teardown] Stopping {name} container ...", flush=True)
         try:
             container.remove(force=True)
         except docker_sdk.errors.NotFound:
             pass
+
+
+def _await_dockerd(client: "DockerClient") -> "ContainerDocker":
+    """Wait for the in-container dockerd to be ready and return a docker caller."""
+    print("\n[setup] Waiting for dockerd in container ...", flush=True)
+    deadline = time.time() + 60
+    while True:
+        try:
+            client.run("docker info")
+            break
+        except RuntimeError:
+            if time.time() > deadline:
+                raise TimeoutError("dockerd did not become ready within 60s")
+            time.sleep(2)
+    print("[setup] Dockerd ready", flush=True)
+    return ContainerDocker(client)
+
+
+@pytest.fixture(scope="session")
+def fioup_device(preflight):
+    """Launch the fioup target container and yield a docker-exec client.
+
+    The container image has fioup pre-installed. It runs privileged (docker:dind)
+    so fioup can manage compose apps; commands are executed via `docker exec`.
+    """
+    yield from _launch_client_container(CONTAINER_NAME, CONTAINER_NAME)
 
 
 @pytest.fixture(scope="session")
@@ -207,34 +227,21 @@ def docker(fioup_device) -> ContainerDocker:
 
     Usage: docker("ps"), docker("images"), ...
     """
-    print("\n[setup] Waiting for dockerd in container ...", flush=True)
-    deadline = time.time() + 60
-    while True:
-        try:
-            fioup_device.run("docker info")
-            break
-        except RuntimeError:
-            if time.time() > deadline:
-                raise TimeoutError("dockerd did not become ready within 60s")
-            time.sleep(2)
-    print("[setup] Dockerd ready", flush=True)
-    return ContainerDocker(fioup_device)
+    return _await_dockerd(fioup_device)
 
 
-@pytest.fixture(scope="session")
-def registered_device(update_server, fioup_device) -> dict:
-    """Run fioup check-in and wait for the device to appear in update-server."""
-    print("[setup] Copying device credentials ...", flush=True)
-    fioup_device.run("mkdir -p /var/sota")
+def _install_device_creds(client: "DockerClient", update_server: Path):
+    """Copy the generated device certs + sota.toml into a client container."""
+    client.run("mkdir -p /var/sota")
     device_dir = update_server / "device"
-    fioup_device.put(device_dir / "root.crt", "/var/sota/root.crt")
-    fioup_device.put(device_dir / "client.pem", "/var/sota/client.pem")
-    fioup_device.put(device_dir / "pkey.pem", "/var/sota/pkey.pem")
-    fioup_device.put_text(SOTA_TOML, "/var/sota/sota.toml")
+    client.put(device_dir / "root.crt", "/var/sota/root.crt")
+    client.put(device_dir / "client.pem", "/var/sota/client.pem")
+    client.put(device_dir / "pkey.pem", "/var/sota/pkey.pem")
+    client.put_text(SOTA_TOML, "/var/sota/sota.toml")
 
-    print("\n[setup] Running fioup check-in ...", flush=True)
-    stdout, stderr = fioup_device.run("fioup check", check=False)
 
+def _await_registered_device(stdout: str, stderr: str) -> dict:
+    """Poll the user API until the device shows up (registered via mTLS check-in)."""
     try:
         resp = requests.get(f"http://localhost:{SERVER_UI_PORT}/v1/devices", timeout=5)
         resp.raise_for_status()
@@ -248,6 +255,18 @@ def registered_device(update_server, fioup_device) -> dict:
         pytest.fail(f"update-server /v1/devices request failed: {exc}")
 
     raise RuntimeError(f"Device did not appear in update-server: stdout({stdout}) stderr({stderr})")
+
+
+@pytest.fixture(scope="session")
+def registered_device(update_server, fioup_device) -> dict:
+    """Run fioup check-in and wait for the device to appear in update-server."""
+    print("[setup] Copying device credentials ...", flush=True)
+    _install_device_creds(fioup_device, update_server)
+
+    print("\n[setup] Running fioup check-in ...", flush=True)
+    stdout, stderr = fioup_device.run("fioup check", check=False)
+
+    return _await_registered_device(stdout, stderr)
 
 
 @pytest.fixture(scope="session")

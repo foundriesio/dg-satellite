@@ -25,9 +25,12 @@ COPY .cache/aktualizr-lite        /usr/local/bin/aktualizr-lite
 COPY .cache/libaktualizr_lite.so  /usr/local/lib/libaktualizr_lite.so
 COPY .cache/libaktualizr.so       /usr/local/lib/libaktualizr.so
 COPY .cache/composectl            /usr/bin/composectl
+# fiopull: the ostree pull helper used when ostree_pull_tool = "fiopull" is set.
+# Installed at the default FioPullBin path so aktualizr-lite finds it by name.
+COPY .cache/fiopull               /usr/bin/fiopull
 COPY .cache/make_sys_rootfs.sh    /usr/local/bin/make_sys_rootfs.sh
 COPY entrypoint.aklite.sh         /usr/local/bin/entrypoint.aklite.sh
-RUN chmod +x /usr/local/bin/aktualizr-lite /usr/bin/composectl \
+RUN chmod +x /usr/local/bin/aktualizr-lite /usr/bin/composectl /usr/bin/fiopull \
         /usr/local/bin/make_sys_rootfs.sh /usr/local/bin/entrypoint.aklite.sh \
     && ldconfig
 

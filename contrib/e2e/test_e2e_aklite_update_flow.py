@@ -1,9 +1,10 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: BSD-3-Clause-Clear
 
-"""E2E test: aktualizr-lite full update flow against a local update-server.
+"""E2E tests: aktualizr-lite full update flow against a local update-server.
 
-Registers a real aktualizr-lite device, uploads an ostree(+app) update, creates
+One variant per ostree pull path: libostree (built-in) and fiopull. Each
+registers a real aktualizr-lite device, uploads an ostree(+app) update, creates
 a rollout, drives check -> update -> simulated reboot -> run, and verifies the
 installed version, the running shellhttpd app, and the server-side
 EcuInstallationCompleted event.
@@ -11,10 +12,16 @@ EcuInstallationCompleted event.
 
 import json
 
-from conftest import AKLITE_TARGET_VERSION, HARDWARE_ID
+from conftest import (
+    AKLITE_FIOPULL_TARGET_VERSION,
+    AKLITE_TARGET_VERSION,
+    HARDWARE_ID,
+)
 
 UPDATE_NAME = "aklite-e2e-update"
+FIOPULL_UPDATE_NAME = "aklite-e2e-fiopull-update"
 ROLLOUT_NAME = "aklite-e2e-rollout"
+FIOPULL_ROLLOUT_NAME = "aklite-e2e-fiopull-rollout"
 TAG = "main"
 
 # aktualizr-lite return codes (from aktualizr-lite/docker-e2e-test/e2e-test.py).
@@ -99,3 +106,29 @@ def test_aklite_update_flow_libostree(
 
     _verify_update(fiocli, fiocli_tail, aklite_device, aklite_docker,
                    uuid, UPDATE_NAME, ROLLOUT_NAME, version)
+
+
+def test_aklite_update_flow_fiopull(
+    fiocli, fiocli_tail, aklite_fiopull_update, aklite_registered_device,
+    aklite_device, aklite_docker,
+):
+    # Runs after the libostree test on the same device, so it needs a higher
+    # version to be seen as an upgrade.
+    uuid = aklite_registered_device["uuid"]
+    version = AKLITE_FIOPULL_TARGET_VERSION
+
+    fiocli(
+        "updates", "upload",
+        f"--hardware-id={HARDWARE_ID}",
+        f"--version={version}",
+        f"--name={HARDWARE_ID}-lmp-{version}",
+        TAG, FIOPULL_UPDATE_NAME, str(aklite_fiopull_update),
+    )
+
+    aklite_device.run(
+        "printf '[pacman]\\nostree_pull_tool = \"fiopull\"\\n'"
+        " > /etc/sota/conf.d/z-55-fiopull.toml"
+    )
+
+    _verify_update(fiocli, fiocli_tail, aklite_device, aklite_docker,
+                   uuid, FIOPULL_UPDATE_NAME, FIOPULL_ROLLOUT_NAME, version)

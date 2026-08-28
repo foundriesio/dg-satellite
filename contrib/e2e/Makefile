@@ -38,13 +38,19 @@ $(CACHE)/aktualizr-lite:
 	cp $(AKLITE_REPO)/build/src/libaktualizr_lite.so $(CACHE)/libaktualizr_lite.so
 	cp $(AKLITE_REPO)/build/aktualizr/src/libaktualizr/libaktualizr.so $(CACHE)/libaktualizr.so
 
+# Build fiopull from source using a throwaway Go container.
+$(CACHE)/fiopull:
+	mkdir -p $(CACHE)
+	docker run --rm -v $(CACHE):/out golang:1.24 sh -c "\
+		git clone --depth=1 https://github.com/foundriesio/ostreeuploader.git /src && \
+		cd /src && make fiopull && cp bin/fiopull /out/fiopull"
 
 $(CACHE)/make_sys_rootfs.sh: $(AKLITE_REPO)/tests/make_sys_rootfs.sh
 	mkdir -p $(CACHE)
 	cp $(AKLITE_REPO)/tests/make_sys_rootfs.sh $(CACHE)/make_sys_rootfs.sh
 
 aklite-e2e: $(CACHE)/aklite-e2e.stamp
-$(CACHE)/aklite-e2e.stamp: Dockerfile.aklite entrypoint.aklite.sh $(CACHE)/aktualizr-lite $(CACHE)/make_sys_rootfs.sh $(CACHE)/composectl
+$(CACHE)/aklite-e2e.stamp: Dockerfile.aklite entrypoint.aklite.sh $(CACHE)/aktualizr-lite $(CACHE)/fiopull $(CACHE)/make_sys_rootfs.sh $(CACHE)/composectl
 	docker build -t aklite-e2e -f Dockerfile.aklite .
 	touch $@
 

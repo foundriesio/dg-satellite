@@ -486,6 +486,8 @@ def sample_update(composectl_bin) -> Path:
 # Target version for the uploaded update. Chosen > 1 so it is unambiguously
 # newer than the container's base commit (which has no factory version).
 AKLITE_TARGET_VERSION = 2
+# Version used for the fiopull variant, installed after the libostree variant.
+AKLITE_FIOPULL_TARGET_VERSION = 3
 
 
 @pytest.fixture(scope="session")
@@ -557,6 +559,53 @@ ostree --repo=ostree_repo commit --branch={OSTREE_BRANCH} \
     # Reuse the compose-app payload pulled by sample_update. It uploads its
     # `apps/` subdir as-is (the server reads <update>/apps/apps), so mirror that
     # exact layout here.
+    src_apps = sample_update / "apps"
+    dst_apps = update_dir / "apps"
+    if dst_apps.exists():
+        shutil.rmtree(dst_apps)
+    shutil.copytree(src_apps, dst_apps)
+
+    return update_dir
+
+
+@pytest.fixture(scope="session")
+def aklite_fiopull_update(aklite_device, sample_update) -> Path:
+    """Build the ostree update artifact for the fiopull variant.
+
+    A second, distinct commit (version AKLITE_FIOPULL_TARGET_VERSION) is built
+    so the fiopull test can run after the libostree test on the same device.
+    The archive ostree repo is copied to .cache/aklite-fiopull-update/ for
+    upload via fiocli.
+    """
+    update_dir = CACHE_DIR / "aklite-fiopull-update"
+    ostree_repo = update_dir / "ostree_repo"
+    if (ostree_repo / "config").exists():
+        return update_dir
+
+    version = AKLITE_FIOPULL_TARGET_VERSION
+
+    # Build a second commit on a fresh tree so this fixture is self-contained
+    # and does not depend on /tmp/upd left over from the aklite_update build.
+    build = f"""
+set -e
+rm -rf /tmp/upd2 && mkdir -p /tmp/upd2
+cd /tmp/upd2
+/usr/local/bin/make_sys_rootfs.sh tree {OSTREE_BRANCH} {HARDWARE_ID} lmp
+mkdir -p tree/usr/lib/sota/conf.d
+printf '[provision]\\nprimary_ecu_hardware_id = "{HARDWARE_ID}"\\n' \
+    > tree/usr/lib/sota/conf.d/40-hardware-id.toml
+mkdir -p tree/usr/lib
+printf 'ID="lmp"\\nNAME="Generated OSTree-enabled OS"\\nPRETTY_NAME="LMP {version}"\\nIMAGE_VERSION="{version}"\\n' > tree/usr/lib/os-release
+echo "aklite-e2e fiopull update {version}" > tree/usr/share/sota/update-marker
+ostree --repo=ostree_repo init --mode=archive
+ostree --repo=ostree_repo commit --branch={OSTREE_BRANCH} \
+    --generate-sizes --tree=dir=tree
+"""
+    aklite_device.run(build)
+
+    update_dir.mkdir(parents=True, exist_ok=True)
+    aklite_device.get_dir("/tmp/upd2/ostree_repo", ostree_repo)
+
     src_apps = sample_update / "apps"
     dst_apps = update_dir / "apps"
     if dst_apps.exists():

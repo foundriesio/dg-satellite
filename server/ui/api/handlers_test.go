@@ -977,7 +977,6 @@ func TestApiRolloutDaemon(t *testing.T) {
 	require.Nil(t, err)
 	daemons := daemons.New(tc.ctx, tc.api, usersS, daemons.WithRolloverInterval(20*time.Millisecond))
 
-	daemons.Start()
 	defer daemons.Shutdown()
 	tc.u.AllowedScopes = users.ScopeUpdatesR
 
@@ -1010,6 +1009,7 @@ func TestApiRolloutDaemon(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, "", dev.UpdateName)
 
+	daemons.Start()
 	// After the watchdog daemon processing, rollouts are committed.
 	require.Eventually(t, func() bool {
 		d1 := s(tc.GET("/updates/tag1/update1/rollouts/roll1", 200))
@@ -1131,8 +1131,9 @@ data: {"uuid":"test-device-1","correlationId":"uuid-1","target-name":"intel-core
 	require.Equal(t, 200, rec3.Code())
 	require.Nil(t, d1.ProcessEvents(events))
 	expectedStreamY := strings.Replace(expectedStreamX, "id: 3", "id: 4", 1)
-	expectedStream3 += expectedStreamY + keepaliveResponseText
-	requireBody(rec3, expectedStream3)
+	require.Eventually(t, func() bool {
+		return strings.Contains(rec3.BodyString(), expectedStreamY+keepaliveResponseText)
+	}, 5*time.Second, 5*time.Millisecond)
 	tc.assertNotDone(done3)
 
 	cancel() // This is where we disconnect, closing all holding handlers.

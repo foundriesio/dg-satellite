@@ -14,6 +14,7 @@ import (
 	"github.com/foundriesio/update-server/server"
 	"github.com/foundriesio/update-server/server/gateway"
 	"github.com/foundriesio/update-server/server/ui"
+	"github.com/foundriesio/update-server/server/ui/daemons"
 	"github.com/foundriesio/update-server/storage"
 )
 
@@ -22,6 +23,10 @@ type ServeCmd struct {
 
 	UiAddr      string `default:":8080"`
 	GatewayAddr string `default:":8443"`
+
+	// Default matches daemons.New's own default (5m); overridable so tests and local/e2e
+	// deployments don't have to wait up to 5 minutes for a rollout to take effect.
+	RolloutInterval time.Duration `default:"5m" help:"how often to apply pending rollout requests"`
 }
 
 func (c *ServeCmd) Run(args CommonArgs) error {
@@ -36,7 +41,7 @@ func (c *ServeCmd) Run(args CommonArgs) error {
 	if err != nil {
 		return fmt.Errorf("failed to load database: %w", err)
 	}
-	uiServer, err := ui.NewServer(args.ctx, db, fs, c.UiAddr, c.GatewayAddr)
+	uiServer, err := ui.NewServer(args.ctx, db, fs, c.UiAddr, c.GatewayAddr, daemons.WithRolloverInterval(c.RolloutInterval))
 	if err != nil {
 		return err
 	}

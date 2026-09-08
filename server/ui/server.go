@@ -25,7 +25,7 @@ type daemon interface {
 	Shutdown()
 }
 
-func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, bindAddr, gatewayAddr string) (server.Server, error) {
+func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, bindAddr, gatewayAddr string, daemonOpts ...daemons.Option) (server.Server, error) {
 	log := context.CtxGetLog(ctx)
 
 	authConfig, err := fs.Auth.GetAuthConfig()
@@ -56,7 +56,7 @@ func NewServer(ctx context.Context, db *storage.DbHandle, fs *storage.FsHandle, 
 	}
 	log.Info("Using authentication provider", "name", provider.Name())
 
-	daemons := daemons.New(ctx, strg, users)
+	daemons := daemons.New(ctx, strg, users, daemonOpts...)
 
 	ca, err := apiHandlers.LoadDeviceCa(fs, gatewayAddr)
 	if err != nil {

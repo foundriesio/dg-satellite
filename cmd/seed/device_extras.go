@@ -46,6 +46,25 @@ func seedDeviceConfigHistory(ap *api.Storage, uuid string) error {
 	return nil
 }
 
+// seedAppsOverride writes a device config revision that overrides
+// pacman.compose_apps to a single app, so the device Apps page's "override"
+// branch (a device-selected subset of the target's apps, not the full list)
+// has a seeded example.
+func seedAppsOverride(ap *api.Storage, uuid, apps string) error {
+	tomlConfig := fmt.Sprintf(`[pacman]
+  type = "ostree+compose_apps"
+  compose_apps = "%s"
+`, apps)
+	files := map[string]api.ConfigFile{
+		storage.ConfigSotaOverride: {Value: tomlConfig},
+	}
+	content, err := json.Marshal(files)
+	if err != nil {
+		return fmt.Errorf("marshal apps override for %s: %w", uuid, err)
+	}
+	return ap.SaveDeviceConfig(uuid, string(content), "noauth-fake-user", "seed: override compose apps")
+}
+
 // seedDeviceAppsStates saves a fake apps-states snapshot for the device's
 // "Apps States" page.
 func seedDeviceAppsStates(d *gateway.Device, i int) error {

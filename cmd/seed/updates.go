@@ -39,14 +39,17 @@ func fakeHex(i, length int) string {
 	return fmt.Sprintf("%x", result)
 }
 
+// appCatalog is the full set of apps available across seeded updates. Each
+// target ships a growing/shrinking slice of it (see targetsJSON) so the Apps
+// management page has more than one static app list to page through.
+var appCatalog = []string{"shellhttpd", "nginx", "mosquito", "grafana", "portainer", "telegraf"}
+
 // targetsJSON builds a structurally-valid TUF targets.json body.
 func targetsJSON(i int, name, expires string) (string, error) {
-	sha256 := fakeHex(i, 32)      // 64 hex chars
-	sha512 := fakeHex(i+100, 64)  // 128 hex chars
-	appSha1 := fakeHex(i+200, 32) // shellhttpd
-	appSha2 := fakeHex(i+300, 32) // nginx
-	keyid := fakeHex(i+400, 32)   // 64 hex chars
-	sig := fakeHex(i+500, 64)     // 128 hex chars
+	sha256 := fakeHex(i, 32)     // 64 hex chars
+	sha512 := fakeHex(i+100, 64) // 128 hex chars
+	keyid := fakeHex(i+400, 32)  // 64 hex chars
+	sig := fakeHex(i+500, 64)    // 128 hex chars
 
 	now := time.Now().UTC().Format(time.RFC3339)
 
@@ -89,6 +92,13 @@ func targetsJSON(i int, name, expires string) (string, error) {
 
 	targetName := fmt.Sprintf("intel-corei7-64-lmp-%s", name)
 
+	apps := appCatalog[:2+(i%(len(appCatalog)-1))]
+	dockerApps := make(map[string]dockerApp, len(apps))
+	for j, app := range apps {
+		hash := fakeHex(i+200+j, 32)
+		dockerApps[app] = dockerApp{URI: fmt.Sprintf("hub.foundries.io/local-factory/%s@sha256:%s", app, hash)}
+	}
+
 	doc := tufTargets{
 		Signed: signed{
 			Type:        "Targets",
@@ -103,19 +113,16 @@ func targetsJSON(i int, name, expires string) (string, error) {
 						"sha512": sha512,
 					},
 					Custom: custom{
-						HardwareIDs:  []string{"intel-corei7-64"},
-						Tags:         []string{"main"},
-						TargetFormat: "OSTREE",
-						Version:      name,
-						Name:         "intel-corei7-64-lmp",
-						URI:          "",
-						CreatedAt:    now,
-						UpdatedAt:    now,
-						Arch:         "amd64",
-						DockerComposeApps: map[string]dockerApp{
-							"shellhttpd": {URI: fmt.Sprintf("hub.foundries.io/local-factory/shellhttpd@sha256:%s", appSha1)},
-							"nginx":      {URI: fmt.Sprintf("hub.foundries.io/local-factory/nginx@sha256:%s", appSha2)},
-						},
+						HardwareIDs:       []string{"intel-corei7-64"},
+						Tags:              []string{"main"},
+						TargetFormat:      "OSTREE",
+						Version:           name,
+						Name:              "intel-corei7-64-lmp",
+						URI:               "",
+						CreatedAt:         now,
+						UpdatedAt:         now,
+						Arch:              "amd64",
+						DockerComposeApps: dockerApps,
 					},
 				},
 			},
@@ -197,14 +204,21 @@ func rootJSON(i int, expires string) string {
 }
 
 // seedUpdates creates `count` fake update entries (TUF metadata + token dirs +
-// one rollout each) under <datadir>/updates/main/. The first update's rollout
-// is committed against the "alpha" group and fed a fake device-event history,
-// so the rollout tail log and per-device update pages aren't empty.
+// one rollout each) under <datadir>/updates/main/. The first len(rolloutGroups)
+// updates' rollouts are committed, one per group, and fed a fake device-event
+// history, so the rollout tail log and per-device update/apps pages aren't
+// empty and cover more than one group.
 func seedUpdates(fs *storage.FsHandle, apiStorage *api.Storage, gw *gateway.Storage, count int) error {
 	const tag = "main"
 	const baseVersion = 148
 
 	expires := time.Now().AddDate(0, 6, 0).UTC().Format(time.RFC3339)
+
+	// rolloutGroups: the first len(rolloutGroups) updates get their rollout
+	// committed, one to each group, so devices in multiple groups end up
+	// actually rolled out instead of just one. `groups` is the package-level
+	// slice declared in cmd/seed/main.go.
+	rolloutGroups := groups[:2]
 
 	created := 0
 	skipped := 0
@@ -277,17 +291,27 @@ func seedUpdates(fs *storage.FsHandle, apiStorage *api.Storage, gw *gateway.Stor
 			log.Printf("skip  rollout %s/%s/%s (already exists)", tag, name, rolloutName)
 			skipped++
 		} else {
+			// The first len(rolloutGroups) updates get committed, one to each
+			// group in rolloutGroups; the rest stay pending against "alpha" so
+			// the rollout list also shows uncommitted rollouts.
+			targetGroup := ""
+			if i < len(rolloutGroups) {
+				targetGroup = rolloutGroups[i]
+			}
+			proposedGroups := []string{"alpha"}
+			if targetGroup != "" {
+				proposedGroups = []string{targetGroup}
+			}
+
 			if err := apiStorage.CreateRollout(tag, name, rolloutName, api.Rollout{
-				Groups: []string{"alpha"},
+				Groups: proposedGroups,
 			}); err != nil {
 				return fmt.Errorf("CreateRollout for %s/%s: %w", tag, name, err)
 			}
 
-			// Only the first update's rollout is committed against the "alpha"
-			// group, so exactly one update gets a full device-event history.
-			if i == 0 {
+			if targetGroup != "" {
 				if err := apiStorage.CommitRollout(tag, name, rolloutName, api.Rollout{
-					Groups: []string{"alpha"},
+					Groups: proposedGroups,
 				}); err != nil {
 					return fmt.Errorf("CommitRollout for %s/%s: %w", tag, name, err)
 				}
@@ -297,6 +321,14 @@ func seedUpdates(fs *storage.FsHandle, apiStorage *api.Storage, gw *gateway.Stor
 				}
 				if err := seedRolloutEvents(gw, name, rollout.Effect); err != nil {
 					return fmt.Errorf("seed rollout events for %s/%s: %w", tag, name, err)
+				}
+				// Override apps on the first device of the group so the Apps
+				// page's "override" branch (a subset of the target's apps)
+				// has an example instead of only the inherited-apps branch.
+				if len(rollout.Effect) > 0 {
+					if err := seedAppsOverride(apiStorage, rollout.Effect[0], "shellhttpd"); err != nil {
+						return fmt.Errorf("seed apps override for %s/%s: %w", tag, name, err)
+					}
 				}
 			}
 			log.Printf("create update %s/%s + rollout %s", tag, name, rolloutName)

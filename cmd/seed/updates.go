@@ -42,7 +42,7 @@ func fakeHex(i, length int) string {
 // appCatalog is the full set of apps available across seeded updates. Each
 // target ships a growing/shrinking slice of it (see targetsJSON) so the Apps
 // management page has more than one static app list to page through.
-var appCatalog = []string{"shellhttpd", "nginx", "mosquitto", "portainer", "telegraf"}
+var appCatalog = []string{"shellhttpd", "nginx", "mosquito", "grafana", "portainer", "telegraf"}
 
 // targetsJSON builds a structurally-valid TUF targets.json body.
 func targetsJSON(i int, name, expires string) (string, error) {

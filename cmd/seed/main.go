@@ -150,8 +150,8 @@ func seedDevices(datadir string, numDevices int) error {
 
 func main() {
 	datadir := flag.String("datadir", "", "path to the server data directory (required)")
-	numDevices := flag.Int("devices", 5, "number of devices to seed")
-	numUpdates := flag.Int("updates", 2, "number of fake updates to seed")
+	numDevices := flag.Int("devices", 10, "number of devices to seed")
+	numUpdates := flag.Int("updates", 4, "number of fake updates to seed")
 	flag.Parse()
 
 	if *datadir == "" {
